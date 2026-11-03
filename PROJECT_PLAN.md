@@ -109,3 +109,9 @@ spreadsheet/service-account authorization. The dashboard was deployed to Vercel
 at echolink-green.vercel.app through a restricted, authenticated local bridge
 and temporary Cloudflare tunnel. GitHub main CI/CD is defined; actual push and
 Actions acceptance depend on valid GitHub login and a persistent Vercel token.
+
+Public Edge acceptance passed using the existing local password: one Page,
+21 feeds, Drafts and Activity, Secure/HttpOnly session, no browser errors or
+exposed secrets. Anonymous tunnel HTTP 401 confirmed. Build and 24 automated
+tests passed. Initial commit exists locally; GitHub rejected the main push
+with invalid saved credentials, so CI deployment is not yet verified.

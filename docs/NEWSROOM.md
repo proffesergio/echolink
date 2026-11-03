@@ -7,6 +7,21 @@ condition and records stage results under Activity.
 
 ## Generate a visible draft
 
+On this PC `gemma3:4b` is installed along with the `echolink-gemma3:4b` profile
+configured for 8192 context. The Page uses that profile at temperature 0.3.
+To recreate it after downloading the base model:
+
+```powershell
+ollama pull gemma3:4b
+ollama create echolink-gemma3:4b -f config/Modelfile.gemma3-4b
+```
+
+The 4B test produced a longer draft but contradictory polling numbers. It is
+flagged in review. Caption length and language checks do not verify facts:
+compare numbers, names and attribution with the source before approving.
+The schedule is paused after testing; an existing user-approved draft was
+preserved. Keep DRY RUN on until Facebook authorization and review are complete.
+
 1. Confirm **DRY RUN** at the top of the dashboard.
 2. On Overview choose the enabled Page under **Today's top story → your draft**.
 3. Enable the verified Bangla feeds if needed. That action links/enables the 20

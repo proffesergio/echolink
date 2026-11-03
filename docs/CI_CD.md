@@ -30,6 +30,22 @@ tell the assistant once saved; do not paste it in chat. The assistant can then
 set the repository secrets and verify an actual Actions deployment.
 See [Vercel's CI workflow documentation](https://vercel.com/kb/guide/using-vercel-cli-for-custom-workflows).
 
+The initial local commit was created, but GitHub rejected the push with
+`Invalid username or token`. No Actions run has been verified yet. After the
+credentials above are ready, the assistant can run:
+
+```powershell
+node scripts/configure-github-secrets.mjs
+gh auth setup-git
+git push -u origin main
+gh run list --repo proffesergio/echolink
+```
+
+The deployed dashboard passed a real Edge browser test with the existing
+password: secure HttpOnly session, one Page, 21 feeds, Drafts and Activity,
+no browser errors and no credential values in API state. Anonymous requests
+to the tunnel returned HTTP 401. Build and all 24 automated tests passed.
+
 ## Running the local services
 
 Keep n8n (`n8n start`), Ollama, the worker, bridge and tunnel running.
