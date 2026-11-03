@@ -1,0 +1,789 @@
+{
+  "checkedAt": "2026-11-03T07:52:19.349Z",
+  "targetDistinctPublishers": 20,
+  "verifiedPublishers": 20,
+  "sources": [
+    {
+      "name": "প্রথম আলো",
+      "publisher": "prothomalo.com",
+      "url": "https://www.prothomalo.com/stories.rss",
+      "verified": true,
+      "itemCount": 90,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.prothomalo.com",
+        "www.kishoralo.com",
+        "www.haal.fashion"
+      ],
+      "latestDate": "2026-11-03T07:45:23.000Z"
+    },
+    {
+      "name": "সমকাল",
+      "publisher": "samakal.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://samakal.com/rss.xml",
+          "error": "Attribute without value\nLine: 56\nColumn: 75\nChar: >"
+        },
+        {
+          "url": "https://samakal.com/feed",
+          "error": "Attribute without value\nLine: 56\nColumn: 75\nChar: >"
+        }
+      ]
+    },
+    {
+      "name": "যুগান্তর",
+      "publisher": "jugantor.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.jugantor.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.jugantor.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "ইত্তেফাক",
+      "publisher": "ittefaq.com.bd",
+      "url": "https://www.ittefaq.com.bd/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.ittefaq.com.bd"
+      ],
+      "latestDate": "2026-11-03T07:46:32.000Z"
+    },
+    {
+      "name": "কালের কণ্ঠ",
+      "publisher": "kalerkantho.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.kalerkantho.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.kalerkantho.com/rss/rss.xml",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "বাংলাদেশ প্রতিদিন",
+      "publisher": "bd-pratidin.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.bd-pratidin.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.bd-pratidin.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "বাংলা ট্রিবিউন",
+      "publisher": "banglatribune.com",
+      "url": "https://www.banglatribune.com/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.banglatribune.com"
+      ],
+      "latestDate": "2026-11-03T07:49:30.000Z"
+    },
+    {
+      "name": "জাগো নিউজ",
+      "publisher": "jagonews24.com",
+      "url": "https://www.jagonews24.com/rss/rss.xml",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.jagonews24.com"
+      ],
+      "latestDate": "2026-11-03T07:50:44.000Z"
+    },
+    {
+      "name": "ঢাকা পোস্ট",
+      "publisher": "dhakapost.com",
+      "url": "https://www.dhakapost.com/rss/rss.xml",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.dhakapost.com"
+      ],
+      "latestDate": "2026-11-03T07:51:39.000Z"
+    },
+    {
+      "name": "বিডিনিউজ২৪ বাংলা",
+      "publisher": "bangla.bdnews24.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://bangla.bdnews24.com/rss.xml",
+          "error": "Invalid character in entity name\nLine: 36\nColumn: 47\nChar: ="
+        },
+        {
+          "url": "https://bangla.bdnews24.com/feed/",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "বাংলানিউজ২৪",
+      "publisher": "banglanews24.com",
+      "url": "https://www.banglanews24.com/rss.xml",
+      "verified": true,
+      "itemCount": 77,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.banglanews24.com"
+      ],
+      "latestDate": "2026-11-03T07:45:39.000Z"
+    },
+    {
+      "name": "রাইজিংবিডি",
+      "publisher": "risingbd.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.risingbd.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.risingbd.com/rss/rss.xml",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "বার্তা২৪",
+      "publisher": "barta24.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://barta24.com/rss.xml",
+          "error": "Invalid character in entity name\nLine: 0\nColumn: 3913\nChar: ="
+        },
+        {
+          "url": "https://barta24.com/feed/",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "ঢাকা টাইমস",
+      "publisher": "dhakatimes24.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dhakatimes24.com/rss.xml",
+          "error": "Invalid character in entity name\nLine: 14\nColumn: 202\nChar:  "
+        },
+        {
+          "url": "https://www.dhakatimes24.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "দেশ রূপান্তর",
+      "publisher": "deshrupantor.com",
+      "url": "https://www.deshrupantor.com/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.deshrupantor.com"
+      ],
+      "latestDate": "2026-11-03T07:50:30.000Z"
+    },
+    {
+      "name": "জনকণ্ঠ",
+      "publisher": "dailyjanakantha.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dailyjanakantha.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.dailyjanakantha.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "আমাদের সময়",
+      "publisher": "dainikamadershomoy.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dainikamadershomoy.com/feed/",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://www.dainikamadershomoy.com/rss.xml",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "চ্যানেল আই",
+      "publisher": "channelionline.com",
+      "url": "https://www.channelionline.com/rss.xml",
+      "verified": true,
+      "itemCount": 30,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.channelionline.com"
+      ],
+      "latestDate": "2026-11-03T07:35:32.000Z"
+    },
+    {
+      "name": "যমুনা টিভি",
+      "publisher": "jamuna.tv",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://jamuna.tv/feed/",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://jamuna.tv/rss.xml",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "এনটিভি",
+      "publisher": "ntvbd.com",
+      "url": "https://www.ntvbd.com/rss.xml",
+      "verified": true,
+      "itemCount": 10,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.ntvbd.com"
+      ],
+      "latestDate": "2026-10-22T12:07:00.000Z"
+    },
+    {
+      "name": "সময় সংবাদ",
+      "publisher": "somoynews.tv",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.somoynews.tv/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.somoynews.tv/feed/",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "আরটিভি",
+      "publisher": "rtvonline.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.rtvonline.com/rss/rss.xml",
+          "error": "Invalid character in entity name\nLine: 1\nColumn: 126\nChar:  "
+        },
+        {
+          "url": "https://www.rtvonline.com/rss.xml",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "একাত্তর",
+      "publisher": "ekattor.tv",
+      "url": "https://ekattor.tv/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "ekattor.tv"
+      ],
+      "latestDate": "2026-11-03T07:51:38.000Z"
+    },
+    {
+      "name": "ডেইলি স্টার বাংলা",
+      "publisher": "bangla.thedailystar.net",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://bangla.thedailystar.net/rss.xml",
+          "error": "Insufficient Bangla news items"
+        },
+        {
+          "url": "https://bangla.thedailystar.net/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "আমার দেশ",
+      "publisher": "dailyamardesh.com",
+      "url": "https://www.dailyamardesh.com/feed",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.dailyamardesh.com"
+      ],
+      "latestDate": "2026-11-03T07:32:27.000Z"
+    },
+    {
+      "name": "ইনকিলাব",
+      "publisher": "dailyinqilab.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://dailyinqilab.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://dailyinqilab.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "মানবজমিন",
+      "publisher": "mzamin.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://mzamin.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://mzamin.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "নয়াদিগন্ত",
+      "publisher": "dailynayadiganta.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dailynayadiganta.com/rss.xml",
+          "error": "fetch failed"
+        },
+        {
+          "url": "https://www.dailynayadiganta.com/rss/rss.xml",
+          "error": "fetch failed"
+        }
+      ]
+    },
+    {
+      "name": "সংবাদ প্রতিদিন",
+      "publisher": "sangbadpratidin.in",
+      "url": "https://www.sangbadpratidin.in/feed/",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.sangbadpratidin.in"
+      ],
+      "latestDate": "2026-11-03T07:44:19.000Z"
+    },
+    {
+      "name": "আনন্দবাজার",
+      "publisher": "anandabazar.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.anandabazar.com/rss",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://www.anandabazar.com/rss/west-bengal",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "এই সময়",
+      "publisher": "eisamay.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://eisamay.com/rssfeedstopstories.cms",
+          "error": "HTTP 410"
+        },
+        {
+          "url": "https://eisamay.com/rss.xml",
+          "error": "Attribute without value\nLine: 211\nColumn: 72\nChar: >"
+        }
+      ]
+    },
+    {
+      "name": "আজকাল",
+      "publisher": "aajkaal.in",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://aajkaal.in/rss.xml",
+          "error": "Too large"
+        },
+        {
+          "url": "https://aajkaal.in/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "বাংলা হিন্দুস্তান টাইমস",
+      "publisher": "bangla.hindustantimes.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://bangla.hindustantimes.com/rss",
+          "error": "Cross-host redirect"
+        },
+        {
+          "url": "https://bangla.hindustantimes.com/rss.xml",
+          "error": "Cross-host redirect"
+        }
+      ]
+    },
+    {
+      "name": "গণশক্তি",
+      "publisher": "ganashakti.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://ganashakti.com/feed/",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://ganashakti.com/rss.xml",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "কালবেলা",
+      "publisher": "kalbela.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.kalbela.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.kalbela.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "আজকের পত্রিকা",
+      "publisher": "ajkerpatrika.com",
+      "url": "https://www.ajkerpatrika.com/feed",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.ajkerpatrika.com"
+      ],
+      "latestDate": "2026-11-03T07:50:16.000Z"
+    },
+    {
+      "name": "বণিক বার্তা",
+      "publisher": "bonikbarta.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://bonikbarta.com/rss.xml",
+          "error": "Unexpected close tag\nLine: 24\nColumn: 8\nChar: >"
+        },
+        {
+          "url": "https://bonikbarta.com/feed/",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "নিউজ বাংলা",
+      "publisher": "newsbangla24.com",
+      "url": "https://www.newsbangla24.com/rss.xml",
+      "verified": true,
+      "itemCount": 50,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.newsbangla24.com"
+      ],
+      "latestDate": "2026-11-03T13:27:32.000Z"
+    },
+    {
+      "name": "ঢাকাপ্রকাশ",
+      "publisher": "dhakaprokash24.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dhakaprokash24.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://www.dhakaprokash24.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "প্রতিদিনের সংবাদ",
+      "publisher": "protidinersangbad.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.protidinersangbad.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.protidinersangbad.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "খবর সংযোগ",
+      "publisher": "khoborsangjog.com",
+      "url": "https://www.khoborsangjog.com/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.khoborsangjog.com"
+      ],
+      "latestDate": "2026-11-03T07:40:41.000Z"
+    },
+    {
+      "name": "ভোরের পাতা",
+      "publisher": "dailyvorerpata.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dailyvorerpata.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://www.dailyvorerpata.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "ভোরের কাগজ",
+      "publisher": "bhorerkagoj.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.bhorerkagoj.com/rss.xml",
+          "error": "Cross-host redirect"
+        },
+        {
+          "url": "https://www.bhorerkagoj.com/feed/",
+          "error": "Cross-host redirect"
+        }
+      ]
+    },
+    {
+      "name": "দেশ টিভি",
+      "publisher": "desh.tv",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.desh.tv/rss.xml",
+          "error": "Attribute without value\nLine: 41\nColumn: 25\nChar: i"
+        },
+        {
+          "url": "https://www.desh.tv/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "একুশে টিভি",
+      "publisher": "ekushey-tv.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.ekushey-tv.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://www.ekushey-tv.com/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "সারাবাংলা",
+      "publisher": "sarabangla.net",
+      "url": "https://sarabangla.net/feed/",
+      "verified": true,
+      "itemCount": 10,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "sarabangla.net"
+      ],
+      "latestDate": "2026-11-03T07:00:41.000Z"
+    },
+    {
+      "name": "ঢাকা মেইল",
+      "publisher": "dhakamail.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://dhakamail.com/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://dhakamail.com/feed/",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "দৈনিক বাংলা",
+      "publisher": "dainikbangla.com.bd",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.dainikbangla.com.bd/rss.xml",
+          "error": "HTTP 500"
+        },
+        {
+          "url": "https://www.dainikbangla.com.bd/feed/",
+          "error": "HTTP 404"
+        }
+      ]
+    },
+    {
+      "name": "বাংলাদেশ জার্নাল",
+      "publisher": "bd-journal.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.bd-journal.com/rss/rss.xml",
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.bd-journal.com/rss.xml",
+          "error": "HTTP 403"
+        }
+      ]
+    },
+    {
+      "name": "বিডি২৪লাইভ",
+      "publisher": "bd24live.com",
+      "url": "https://www.bd24live.com/bangla/feed/",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.bd24live.com"
+      ],
+      "latestDate": "2026-11-03T07:30:36.000Z"
+    },
+    {
+      "name": "বায়ান্ন",
+      "publisher": "bayanno.com",
+      "url": "https://bayanno.com/feed",
+      "verified": true,
+      "itemCount": 20,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "bayanno.com"
+      ],
+      "latestDate": "2026-11-03T07:46:25.000Z"
+    },
+    {
+      "name": "বাংলা ইনসাইডার",
+      "publisher": "banglainsider.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.banglainsider.com/rss.xml",
+          "error": "fetch failed"
+        },
+        {
+          "url": "https://www.banglainsider.com/feed/",
+          "error": "fetch failed"
+        }
+      ]
+    },
+    {
+      "name": "নিউজ২৪",
+      "publisher": "news24bd.tv",
+      "url": "https://www.news24bd.tv/rss.xml",
+      "verified": true,
+      "itemCount": 56,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "www.news24bd.tv"
+      ],
+      "latestDate": "2026-10-13T14:14:16.000Z"
+    },
+    {
+      "name": "বাংলা ঢাকা ট্রিবিউন",
+      "publisher": "bangla.dhakatribune.com",
+      "url": "https://bangla.dhakatribune.com/feed/",
+      "verified": true,
+      "itemCount": 100,
+      "banglaTitleRatio": 1,
+      "articleHosts": [
+        "bangla.dhakatribune.com"
+      ],
+      "latestDate": "2026-11-03T07:41:51.000Z"
+    },
+    {
+      "name": "বাংলা আউটলুক",
+      "publisher": "banglaoutlook.org",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://www.banglaoutlook.org/rss.xml",
+          "error": "Attribute without value\nLine: 40\nColumn: 69\nChar: >"
+        },
+        {
+          "url": "https://www.banglaoutlook.org/feed/",
+          "error": "Feed not recognized as RSS 1 or 2."
+        }
+      ]
+    },
+    {
+      "name": "প্রতিদিনের বাংলাদেশ",
+      "publisher": "protidinerbangladesh.com",
+      "verified": false,
+      "failures": [
+        {
+          "url": "https://protidinerbangladesh.com/rss.xml",
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://protidinerbangladesh.com/feed/",
+          "error": "Cross-host redirect"
+        }
+      ]
+    }
+  ]
+}

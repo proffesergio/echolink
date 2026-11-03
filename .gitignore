@@ -1,0 +1,10 @@
+.neon
+node_modules/
+.env
+.env.*
+.env.local.*.tmp
+!.env.example
+dist/
+artifacts/
+.codex/
+.vercel/

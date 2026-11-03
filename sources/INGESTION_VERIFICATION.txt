@@ -1,0 +1,5 @@
+2026-11-03T08:14:23.305Z
+PASS live RSS ingestion on isolated branch: 20 publisher configurations; {"inserted":17,"duplicates":2,"failedFeeds":0}; max network concurrency=4; requests=40.
+PASS repeated ingestion: {"inserted":2,"duplicates":17,"failedFeeds":0}; second-run requests=25; duplicates avoided article re-fetch.
+PASS isolation: no Facebook post/comment or Airtable write attempted; real news test data stays only on the disposable branch.
+Exit: 0

@@ -1,0 +1,110 @@
+{
+  "name": "EchoLink — Delayed source comments",
+  "active": false,
+  "nodes": [
+    {
+      "id": "40d1454b-8a45-4f98-a72a-888a451d5ec4",
+      "name": "Setup notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        40
+      ],
+      "parameters": {
+        "width": 720,
+        "height": 150,
+        "content": "## Delayed source comments\nRun once per minute alongside the Complete pipeline (or the individual job schedules). Only comments whose due time has passed are eligible, and page quiet hours still apply. Dry-run mode never sends comments. Ambiguous API outcomes require manual reconciliation."
+      }
+    },
+    {
+      "id": "3851f80e-ee86-4401-b27f-ad6490707e9a",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7af01d32-af38-4c1e-a0ff-4e99a9fdb6a5",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "25a99e30-cf7c-48f2-93bd-5cb7607d0fd8",
+      "name": "Run job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/jobs/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 900000
+        }
+      },
+      "retryOnFail": false,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "echolinkWorkerAuth01",
+          "name": "EchoLink local worker"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Run job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Run job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Dhaka",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "id": "echolinkComments1"
+}

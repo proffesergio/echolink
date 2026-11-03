@@ -1,0 +1,45 @@
+{
+  "name": "echolink",
+  "version": "1.0.0",
+  "description": "EchoLink Multi-Tenant News Aggregator & AI Pipeline",
+  "type": "module",
+  "main": "src/server.mjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node src/server.mjs",
+    "dashboard": "node scripts/open-dashboard.mjs",
+    "verify:dashboard": "node scripts/check-dashboard.mjs",
+    "verify:ui": "node scripts/check-ui.mjs",
+    "verify:pipeline": "node scripts/check-pipeline.mjs",
+    "verify:recovery": "node scripts/check-recovery.mjs",
+    "test": "node --test test/*.test.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "airtable:export": "node scripts/export-airtable-schema.mjs",
+    "airtable:setup": "node scripts/setup-airtable.mjs",
+    "n8n:setup": "node scripts/bootstrap-n8n.mjs",
+    "verify:database": "node scripts/check-database.mjs",
+    "verify:airtable": "node scripts/check-airtable.mjs",
+    "verify:n8n": "node scripts/check-n8n.mjs",
+    "verify:services": "node scripts/verify-services.mjs",
+    "deploy": "neon deploy --env .env.local",
+    "verify:workflow-control": "node scripts/check-workflow-control.mjs",
+    "verify:password-ui": "node scripts/check-password-ui.mjs",
+    "verify:newsroom": "node scripts/check-newsroom-ui.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@neon/config": "latest",
+    "cheerio": "^1.1.2",
+    "pg": "^8.16.3",
+    "rss-parser": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}

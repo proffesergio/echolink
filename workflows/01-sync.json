@@ -1,0 +1,103 @@
+{
+  "name": "EchoLink — sync",
+  "active": false,
+  "nodes": [
+    {
+      "id": "9294b15f-346b-4e95-bc05-50edb613f99a",
+      "name": "Setup notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        40
+      ],
+      "parameters": {
+        "width": 720,
+        "height": 150,
+        "content": "## EchoLink: sync\nRuns every 15 minutes. Select an HTTP Header Auth credential on Run job: name Authorization; value Bearer <WORKER_API_KEY>.\nWindows npm n8n and worker use 127.0.0.1:8787. For Docker n8n rebuild with ECHOLINK_WORKER_URL set to a reachable worker address. Import inactive, test manually, then activate."
+      }
+    },
+    {
+      "id": "042261c9-4f94-48cd-8cea-d49a86f960a7",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "970e32cf-9704-4060-b160-78c0af300eb5",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d65a88a4-ba2e-4a9a-a7e0-41ada27ca4f0",
+      "name": "Run job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/jobs/sync",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 900000
+        }
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Run job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Run job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Dhaka",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {}
+}

@@ -1,0 +1,401 @@
+{
+  "name": "EchoLink News Automation",
+  "version": 1,
+  "notes": [
+    "Create all three tables, then resolve Linked Page fields to the Page Configurations table.",
+    "IDs use single line text for API provisioning. Airtable record IDs are the runtime relational keys.",
+    "Posting windows use HH:mm text; Timestamp Logged is a writable date/time supplied by the worker.",
+    "FB Permanent Page Token is a legacy placeholder; worker authentication uses secret aliases."
+  ],
+  "tables": [
+    {
+      "name": "[] Page Configurations",
+      "fields": [
+        {
+          "name": "Page ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "FB Page Name",
+          "type": "singleLineText"
+        },
+        {
+          "name": "FB Page ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "FB Permanent Page Token",
+          "type": "singleLineText",
+          "description": "Legacy placeholder. Use FB Secret Alias and local credential storage instead."
+        },
+        {
+          "name": "Target Language",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Bangla"
+              },
+              {
+                "name": "English"
+              },
+              {
+                "name": "Bilingual-Mix"
+              }
+            ]
+          }
+        },
+        {
+          "name": "AI Infrastructure Target",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Ollama"
+              },
+              {
+                "name": "LocalAI"
+              },
+              {
+                "name": "LM Studio"
+              },
+              {
+                "name": "Neon AI Gateway"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Local Endpoint URL",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Model Identifier",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Temperature",
+          "type": "number",
+          "options": {
+            "precision": 2
+          }
+        },
+        {
+          "name": "Posting Window Start",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Posting Window End",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Max Posts Per Day",
+          "type": "number",
+          "options": {
+            "precision": 0
+          }
+        },
+        {
+          "name": "Require Human Approval",
+          "type": "checkbox",
+          "options": {
+            "icon": "check",
+            "color": "greenBright"
+          }
+        },
+        {
+          "name": "Active Status",
+          "type": "checkbox",
+          "options": {
+            "icon": "check",
+            "color": "greenBright"
+          }
+        },
+        {
+          "name": "Timezone",
+          "type": "singleLineText"
+        },
+        {
+          "name": "AI Secret Alias",
+          "type": "singleLineText"
+        },
+        {
+          "name": "FB Secret Alias",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Source Comment Delay Minutes",
+          "type": "number",
+          "options": {
+            "precision": 0
+          }
+        },
+        {
+          "name": "Minimum Minutes Between Posts",
+          "type": "number",
+          "options": {
+            "precision": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "[] Ingestion Feeds",
+      "fields": [
+        {
+          "name": "Feed ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Linked Page",
+          "type": "multipleRecordLinks",
+          "linkedTable": "[] Page Configurations"
+        },
+        {
+          "name": "Feed Name",
+          "type": "singleLineText"
+        },
+        {
+          "name": "RSS / Scraper URL",
+          "type": "url"
+        },
+        {
+          "name": "Fallback URL",
+          "type": "url"
+        },
+        {
+          "name": "Active Status",
+          "type": "checkbox",
+          "options": {
+            "icon": "check",
+            "color": "greenBright"
+          }
+        }
+      ]
+    },
+    {
+      "name": "[] Content Log & Deduplication",
+      "fields": [
+        {
+          "name": "Log ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Automation ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Article Hash ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Semantic Vector ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Linked Page",
+          "type": "multipleRecordLinks",
+          "linkedTable": "[] Page Configurations"
+        },
+        {
+          "name": "Source Title",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Source URL",
+          "type": "url"
+        },
+        {
+          "name": "Extracted Text Content",
+          "type": "multilineText"
+        },
+        {
+          "name": "AI Generated Caption",
+          "type": "multilineText"
+        },
+        {
+          "name": "Media Attachment URLs",
+          "type": "multilineText"
+        },
+        {
+          "name": "Status",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Queued"
+              },
+              {
+                "name": "Pending Approval"
+              },
+              {
+                "name": "Approved"
+              },
+              {
+                "name": "Posted"
+              },
+              {
+                "name": "Skipped (Duplicate)"
+              },
+              {
+                "name": "Skipped (Outside Window)"
+              },
+              {
+                "name": "Failed"
+              },
+              {
+                "name": "Publishing"
+              },
+              {
+                "name": "Publish Unknown"
+              },
+              {
+                "name": "Dry Run"
+              },
+              {
+                "name": "Rejected"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Approval Decision",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Approved"
+              },
+              {
+                "name": "Rejected"
+              }
+            ]
+          }
+        },
+        {
+          "name": "FB Post ID Reference",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Timestamp Logged",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "iso"
+            },
+            "timeFormat": {
+              "name": "24hour"
+            },
+            "timeZone": "utc"
+          }
+        },
+        {
+          "name": "Timestamp Published",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "iso"
+            },
+            "timeFormat": {
+              "name": "24hour"
+            },
+            "timeZone": "utc"
+          }
+        },
+        {
+          "name": "Source Comment Status",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Queued"
+              },
+              {
+                "name": "Sending"
+              },
+              {
+                "name": "Sent"
+              },
+              {
+                "name": "Unknown"
+              },
+              {
+                "name": "Failed"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Source Comment ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Source Comment Due At",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "iso"
+            },
+            "timeFormat": {
+              "name": "24hour"
+            },
+            "timeZone": "utc"
+          }
+        },
+        {
+          "name": "Outcome Detail",
+          "type": "multilineText"
+        },
+        {
+          "name": "Source Published At",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "iso"
+            },
+            "timeFormat": {
+              "name": "24hour"
+            },
+            "timeZone": "utc"
+          }
+        },
+        {
+          "name": "Scheduled At",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "iso"
+            },
+            "timeFormat": {
+              "name": "24hour"
+            },
+            "timeZone": "utc"
+          }
+        },
+        {
+          "name": "Editorial Analysis",
+          "type": "multilineText"
+        },
+        {
+          "name": "Image Suggestion",
+          "type": "multilineText"
+        },
+        {
+          "name": "Selection Score",
+          "type": "number",
+          "options": {
+            "precision": 2
+          }
+        },
+        {
+          "name": "Selection Reason",
+          "type": "multilineText"
+        },
+        {
+          "name": "Dashboard Panel",
+          "type": "singleLineText"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+node_modules
+.env*
+.neon
+.codex
+.git
+artifacts
