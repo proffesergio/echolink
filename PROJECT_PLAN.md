@@ -26,10 +26,11 @@ GitHub main push and the complete Actions build/test/deploy run now pass.
 CLI 65.4.0 resolved the old pinned CLI's project-settings failure with the token.
 Facebook authorization and Google Sheets connection have since been completed.
 A real photo post and its delayed source comment were verified directly through
-Meta on November 4. The user's current Page configuration is disabled; preserve
-that choice and the configured 20-post daily cap, 60-minute gap, 09:00–23:00
-Asia/Dhaka window and five-minute comment delay. Live mode is configured, but a
-disabled Page must remain blocked. Factual-quality acceptance, semantic duplicate
+Meta on November 4. A final November 4 read shows the Page enabled in Airtable;
+preserve the current owner-managed activation setting and the configured 20-post
+daily cap, 60-minute gap, 09:00–23:00 Asia/Dhaka window and five-minute comment
+delay. Live mode is configured; a disabled Page must remain blocked whenever the
+owner disables it. Factual-quality acceptance, semantic duplicate
 evaluation, stable hosting and the advanced integrations remain open. Earlier
 handoff entries below are historical and do not override this current state.
 
@@ -138,8 +139,9 @@ Connection checklist and delivery contract:
   database, but existing Bangla-slug detail URLs returned 404. A new live public
   article URL remains unverified; do not claim full website delivery acceptance.
 - Migration 008 and Airtable website fields/Skipped comment state were applied.
-  Optional website delivery is configured only for NobleSeek. The owner-disabled
-  Page, 20/day cap and 60-minute gap were preserved. An actual comments job returned
+  Optional website delivery is configured only for NobleSeek. Initial checks
+  preserved the disabled Page; a final Airtable read shows it enabled. No test
+  changed that setting. The 20/day cap and 60-minute gap remain. A comments job returned
   `policyDisabled:true` with zero sent. Sheets upgraded its dedicated header and
   synchronized 64 rows successfully.
 - Local worker/bridge/tunnel/dashboard/Ollama/n8n connectivity and the CMS browser

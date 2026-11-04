@@ -4,7 +4,7 @@ Open https://echolinkbd.vercel.app/admin. The Windows worker, n8n, Ollama, inter
 
 ## Current Page settings
 
-NobleSeek's latest saved policy is live mode, 20 posts per local day, a 60-minute minimum gap, 09:00–23:00 Asia/Dhaka and general approval off. The Page itself is disabled by the owner. Automatic source/website link comments are now disabled by explicit owner choice; the five-minute delay remains available if links are enabled later. These are operating settings, not Meta-provided safe limits or a guarantee against restrictions. Other posts made directly on Facebook are not counted by EchoLink.
+NobleSeek's latest saved policy is live mode, 20 posts per local day, a 60-minute minimum gap, 09:00–23:00 Asia/Dhaka and general approval off. The final November 4 Airtable read shows the Page enabled; activation remains owner-managed. Automatic source/website link comments are disabled by explicit owner choice; the five-minute delay remains available if links are enabled later. These are operating settings, not Meta-provided safe limits or a guarantee against restrictions. Other posts made directly on Facebook are not counted by EchoLink.
 
 Website posting is optional for each Page. The NobleSeek connector uses a Page
 allowlist; an optional website failure does not block native Facebook delivery
@@ -105,5 +105,5 @@ Separately, on November 4 a real NobleSeek photo post and its source-link commen
 were read back successfully through Meta, with matching caption and photo
 attachment. The comment was created after the configured five-minute delay.
 This confirms API delivery for that post; it does not establish anonymous public
-visibility, factual quality of all drafts or zero semantic duplicates. The Page
-is currently disabled by the user and must stay disabled until they change it.
+visibility, factual quality of all drafts or zero semantic duplicates. Always
+respect the current owner-managed activation setting in Airtable.

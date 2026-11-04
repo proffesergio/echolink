@@ -91,7 +91,7 @@ matched the configured database. **Existing published Bangla-slug detail URLs
 returned HTTP 404.** The cause is not established. The connection test reports
 that warning and does not claim a live article detail works. New EchoLink slugs
 are ASCII, but real public delivery of a newly approved article still requires
-verification after the Page is deliberately enabled. No production website
+verification with a user-approved live article. No production website
 article was retained or publicly published by these probes.
 
 Disposable Neon tests separately prove website-first delivery, required versus
