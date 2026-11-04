@@ -57,7 +57,7 @@ CSV files contain headers only; JSON includes field types, select choices and li
 | Extracted Text Content | multilineText |  |
 | AI Generated Caption | multilineText |  |
 | Media Attachment URLs | multilineText |  |
-| Status | singleSelect | Queued, Pending Approval, Approved, Posted, Skipped (Duplicate), Skipped (Outside Window), Failed, Publishing, Publish Unknown, Dry Run, Rejected |
+| Status | singleSelect | Queued, Pending Approval, Approved, Posted, Skipped (Duplicate), Skipped (Outside Window), Failed, Publishing, Publish Unknown, Dry Run, Rejected, Draft |
 | Approval Decision | singleSelect | Approved, Rejected |
 | FB Post ID Reference | singleLineText |  |
 | Timestamp Logged | dateTime |  |

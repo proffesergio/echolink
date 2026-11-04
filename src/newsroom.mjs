@@ -40,6 +40,6 @@ export function draftQuality(draft,page,article={}){
 export function contentPanel(article){
   if(article.status==='Posted')return 'Published';
   if(article.status==='Approved')return 'Scheduled';
-  if(article.caption&&['Pending Approval','Dry Run','Queued'].includes(article.status))return 'Drafts';
+  if(article.caption&&['Draft','Pending Approval','Dry Run','Queued'].includes(article.status))return 'Drafts';
   return article.status==='Queued'?'News inbox':'Needs attention';
 }

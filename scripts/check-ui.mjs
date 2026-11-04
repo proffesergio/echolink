@@ -28,6 +28,7 @@ try{
   await page.getByRole('button',{name:'Connections',exact:true}).click();
   if(await page.locator('input[type="password"]').count()!==2)throw new Error('Token inputs not protected');
   await page.getByRole('button',{name:'Review queue',exact:true}).click();
+  await page.locator('summary').filter({hasText:'Skipped & failed ingestion events'}).click();
   await page.getByRole('heading',{name:'Skipped & failed ingestion events'}).waitFor();
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   await page.getByRole('heading',{name:'Dashboard password',exact:true}).waitFor();

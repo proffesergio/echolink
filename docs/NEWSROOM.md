@@ -73,7 +73,7 @@ image elsewhere, host it at an accessible HTTPS URL and paste it into Image URL.
 
 ## Drafts, Scheduled and Published
 
-- **Drafts**: captions waiting for approval, queued captions and completed dry-run
+- **Drafts**: held Drafts, captions waiting for approval, queued captions and completed dry-run
   captions. Saving caption, image or scheduled time requires fresh approval.
 - **Scheduled**: approved posts waiting for their chosen time or next eligible
   publishing window. Choosing a future time does not override approval, quiet
@@ -83,6 +83,12 @@ image elsewhere, host it at an accessible HTTPS URL and paste it into Image URL.
   Dry Run and Publish Unknown are not shown as confirmed publications.
 - **Review queue**: all latest articles, including raw news inbox records and
   failed/skipped ingestion audit events.
+
+The current queue starts with generated posts; use Content stage → News inbox
+for raw RSS. See [EDITORIAL_OPERATIONS.md](EDITORIAL_OPERATIONS.md) for Save Draft,
+Edit, Review, Approve, Schedule and Publish Now. The new **Save Draft** explicitly
+holds a post out of the publishing queue; **Approve & Schedule** records approval
+and a future time in one confirmed action.
 
 To schedule: save a future local date/time in the draft, review the content again,
 then approve it. Time entry uses the browser's local timezone and is stored in

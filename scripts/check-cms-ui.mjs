@@ -1,0 +1,65 @@
+import '../src/env.mjs';
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {mkdir} from 'node:fs/promises';
+const base=process.env.CMS_TEST_ORIGIN||'http://127.0.0.1:8787',browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
+page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept());
+try{
+  await page.goto(base+'/admin');await page.getByLabel('password',{exact:true}).fill(process.env.DASHBOARD_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByRole('heading',{name:"Today's top story → your draft"}).waitFor();
+  const state=await (await page.request.get(base+'/admin/api/state')).json(),pageId=state.pages[0].id;
+  const id='11111111-1111-4111-8111-111111111111';let version=Date.now();
+  const article={id,page_id:pageId,title:'CMS interface test — never persisted',caption:'A synthetic editorial draft for interface verification only.',status:'Pending Approval',source_url:'https://example.com/test',image_url:'https://example.com/test.jpg',analysis:'Synthetic review data',image_prompt:'Symbolic illustration suggestion',updated_at:new Date(version).toISOString()};
+  const writes=[];
+  const snapshot=()=>({...state,articles:[{...article,panel:article.status==='Posted'?'Published':article.status==='Approved'?'Scheduled':'Drafts'}],navCounts:{queue:article.status==='Pending Approval'?1:0,drafts:['Draft','Pending Approval'].includes(article.status)?1:0,scheduled:article.status==='Approved'?1:0,published:article.status==='Posted'?1:0,inbox:0,total:1}});
+  // Browser fixtures do not mutate the user's actual articles, approve anything
+  // on the server, or call Facebook. Real transitions are tested on a DB branch.
+  await page.route('**/admin/api/state',route=>route.fulfill({json:snapshot()}));
+  await page.route('https://example.com/test.jpg',route=>route.fulfill({status:204}));
+  await page.route('**/admin/api/draft',async route=>{
+    const body=route.request().postDataJSON();writes.push({type:'draft',body});await new Promise(resolve=>setTimeout(resolve,500));
+    article.caption=body.caption;article.image_url=body.imageURL;article.status=body.intent==='draft'?'Draft':'Pending Approval';article.updated_at=new Date(++version).toISOString();
+    await route.fulfill({json:{ok:true,status:article.status,updatedAt:article.updated_at}});
+  });
+  await page.route('**/admin/api/article-action',async route=>{
+    const body=route.request().postDataJSON();writes.push({type:'action',body});
+    assert.notEqual(body.action,'publish','Browser test must never publish');
+    article.status=body.action==='draft'?'Draft':body.action==='review'?'Pending Approval':'Approved';article.scheduled_at=body.scheduledAt||null;article.updated_at=new Date(++version).toISOString();
+    await route.fulfill({json:{ok:true,status:article.status,message:'Test action saved'}});
+  });
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('button',{name:'Review queue',exact:true}).click();
+  const card=page.locator(`[data-article="${id}"]`);await card.waitFor();
+  for(const name of ['Edit','Save Draft','Review','Approve','Schedule','Publish Now'])assert.equal(await card.getByRole('button',{name,exact:true}).count(),1,'Missing or duplicate visible action: '+name);
+  assert.equal(await card.getByRole('button',{name:'Publish Now',exact:true}).isDisabled(),true);
+  assert.match(await page.locator('nav [data-tab="drafts"]').innerText(),/1/);
+  await card.getByRole('button',{name:'Edit',exact:true}).click();
+  await card.locator('textarea[name="caption"]').fill('Edited synthetic caption — no actual user record is changed.');
+  await card.locator('form').getByRole('button',{name:'Save Draft',exact:true}).click();
+  await page.locator('#work-progress').waitFor({state:'visible'});
+  await page.getByText('Saved Draft. It is held out of the publishing queue.',{exact:true}).waitFor();assert.equal(article.status,'Draft');
+  assert.equal(writes[0].body.imageURL,'https://example.com/test.jpg');
+  await card.getByRole('button',{name:'Review',exact:true}).click();await page.getByText('Test action saved',{exact:true}).waitFor();assert.equal(article.status,'Pending Approval');
+  await card.getByRole('button',{name:'Approve',exact:true}).click();await page.waitForFunction(()=>document.querySelector('nav [data-tab="scheduled"]')?.innerText.includes('1'));
+  assert.equal(article.status,'Approved');
+  await card.getByRole('button',{name:'Schedule',exact:true}).click();
+  const tomorrow=new Date(Date.now()+86400000),local=new Date(tomorrow-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  await card.locator('input[name="scheduledAt"]').fill(local);await card.getByRole('button',{name:'Approve & Schedule',exact:true}).click();
+  await page.getByText('Approved and scheduled. Posting hours, limits and dry-run still apply.',{exact:true}).waitFor();assert.ok(new Date(article.scheduled_at)>new Date());
+  assert.ok(writes.some(w=>w.body.action==='schedule'&&w.body.confirmed));
+  const background={id:'browser-only-run',job:'preview',status:'Running',trigger_source:'fixture',started_at:new Date().toISOString()};state.runs.unshift(background);
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.work-label')?.textContent.startsWith('Background work:'));
+  assert.equal(await page.locator('#work-progress').isVisible(),true,'Background progress must remain visible after HTTP requests finish');
+  background.status='Succeeded';await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.locator('#work-progress').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Operations center',exact:true}).click();await page.getByRole('heading',{name:'Editorial operations center'}).waitFor();
+  await mkdir('.codex/logs',{recursive:true});await page.screenshot({path:'.codex/logs/cms-operations.png',fullPage:true});
+  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Connection center',exact:true}).waitFor();await page.getByRole('heading',{name:'Facebook Page token: start here'}).waitFor();
+  await page.getByLabel('Find a connection',{exact:true}).fill('Bright Data');assert.equal(await page.locator('[data-connection-name]:visible').count(),1);
+  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Review queue',exact:true}).click();await card.waitFor();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Mobile layout overflows');
+  await page.screenshot({path:'.codex/logs/cms-mobile.png',fullPage:true});
+  assert.deepEqual(errors,[]);
+  console.log('PASS CMS browser: visible post actions, Edit/Save Draft/Review/Approve/Schedule, photo preservation, disabled dry-run publish, navigation counts, animated work indicator, operations/connection centers and mobile layout. Browser mutations were fixtures only.');
+}catch(error){console.error('FAIL CMS browser:',error.name,error.message.split('\n')[0]);process.exitCode=1;}
+finally{await browser.close()}

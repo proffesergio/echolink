@@ -173,21 +173,29 @@ function graphBase() {
   if (!/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION || '')) throw new Error('Set a supported META_GRAPH_VERSION');
   return `https://graph.facebook.com/${process.env.META_GRAPH_VERSION}`;
 }
-async function publish(page, article) {
+export async function publish(page, article, transport=jsonRequest) {
   const token = tokens('FB_TOKENS_JSON')[page.fbSecret];
   if (!token) throw new Error('Facebook token alias is missing');
   const base = graphBase();
   const send = async image => {
     const payload = image ? { url: image, caption: article.caption } : { message: article.caption };
-    return jsonRequest(`${base}/${encodeURIComponent(page.fbPageId)}/${image ? 'photos' : 'feed'}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...bearer(token) }, body: JSON.stringify(payload) }, { hosts: ['graph.facebook.com'] });
+    return transport(`${base}/${encodeURIComponent(page.fbPageId)}/${image ? 'photos' : 'feed'}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...bearer(token) }, body: JSON.stringify(payload) }, { hosts: ['graph.facebook.com'] });
   };
-  try { return await send(article.image_url); }
-  catch (e) {
-    // A definitive 400 rejection of a photo permits a text fallback. Timeouts and
-    // ambiguous responses never trigger another POST.
-    if (article.image_url && e instanceof HttpError && e.status === 400) return send(null);
-    throw e;
-  }
+  // Honor the reviewed image choice. A rejected image must not silently become
+  // a text-only post; the editor can remove/change it and retry explicitly.
+  return send(article.image_url);
+}
+export async function publicationReadiness(pageId){
+  const page=(await settings('page')).find(r=>r.id===pageId)?.config;
+  if(!page?.active)return {ready:false,reason:'Enable this Page before publishing'};
+  if(dryRun())return {ready:false,reason:'Dry-run is enabled. Switch publishing mode in Settings before Publish Now'};
+  if(!/^\d+$/.test(page.fbPageId||''))return {ready:false,reason:'Save a numeric Facebook Page ID under Pages & models'};
+  if(!tokens('FB_TOKENS_JSON')[page.fbSecret])return {ready:false,reason:'Save a Page access token under Connections using this Page’s FB Secret Alias'};
+  if(!/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION||''))return {ready:false,reason:'Save the Graph API version in Connections → Facebook Page token'};
+  if(!inWindow(new Date(),page))return {ready:false,reason:'Outside this Page’s posting window. Choose Schedule instead'};
+  if(await dailyCount(page)>=page.dailyMax)return {ready:false,reason:'This Page has reached its daily posting cap'};
+  if(!await gapSatisfied(page))return {ready:false,reason:'Minimum post spacing or an unresolved publication blocks this Page'};
+  return {ready:true};
 }
 export async function processQueue(options={}) {
   const preview=options.preview===true;
@@ -202,9 +210,9 @@ export async function processQueue(options={}) {
     if (!preview&&!inWindow(new Date(), page)) return { page: page.id, queued: 'outside window' };
     if (!preview&&await dailyCount(page) >= page.dailyMax) return { page: page.id, queued: 'daily cap' };
     if (!preview&&!await gapSatisfied(page)) return { page: page.id, queued: 'minimum post gap or unresolved publication' };
-    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) ORDER BY source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id]);
+    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) AND ($2::uuid IS NULL OR id=$2) ORDER BY source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id,options.articleId||null]);
     const ranked=rankNews(r.rows.filter(a=>!preview||!a.caption),page);
-    const a=(!preview&&r.rows.find(a=>a.status==='Approved'))||ranked[0];
+    const a=options.articleId?r.rows[0]:(!preview&&r.rows.find(a=>a.status==='Approved'))||ranked[0];
     if (!a) return { page: page.id, empty: true,reason:r.rows.length?'No eligible news dated today. Missing/old publication dates are excluded from top-news selection.':'Queue empty. Run ingestion with enabled feeds first.' };
     if(a.selection_score!==undefined)await update(a.id,{selection_score:a.selection_score,selection_reason:a.selection_reason});
     try {
@@ -237,7 +245,12 @@ export async function processQueue(options={}) {
             VALUES($1,$2,$3,$4,now()+($5::double precision*interval '1 minute')) ON CONFLICT DO NOTHING`, [a.id,page.id,postId,`সূত্র: ${a.source_url}`,page.commentDelay]);
         });
         return { posted: a.id };
-      } catch {
+      } catch(error) {
+        if(error instanceof HttpError&&error.status>=400&&error.status<500&&error.status!==408){
+          await update(a.id,{status:'Failed',last_error:`Facebook rejected publication (HTTP ${error.status}). Check Page permissions and the selected photo; no text-only fallback was sent`});
+          await query("UPDATE echolink.publish_attempts SET outcome='Failed' WHERE id=$1",[attempt]);
+          return {page:page.id,failed:a.id,error:'Facebook rejected publication; review Page credentials and media before retrying'};
+        }
         await update(a.id, { status: 'Publish Unknown', last_error: 'Inspect Facebook and reconcile before retrying' });
         return { unknown: a.id };
       }

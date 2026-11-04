@@ -15,6 +15,14 @@ Facebook token/version, Sheets authorization, model factual-quality acceptance,
 stable hosting and the advanced integrations listed in the guide remain open.
 Earlier handoff entries below describe their dated state, not today's blockers.
 
+Editorial operations follow-up: add explicit held Draft state, visible per-post
+Edit/Review/Approve/Schedule/Publish Now controls, accurate navigation counts,
+animated request/background activity, an operations center and a connection
+catalog that distinguishes working adapters from planned providers. Preserve
+posting gates, stale-edit detection and unknown-outcome protection. A selected
+photo must not silently fall back to text-only after Facebook rejection. Setup
+guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATIONS.md.
+
 | Requirement | Acceptance check | Current state |
 | --- | --- | --- |
 | ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 verified publishers are enabled and linked to Noble Seek; real previews fetched 20 items with no failed feeds; RSS concurrency defaults to 4; see sources/VERIFIED.md |

@@ -1,12 +1,14 @@
 # First real Facebook post: dashboard and n8n walkthrough
 
-Updated 2026-11-03. The imported workflow is **EchoLink — Complete pipeline**:
+Updated 2026-11-04. The imported workflow is **EchoLink — Complete pipeline**:
 http://localhost:5678/workflow/echolinkPipeline01
 
 The canvas calls the EchoLink worker. AI, RSS extraction, deduplication, Graph
 requests and PostgreSQL transactions run in that worker. There is no separate
 Facebook or Ollama credential to attach to a canvas node: those settings belong
 to the dashboard. Keep the older eight workflows stopped when using this one.
+For the current dashboard controls and token steps, use
+[EDITORIAL_OPERATIONS.md](EDITORIAL_OPERATIONS.md) and [FACEBOOK_TOKEN.md](FACEBOOK_TOKEN.md).
 
 ## 1. Sign in and start the local services
 
@@ -34,17 +36,17 @@ Keep n8n running in its own terminal (`n8n start`). Do not launch a second copy
 if port 5678 is already in use. The managed worker is already running on 8787.
 
 For native Windows Ollama, install it from https://ollama.com/download/windows,
-launch the app, and download the small starting model described in the Windows
-guide:
+launch the app. This PC already has the tested 4B profile. To recreate it:
 
 ```powershell
-ollama pull gemma3:1b
+ollama pull gemma3:4b
+ollama create echolink-gemma3:4b -f config/Modelfile.gemma3-4b
 ollama list
 Invoke-RestMethod http://localhost:11434/v1/models
 ```
 
-This small model is for an initial connection/quality test; review its Bangla
-carefully. Ollama's OpenAI-compatible API supports the local endpoint used here:
+The 4B model has produced factual contradictions; review its Bangla and source
+facts carefully. Ollama's OpenAI-compatible API supports the local endpoint used here:
 https://docs.ollama.com/api/openai-compatibility
 
 ## 2. Connect the real Facebook Page
@@ -82,7 +84,7 @@ In dashboard **Connections**, save:
 
 | Field | Value |
 | --- | --- |
-| alias | `first-page` (your choice) |
+| alias | `primary-page` (your choice; match the Page setting) |
 | graphVersion | The supported version selected in your Meta app, formatted `vNN.0` |
 | value | The Page access token, entered in the password input |
 
@@ -92,13 +94,13 @@ In **Pages & models**, edit the onboarding page or add a page:
 | --- | --- |
 | FB Page Name | Your actual Page name |
 | FB Page ID | The numeric ID from `/me/accounts` |
-| FB Secret Alias | `first-page` |
+| FB Secret Alias | `primary-page` |
 | AI Infrastructure Target | `Ollama` |
 | Local Endpoint URL | `http://localhost:11434/v1/chat/completions` |
-| Model Identifier | Exact installed ID from Discover models, e.g. `gemma3:1b` |
+| Model Identifier | Exact installed ID from Discover models, here `echolink-gemma3:4b` |
 | AI Secret Alias | Blank for unauthenticated native Ollama |
 | Target Language | `Bangla` |
-| Temperature | `0.4` |
+| Temperature | `0.3` |
 | Timezone | `Asia/Dhaka` |
 | Posting Window Start / End | A window including the current local time |
 | Max Posts Per Day | `1` |

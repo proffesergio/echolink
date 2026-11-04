@@ -7,6 +7,12 @@ tab. A sheet is not connected until you complete your Google account steps.
 
 ## Your account steps
 
+Direct console links:
+[select/create a project](https://console.cloud.google.com/projectselector2/home/dashboard),
+[enable Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com),
+[Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts).
+Choose the same project at the top of the console on each page.
+
 1. Create a spreadsheet in Google Sheets under your own Google account, e.g.
    **EchoLink editorial log**. Keep it private; copy its URL.
 2. In Google Cloud Console, select/create a project and enable **Google Sheets
@@ -20,6 +26,22 @@ tab. A sheet is not connected until you complete your Google account steps.
 5. Copy the `client_email` from that JSON. In the spreadsheet's **Share** dialog,
    add this exact email as **Editor**. Do not enable public link editing.
 
+Click-by-click service-account setup: **Create service account** → name it
+`echolink-sheets` → **Create and continue** → skip optional project roles and
+user grants → **Done**. Open the new account's email/name → **Keys** →
+**Add key → Create new key → JSON → Create**. Google downloads the JSON file.
+Do not choose OAuth Client ID or API key: this EchoLink connector expects the
+service-account JSON, including `client_email` and `private_key`. No browser
+OAuth redirect URL or consent-screen configuration is needed for this route.
+
+The permission that lets the service account edit your sheet comes from sharing
+that spreadsheet with its email. You do not need to grant the service account
+project-wide Editor/Owner merely to write the shared spreadsheet.
+
+If key creation is blocked by an organization policy, use an administrator-approved
+authentication approach; the current dashboard supports JSON keys and would need
+an adapter change for a keyless identity. Do not weaken the organization policy.
+
 ## Save and test in EchoLink
 
 1. Open dashboard **Connections → Google Sheets post log**.
@@ -27,7 +49,7 @@ tab. A sheet is not connected until you complete your Google account steps.
 3. Use the tab name **EchoLink Posts**, or another new dedicated tab. The worker
    creates this tab on the first sync if it is missing. It will not overwrite an
    unrelated existing header.
-4. Paste the service-account JSON into **credentials** and save. The private key
+4. Paste the service-account JSON into **Service-account JSON** and save. The private key
    is saved only in the local worker's `.env.local` and is never returned to the
    browser. Leave the input blank on later saves to retain it. Keep the downloaded
    file out of source control and shared folders; rotate the key if disclosed.
@@ -63,7 +85,7 @@ Source published at, Caption, Image URL, Image suggestion, Analysis, Selection
 score, Selection reason, Scheduled at, Published at, FB post ID, Comment status,
 Comment ID, and Updated at.
 
-- **Drafts** includes captions awaiting approval and completed dry-run captions.
+- **Drafts** includes held Draft records, captions awaiting approval and completed dry-run captions.
 - **Scheduled** means approved and waiting for the chosen time or the next
   eligible posting window. Page windows, caps and minimum gaps still apply.
 - **Published** requires a confirmed Facebook post ID.

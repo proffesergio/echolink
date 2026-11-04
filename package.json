@@ -27,7 +27,8 @@
     "verify:newsroom": "node scripts/check-newsroom-ui.mjs",
     "public:check": "node scripts/check-local-services.mjs",
     "public:repair": "powershell -NoProfile -File scripts/repair-public-dashboard.ps1",
-    "verify:public": "node scripts/check-public-dashboard.mjs"
+    "verify:public": "node scripts/check-public-dashboard.mjs",
+    "verify:cms": "node scripts/check-cms-ui.mjs"
   },
   "keywords": [],
   "author": "",

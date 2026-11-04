@@ -1,4 +1,4 @@
-const routes=new Set(['auth','login','session','logout','password','configuration','state','workflow','test-database','test-airtable','settings','page','feed','secret','hosts','models','test-model','test-facebook','decision','retry','job','preview','enable-feeds','draft','sheets','test-sheets','sync-sheets']);
+const routes=new Set(['auth','login','session','logout','password','configuration','state','workflow','test-database','test-airtable','settings','page','feed','secret','hosts','models','test-model','test-facebook','decision','retry','job','preview','enable-feeds','draft','sheets','test-sheets','sync-sheets','article-action']);
 const fail=(res,status,error)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error}));};
 export default async function proxy(req,res){
   res.setHeader('Cache-Control','no-store');

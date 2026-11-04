@@ -12,10 +12,13 @@ import {planTick} from './scheduler.mjs';
 import {workflowStatus,controlWorkflow} from './workflow-control.mjs';
 import {runJob} from './telemetry.mjs';
 import {contentPanel,generationResult} from './newsroom.mjs';
-import {startPreview,enableBanglaFeeds,editDraft} from './newsroom-actions.mjs';
+import {startPreview,enableBanglaFeeds,editDraft,articleAction,ContentActionError} from './newsroom-actions.mjs';
+import {integrationCatalog} from './integrations.mjs';
 import {validateGoogleCredentials,testSheet,syncSheet} from './sheets.mjs';
 const tickets = new Map();
 let loginFailures=0,loginResetAt=0;
+let editorialMirror=Promise.resolve();
+function queueEditorialMirror(){editorialMirror=editorialMirror.catch(()=>{}).then(()=>runJob('mirror',mirror,'editorial')).catch(()=>{});}
 const reply = (value, status = 200, headers = {}) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 const pageFields = ['Page ID','FB Page Name','FB Page ID','Target Language','AI Infrastructure Target','Local Endpoint URL','Model Identifier','Temperature','Posting Window Start','Posting Window End','Max Posts Per Day','Require Human Approval','Active Status','Timezone','AI Secret Alias','FB Secret Alias','Source Comment Delay Minutes','Minimum Minutes Between Posts'];
 const feedFields = ['Feed ID','Feed Name','Linked Page','RSS / Scraper URL','Fallback URL','Active Status'];
@@ -33,7 +36,7 @@ export async function admin(req) {
   if (!path.startsWith('/admin')) return null;
   prune();
   if(path==='/admin/api/auth'&&req.method==='GET')return reply({authenticated:validSession(readSession(req)),passwordConfigured:passwordConfigured()});
-  const assets = { '/admin': ['index.html','text/html'], '/admin/': ['index.html','text/html'], '/admin/app.js': ['app.js','text/javascript'], '/admin/style.css': ['style.css','text/css'] };
+  const assets = { '/admin': ['index.html','text/html'], '/admin/': ['index.html','text/html'], '/admin/app.js': ['app.js','text/javascript'], '/admin/cms.js':['cms.js','text/javascript'], '/admin/style.css': ['style.css','text/css'] };
   if (req.method === 'GET' && assets[path]) {
     const [file, mime] = assets[path];
     return new Response(await readFile(new URL(`./ui/${file}`, import.meta.url)), { headers: { 'Content-Type': `${mime}; charset=utf-8`, 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'none'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
@@ -71,7 +74,7 @@ export async function admin(req) {
     if(path==='/admin/api/configuration'&&req.method==='GET')return reply({...publicConfiguration(),facebookAliases:Object.keys(maps('FB_TOKENS_JSON')),aiAliases:Object.keys(maps('AI_TOKENS_JSON')),graphVersion:process.env.META_GRAPH_VERSION||'',workflow:workflowStatus()});
     if(path==='/admin/api/preview'&&req.method==='POST'){const {pageId}=await req.json();return reply(await startPreview(pageId),202);}
     if(path==='/admin/api/enable-feeds'&&req.method==='POST'){const {pageId,confirmed}=await req.json();if(confirmed!==true)return reply({error:'Confirm enabling the verified Bangla catalog'},400);return reply(await enableBanglaFeeds(pageId));}
-    if(path==='/admin/api/draft'&&req.method==='POST'){const {id,...body}=await req.json();return reply(await editDraft(id,body));}
+    if(path==='/admin/api/draft'&&req.method==='POST'){const {id,...body}=await req.json();const result=await editDraft(id,body);queueEditorialMirror();return reply(result);}
     if(path==='/admin/api/sheets'&&req.method==='POST'){
       const body=await req.json(),values={};
       if(body.spreadsheetId!==undefined){const id=String(body.spreadsheetId).match(/\/spreadsheets\/d\/([A-Za-z0-9_-]+)/)?.[1]||String(body.spreadsheetId).trim();if(!/^[A-Za-z0-9_-]{15,200}$/.test(id))return reply({error:'Enter a spreadsheet URL or ID'},400);values.GOOGLE_SHEET_ID=id;}
@@ -124,8 +127,8 @@ export async function admin(req) {
       const names=['pages','feeds','articles','counts','audit','scheduler','runs'];
       const results = await Promise.allSettled([
         allRecords(tables().pages), allRecords(tables().feeds),
-        query('SELECT a.id,a.page_id,a.title,a.source_url,a.image_url,a.caption,a.status,a.fb_post_id,a.last_error,a.created_at,a.source_published_at,a.publisher,a.selection_score,a.selection_reason,a.analysis,a.image_prompt,a.scheduled_at,a.published_at,c.status AS comment_status,c.due_at AS comment_due,c.remote_id AS comment_id FROM echolink.articles a LEFT JOIN echolink.source_comments c ON c.article_id=a.id ORDER BY a.created_at DESC LIMIT 200'),
-        query('SELECT status,count(*)::int AS count FROM echolink.articles GROUP BY status'),
+        query('SELECT a.id,a.page_id,a.title,a.source_url,a.image_url,a.caption,a.status,a.fb_post_id,a.last_error,a.created_at,a.updated_at,a.source_published_at,a.publisher,a.selection_score,a.selection_reason,a.analysis,a.image_prompt,a.scheduled_at,a.published_at,c.status AS comment_status,c.due_at AS comment_due,c.remote_id AS comment_id FROM echolink.articles a LEFT JOIN echolink.source_comments c ON c.article_id=a.id ORDER BY (a.caption IS NOT NULL) DESC,a.updated_at DESC LIMIT 200'),
+        query('SELECT status,count(*)::int AS count,count(*) FILTER (WHERE caption IS NOT NULL)::int AS caption_count FROM echolink.articles GROUP BY status'),
         query('SELECT id,page_id,title,source_url,status,detail,occurrences,created_at FROM echolink.ingestion_events ORDER BY updated_at DESC LIMIT 50'),
         planTick(),
         query("SELECT id,job,trigger_source,status,started_at,finished_at,result,error FROM echolink.job_runs WHERE id IN (SELECT id FROM echolink.job_runs ORDER BY started_at DESC LIMIT 50) OR id=(SELECT id FROM echolink.job_runs WHERE job='preview' ORDER BY started_at DESC LIMIT 1) ORDER BY started_at DESC"),
@@ -139,7 +142,10 @@ export async function admin(req) {
         if(!p.fields['Model Identifier'])issues.push({level:'warning',pageId:p.id,message:'Choose an installed AI model for this Page.'});
         if(!maps('FB_TOKENS_JSON')[p.fields['FB Secret Alias']||p.id])issues.push({level:'warning',pageId:p.id,message:`${p.fields['FB Page Name']}: no saved Page token matches its FB Secret Alias. Dry-run drafting works; live publishing is blocked.`});
       }
-      return reply({ pages: pages.map(p => ({ id: p.id, fields: pick(p.fields, pageFields) })), feeds, articles:(data(2)?.rows||[]).map(a=>({...a,panel:contentPanel(a)})), counts:data(3)?.rows||[], audit:data(4)?.rows||[],scheduler:data(5),runs:data(6)?.rows||[],readiness:issues,serviceErrors:errors,configuration:publicConfiguration(),workflow:workflowStatus(),
+      const counts=data(3)?.rows||[],count=status=>counts.find(c=>c.status===status)?.count||0;
+      const navCounts={queue:count('Pending Approval'),drafts:counts.filter(c=>['Draft','Pending Approval','Dry Run','Queued'].includes(c.status)).reduce((sum,c)=>sum+c.caption_count,0),scheduled:count('Approved'),published:count('Posted'),inbox:count('Queued')-(counts.find(c=>c.status==='Queued')?.caption_count||0),total:counts.reduce((sum,c)=>sum+c.count,0)};
+      const configuration=publicConfiguration();
+      return reply({ pages: pages.map(p => ({ id: p.id, fields: pick(p.fields, pageFields) })), feeds, articles:(data(2)?.rows||[]).map(a=>({...a,panel:contentPanel(a)})), counts,navCounts,integrations:integrationCatalog(pages,configuration), audit:data(4)?.rows||[],scheduler:data(5),runs:data(6)?.rows||[],readiness:issues,serviceErrors:errors,configuration,workflow:workflowStatus(),
         dryRun: process.env.DRY_RUN !== 'false', facebookAliases: Object.keys(maps('FB_TOKENS_JSON')), aiAliases: Object.keys(maps('AI_TOKENS_JSON')),
         graphVersion: process.env.META_GRAPH_VERSION || '', sourceHosts: process.env.ALLOWED_SOURCE_HOSTS || '',
       });
@@ -202,9 +208,14 @@ export async function admin(req) {
       const data = await jsonRequest(p.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(secret ? { Authorization: `Bearer ${secret}` } : {}) }, body: JSON.stringify(payload) }, { hosts: hostList('ALLOWED_AI_HOSTS'), local: true, timeoutMs: Math.min(Number(process.env.AI_TIMEOUT_MS || 300000),100000) });
       return reply(generationResult(data.choices?.[0]?.message?.content));
     }
+    if(path==='/admin/api/article-action'&&req.method==='POST'){
+      const body=await req.json();const result=await articleAction(body.id,body.action,body);if(!['publish','generate'].includes(body.action))queueEditorialMirror();return reply(result,202);
+    }
     if (path === '/admin/api/test-facebook' && req.method === 'POST') {
       const { alias, pageId } = await req.json(), secret = maps('FB_TOKENS_JSON')[alias], version = process.env.META_GRAPH_VERSION;
-      if (!secret || !/^\d+$/.test(pageId) || !/^v\d+\.\d+$/.test(version || '')) return reply({ error: 'Save the token/version, then enter a numeric Facebook Page ID' }, 400);
+      if(!/^\d+$/.test(pageId||''))return reply({error:'Enter the numeric Facebook Page ID under Pages & models. Use the id returned by GET /me/accounts, not the app ID or Page username'},400);
+      if(!secret)return reply({error:`No Page token is saved for alias “${alias||'(empty)'}”. Open Connections → Facebook Page token, save it under that alias, then retry`},400);
+      if(!/^v\d+\.\d+$/.test(version||''))return reply({error:'Save graphVersion in Connections → Facebook Page token using the version selected in Graph API Explorer (format vNN.N)'},400);
       const identity = await jsonRequest(`https://graph.facebook.com/${version}/me?fields=id,name`, { headers: { Authorization: `Bearer ${secret}` } }, { hosts: ['graph.facebook.com'] });
       if (String(identity.id) !== pageId) return reply({ error: 'This token does not identify the selected Page; use a Page access token' }, 400);
       return reply({ ok: true, name: identity.name, id: identity.id });
@@ -237,6 +248,7 @@ export async function admin(req) {
     }
     return reply({ error: 'Not found' }, 404);
   } catch (e) {
+    if(e instanceof ContentActionError)return reply({error:e.message},e.status);
     console.error('Admin operation failed:', e.status || e.code || 'configuration/upstream');
     const fieldErrors=new Set(['Enable dry-run before generating a preview','Choose an enabled Page first','Choose a Page first','Review sync is running. Retry shortly','Only an unpublished draft can be edited','Page processing is running. Retry shortly','Article is no longer editable','Caption must contain 1–1800 characters','Use an HTTPS media URL','Choose a future scheduled time','Provide a Google service-account JSON key']);
     if(fieldErrors.has(e.message))return reply({error:e.message},400);

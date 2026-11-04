@@ -21,6 +21,7 @@ try{
   await page.getByRole('button',{name:'Review queue',exact:true}).click();
   await page.getByText('Editorial analysis',{exact:true}).first().waitFor();
   await page.getByText('Suggested illustrative image prompt',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'Edit',exact:true}).first().click();
   await page.locator('form[data-draft]').first().waitFor();
   await mkdir('.codex/logs',{recursive:true});
   await page.screenshot({path:'.codex/logs/newsroom-review.png',fullPage:true});
@@ -32,7 +33,7 @@ try{
   // Do not submit or persist changes to the user's actual draft.
   await page.getByRole('button',{name:'Connections',exact:true}).click();
   await page.getByRole('heading',{name:'Google Sheets post log'}).waitFor();
-  await page.getByLabel('credentials',{exact:true}).waitFor();
+  await page.getByLabel('Service-account JSON',{exact:true}).waitFor();
   await page.setViewportSize({width:390,height:844});
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('Newsroom mobile overflow');
   if(errors.length)throw new Error(errors.join('; '));
