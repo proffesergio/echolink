@@ -5,6 +5,7 @@ import { hash, canonicalUrl, titleHash, normalizePage, inWindow, generationBody,
 import {graphRequest,deliveryGate,FacebookError,checkFacebookConnection,clearConnectionPause} from './facebook.mjs';
 import {reportProgress} from './telemetry.mjs';
 import {withSuggestedHashtags,needsReview} from './publishing-policy.mjs';
+import {editorialReviewReason} from './editorial.mjs';
 import { request, jsonRequest, hostList, HttpError } from './net.mjs';
 import {publishedAt,rankNews,generationResult,draftQuality,contentPanel} from './newsroom.mjs';
 import {syncSheet} from './sheets.mjs';
@@ -144,6 +145,7 @@ async function generate(page, article) {
   let lastError;
   for(let attempt=0;attempt<2;attempt++){
     const body=generationBody(page,article);
+    body.messages[0].content+=' If the supplied article contains conflicting figures or unresolved factual contradictions, do not resolve them by guessing. Start analysis with the exact marker EDITORIAL REVIEW REQUIRED and explain the uncertainty.';
     if(attempt)body.messages[0].content+=' Your previous output was incomplete or too short. Return a complete JSON object and a substantial 2-paragraph caption of at least 180 characters; summarize only facts in the supplied article.';
     let response;
     try{response=await jsonRequest(endpoint.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...bearer(endpoint.token) }, body: JSON.stringify(body) }, { hosts, local: !gateway, timeoutMs: Number(process.env.AI_TIMEOUT_MS || 300000) });}
@@ -230,7 +232,7 @@ export async function processQueue(options={}) {
     // Hold severely late schedules for fresh editorial review instead of flooding
     // the Page with yesterday's backlog after the PC or tunnel returns.
     if(!preview)await query("UPDATE echolink.articles SET status='Draft',approval_hash=NULL,scheduled_at=NULL,last_error='Scheduled time missed by over 6 hours. Held as Draft: review freshness and schedule again.',dirty=true,updated_at=now() WHERE page_id=$1 AND status='Approved' AND scheduled_at<now()-interval '6 hours'",[page.id]);
-    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) AND ($2::uuid IS NULL OR id=$2) ORDER BY (status='Approved') DESC,scheduled_at ASC NULLS LAST,source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id,options.articleId||null]);
+    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,analysis,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) AND ($2::uuid IS NULL OR id=$2) ORDER BY (status='Approved') DESC,scheduled_at ASC NULLS LAST,source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id,options.articleId||null]);
     const ranked=rankNews(r.rows.filter(a=>!preview||!a.caption),page);
     const a=options.articleId?r.rows[0]:(!preview&&r.rows.find(a=>a.status==='Approved'))||ranked[0];
     if (!a) return { page: page.id, empty: true,reason:r.rows.length?'No eligible news dated today. Missing/old publication dates are excluded from top-news selection.':'Queue empty. Run ingestion with enabled feeds first.' };
@@ -241,12 +243,13 @@ export async function processQueue(options={}) {
       if (!a.caption) {
         if (await semanticDuplicate(page, a)) { await update(a.id, { status: 'Skipped (Duplicate)' }); return { duplicate: a.id }; }
         await stage(page,2,'Local AI is generating the caption','Waiting for the configured model. Stage percentage is not a prediction of inference time.');
-        const generated=await generate(page,a);generated.caption=withSuggestedHashtags(generated.caption,a,page.language);a.caption=generated.caption;a.caption_hash=hash(a.caption);
+        const generated=await generate(page,a);generated.caption=withSuggestedHashtags(generated.caption,a,page.language);Object.assign(a,generated);a.caption_hash=hash(a.caption);
         await update(a.id, { ...generated, caption_hash: a.caption_hash,last_error:null,attempts:0 });
       }
       if (needsReview(page,a,preview)) {
-        await stage(page,5,'Draft prepared for human review','Caption, selected photo and analysis saved; no publication requested');
-        await update(a.id, { status: 'Pending Approval' }); return { page:page.id,pending: a.id,title:a.title,selectedFrom:ranked.length,score:a.selection_score,reason:a.selection_reason,preview };
+        const reviewReason=editorialReviewReason(a);
+        await stage(page,5,'Draft prepared for human review',reviewReason||'Caption, selected photo and analysis saved; no publication requested');
+        await update(a.id, { status: 'Pending Approval',last_error:reviewReason }); return { page:page.id,pending: a.id,title:a.title,selectedFrom:ranked.length,score:a.selection_score,reason:a.selection_reason,reviewReason,preview };
       }
       if (!inWindow(new Date(), page) || await dailyCount(page) >= page.dailyMax || !await gapSatisfied(page)) return { queued: a.id };
       if (dryRun()) { if(!a.scheduled_at)await update(a.id, { status: 'Dry Run' }); return { dryRun: a.id }; }

@@ -9,9 +9,11 @@ import {deliveryGate,clearDeliveryPause} from '../src/facebook.mjs';
 if(!process.env.ECHOLINK_TEST_BRANCH)throw new Error('Disposable test branch required');
 const originalFetch=globalThis.fetch,calls=[];
 let response={id:'123_456'},responseStatus=200,responseHeaders={};
+let modelResponse;
 // This test exercises real HTTP payload generation and durable DB transitions,
 // but never makes a Facebook request or alters the production database.
 globalThis.fetch=async(url,options)=>{
+  if(new URL(url).hostname==='127.0.0.1'&&new URL(url).pathname==='/v1/chat/completions'&&modelResponse)return Response.json({choices:[{message:{content:JSON.stringify(modelResponse)}}]});
   if(new URL(url).hostname!=='graph.facebook.com')throw new Error('External adapters disabled in delivery test');
   if(String(url).includes('/debug_token'))return Response.json({data:{is_valid:true,type:'PAGE',scopes:['pages_read_engagement','pages_manage_posts','pages_manage_engagement']}});
   if(String(url).includes('/me?'))return Response.json({id:'123',name:'Delivery probe'});
@@ -44,5 +46,28 @@ try{
   await reset();const preview=await make('Approved');await processQueue({pageId,articleId:preview,preview:true});assert.equal((await query('SELECT status FROM echolink.articles WHERE id=$1',[preview])).rows[0].status,'Pending Approval');assert.equal(calls.length,before,'Live-mode previews never publish');
   await reset();for(let i=0;i<3;i++)await make('Pending Approval');const raw=await make('Queued');await query('UPDATE echolink.articles SET caption=NULL,caption_hash=NULL,approval_hash=NULL WHERE id=$1',[raw]);
   assert.match((await processQueue({pageId,articleId:raw})).pages[0].queued,/Review queue has 3 drafts/);assert.equal(calls.length,before);
-  console.log('PASS delivery on disposable DB: Publish Now → photo post → durable 5-minute source comment → exactly-once comment; spacing gate; persistent rate cooldown; credential pause/resume; missed-schedule hold; live-mode preview review. Facebook was mocked.');
+  await reset();response={id:'123_editorial'};responseStatus=200;responseHeaders={};
+  const automaticPage={...page,approval:false,infrastructure:'Ollama',endpoint:'http://127.0.0.1:11434/v1/chat/completions',model:'test-model',language:'Bangla',temperature:0.2};
+  await query("UPDATE echolink.configurations SET config=$2 WHERE kind='page' AND id=$1",[pageId,JSON.stringify(automaticPage)]);
+  const unsupported=await make('Queued');
+  await query("UPDATE echolink.articles SET body='সূত্রে ২০ জনের কথা আছে।',caption='সংবাদে ৩৭ জনের উল্লেখ।',caption_hash=$2,approval_hash=NULL WHERE id=$1",[unsupported,hash('সংবাদে ৩৭ জনের উল্লেখ।')]);
+  const noWrites=calls.length;
+  assert.equal((await processQueue({pageId,articleId:unsupported})).pages[0].pending,unsupported);
+  assert.match((await query('SELECT last_error FROM echolink.articles WHERE id=$1',[unsupported])).rows[0].last_error,/37/);
+  assert.equal(calls.length,noWrites,'An unsupported figure must not trigger a Facebook write');
+  const flagged=await make('Queued');
+  await query("UPDATE echolink.articles SET analysis='EDITORIAL REVIEW REQUIRED: conflicting figures 53% versus 42%',approval_hash=NULL WHERE id=$1",[flagged]);
+  assert.equal((await processQueue({pageId,articleId:flagged})).pages[0].pending,flagged);
+  assert.equal(calls.length,noWrites,'A stored source-conflict warning must hold an approval-free Page');
+  await articleAction(flagged,'approve',{confirmed:true});
+  assert.equal((await processQueue({pageId,articleId:flagged})).pages[0].posted,flagged,'Explicit matching human approval may release the hold');
+  await reset();const generated=await make('Queued');
+  await query("UPDATE echolink.articles SET caption=NULL,caption_hash=NULL,approval_hash=NULL,body='সূত্রে ২০ জনের উল্লেখ আছে।' WHERE id=$1",[generated]);
+  modelResponse={caption:'সংবাদে ২০ জনের উপস্থিতির তথ্য জানানো হয়েছে। বিষয়টি সম্পর্কে সূত্রে পাওয়া তথ্য অনুযায়ী এই সংক্ষিপ্ত প্রতিবেদন তৈরি করা হয়েছে।\n\nপ্রতিবেদনের সংখ্যাগত তথ্য যাচাই করে দেখা প্রয়োজন। মূল সূত্রে বর্ণিত ঘটনাটি নিয়ে আরও বিস্তারিত তথ্য নিশ্চিত না হওয়া পর্যন্ত কোনো অতিরিক্ত দাবি করা হচ্ছে না।',analysis:'EDITORIAL REVIEW REQUIRED: source figures require verification.',image_prompt:'Neutral editorial illustration'};
+  const beforeGeneration=calls.length;
+  assert.equal((await processQueue({pageId,articleId:generated})).pages[0].pending,generated);
+  const held=(await query('SELECT status,caption,analysis,last_error FROM echolink.articles WHERE id=$1',[generated])).rows[0];
+  assert.equal(held.caption,modelResponse.caption);assert.match(held.analysis,/EDITORIAL REVIEW REQUIRED/);assert.match(held.last_error,/analysis flags/);
+  assert.equal(calls.length,beforeGeneration,'A freshly generated warning must hold within the same run');
+  console.log('PASS delivery on disposable DB: Publish Now → photo post → durable 5-minute source comment → exactly-once comment; spacing gate; persistent rate cooldown; credential pause/resume; missed-schedule hold; live-mode preview review; unsupported-number/source-conflict holds on approval-free Pages, same-run generation hold and explicit human release. Facebook and AI were mocked.');
 }finally{globalThis.fetch=originalFetch;await closePools();}

@@ -1,5 +1,6 @@
 import {inWindow,localDay} from './core.mjs';
-export const needsReview=(page,article,preview=false)=>preview||(page.approval&&(!article.caption_hash||article.approval_hash!==article.caption_hash));
+import {editorialReviewReason} from './editorial.mjs';
+export const needsReview=(page,article,preview=false)=>preview||((page.approval||!!editorialReviewReason(article))&&(!article.caption_hash||article.approval_hash!==article.caption_hash));
 
 // A calendar reservation is checked again at delivery: actual publication times
 // may move when the PC is offline, a previous post is late or Meta throttles us.

@@ -87,8 +87,11 @@ Docker does not change a Windows-native worker's model endpoint.
 
 ## Test today's draft safely
 
-1. Confirm **DRY RUN**. The n8n schedule is paused to preserve the existing
-   approved draft while Facebook credentials are incomplete.
+1. For a fresh safe test, choose **DRY RUN** in Settings deliberately. The saved
+   installation is currently in live mode with the Page disabled by the user;
+   do not assume it is already a dry-run environment. A disabled Page blocks
+   generation/publishing until the user enables it. The single n8n pipeline is
+   active, but it cannot publish to a disabled Page.
 2. On Overview choose the Page, then **Generate today's top draft**. Twenty
    verified feeds are enabled for the Page; the BBC example remains paused.
 3. Watch **Activity**. Background CPU inference can take minutes and continues
@@ -96,8 +99,10 @@ Docker does not change a Windows-native worker's model endpoint.
 4. Open **Drafts**. Check source/date, selection reason, caption, analysis,
    image candidate and illustration suggestion.
 5. Compare numbers, names and attribution with the source. The prior 4B draft
-   had contradictory polling figures and is flagged. Length/language checks do
-   not establish accuracy. Edit before approving; edits revoke previous approval.
+   had contradictory polling figures and is flagged. Unapproved captions with
+   an explicit editorial warning or unsupported numeric values now require
+   review even on automatic Pages. This does not establish accuracy. Edit before
+   approving; edits revoke previous approval. Existing human approvals are kept.
 6. Check permission to reuse a source image, or choose text-only. An image
    suggestion is not a generated or licensed image.
 
@@ -107,30 +112,35 @@ Older drafts stay visible. Items with no known source date are not called today.
 
 ## First real Facebook post
 
-The Page ID is saved, but **the Page token and Graph API version are missing**.
-In Connections save the Page token under `primary-page`, matching the Page's
-FB Secret Alias. Set a currently supported Graph API version in the same
-Connections form's `graphVersion` field.
-Run **Test Facebook connection** and verify the returned Page identity.
+The saved NobleSeek token and Graph API version are now working, including
+publishing and engagement permissions. A real photo post and delayed source
+comment were verified directly through Meta on November 4. On a new setup or
+after a credential change, save the Page token under the alias matching the
+Page's **FB Secret Alias**, save a supported Graph API version and run
+**Test Facebook connection** to check identity and publishing permissions.
 
 After editorial/media review, follow [FIRST_FACEBOOK_POST.md](FIRST_FACEBOOK_POST.md)
 for all 21 n8n nodes and the single-post test: deliberately enable live mode,
 approve one item, check quiet hours/caps/gaps, confirm photo/text publication,
 then verify the delayed source-link comment and remote IDs. Do not approve the
-whole queue. The user's existing approved caption was preserved. Do not run
-that approved item through dry-run Process if it is intended for the real test;
-it would become a completed Dry Run record.
+whole queue. The user's existing approved captions were preserved. The Page is
+currently disabled; enabling it is the user's choice. Its saved policy is
+20 posts/day, 60-minute spacing, 09:00–23:00 Asia/Dhaka and a five-minute source
+comment delay. Do not run a previously approved item through dry-run Process if
+it is intended for a later live test; it may become a completed Dry Run record.
 
 ## Remaining development and setup
 
 | Priority | Remaining work | Your part / development needed |
 | --- | --- | --- |
 | Before unattended operation | Stable tunnel and startup/recovery | Provide Cloudflare account/domain for a named tunnel, or choose an always-on host. Add service startup/recovery and outage alerts. |
-| Before a real post | Facebook authorization and live acceptance | Save token/version; verify Page identity; review one draft. Prove actual photo/text posting and delayed comment end to end. |
-| Before unattended writing | Bangla factual quality | Human review remains required. Develop/evaluate number/name/attribution checks and rejection rules against a news benchmark. 4B output has produced factual errors. |
-| Optional log integration | Google Sheets authorization | Create/share a sheet and service account; follow [GOOGLE_SHEETS.md](GOOGLE_SHEETS.md). Adapter/upserts exist; real Google writes remain unverified. |
+| Before enabling the Page again | Fresh editorial and policy review | Facebook photo delivery and delayed comment have been verified. Keep the user's disabled Page unchanged; review queued captions and current limits before enabling. |
+| Before unattended writing | Bangla factual quality | Unsupported-number and explicit-conflict review gates are implemented, including automatic Pages. Matching human approval releases the hold. Name/attribution checks, relationship reversals and a real news benchmark remain open; 4B output has produced factual errors. |
+| Connected log integration | Google Sheets | The user's service account and EchoLink Posts sheet are connected; real draft writes were verified. Setup reference: [GOOGLE_SHEETS.md](GOOGLE_SHEETS.md). |
 | Media | Image rights or a connected illustration engine | Decide permitted source imagery. No image generator is connected; prompts are suggestions. |
 | Better duplicates | Embedding/semantic evaluation | Exact URL/title dedup works. Semantic mode is disabled; serve embeddings and calibrate similarity. Qdrant MCP installation/tool integration remains optional future work. |
+| Website publishing | NobleSeek database/CMS connector | Supply backend/schema and restricted credentials using [WEBSITE_PUBLISHING.md](WEBSITE_PUBLISHING.md). Publish the website article before Facebook and use its canonical URL in the delayed comment. Not connected yet. |
+| Branding and design | Favicon, Page image watermark and dashboard redesign | Confirm visual preferences and provide the approved NobleSeek logo asset. Preserve the reviewed-image preview and current editorial operations. |
 | Editorial feedback | Notifications and engagement insights | Choose/configure the notification channel. Post-count analytics exists; Page/post insights and automatic topic/time optimization need development and permissions. |
 | Optional paid expansion | Bright Data/Decodo, Postiz, modular MCP | Supply accounts when wanted. These are retained planned options, not connected production services. Current RSS/fallback paths work. |
 | Operations | Backups, restore/load/failure tests and tenant access | Add encrypted off-platform exports, monitoring/log retention, recovery drills and a second Page test. Separate tenant-user roles need further access control; today the dashboard has one owner login. |

@@ -29,6 +29,25 @@ Save the Page. Settings sync to Neon immediately. The UI stores hours as the Air
 
 The reviewed caption, including hashtags, is the published caption. EchoLink does not append hidden text after approval. Local model output still needs factual review.
 
+### Editorial holds on automatic Pages
+
+Even when **Require Human Approval** is off, an unapproved caption is routed to
+**Pending Approval** if its analysis includes `EDITORIAL REVIEW REQUIRED`, or if
+it contains a numeric value absent from the supplied article title/body. The
+dashboard displays the reason beside the draft. Bengali/Latin digits, common
+comma grouping and decimal trailing zeros are normalized; URLs and hashtags are
+excluded. The model is instructed to use the marker for unresolved source
+contradictions. Newly generated and previously saved captions use the same gate.
+
+Compare the figures and source context, edit if necessary, then explicitly
+approve or schedule the saved caption. A matching existing human approval is
+respected; editing the caption revokes it. The check can flag legitimate derived
+figures or different representations, so it requests review instead of silently
+rewriting or rejecting them. Matching figures do not prove attribution, names,
+causality or accuracy: reversed relationships using the same numbers can still
+pass. This is an additional review signal, not a replacement for an editor or a
+validated factual-quality benchmark.
+
 ## Schedule with the calendar
 
 1. Open **Scheduled** to see the monthly calendar. Previous/next month buttons and clickable dates show reservations and recent publications. Calendar times use the browser timezone, labelled above the grid. Page quotas use the Page timezone.
@@ -74,4 +93,11 @@ AI completion time cannot be predicted from these stages. Its meter stays at the
 
 ## Verification
 
-`npm run build` and `npm test` check code/manifests and policy/transport behavior. `node scripts/validate-migration.mjs` creates a disposable Neon branch and tests migrations, concurrent scheduler claims, editorial transitions and the full Publish Now → photo → delayed source-comment path against mocked Facebook responses; it then deletes the branch. `npm run verify:cms` tests the real browser with intercepted mutations, including calendar scheduling and Publish Now. These tests do not publish to a real Page. A reviewed real post, its source comment and real Facebook visibility still need acceptance in the dashboard.
+`npm run build` and `npm test` check code/manifests and policy/transport behavior. `node scripts/validate-migration.mjs` creates a disposable Neon branch and tests migrations, concurrent scheduler claims, editorial transitions and the full Publish Now → photo → delayed source-comment path against mocked Facebook responses; it then deletes the branch. Delivery tests also cover automatic-Page editorial holds, freshly generated warnings and release by explicit matching approval. `npm run verify:cms` tests the real browser with intercepted mutations, including calendar scheduling and Publish Now. These tests do not publish to a real Page.
+
+Separately, on November 4 a real NobleSeek photo post and its source-link comment
+were read back successfully through Meta, with matching caption and photo
+attachment. The comment was created after the configured five-minute delay.
+This confirms API delivery for that post; it does not establish anonymous public
+visibility, factual quality of all drafts or zero semantic duplicates. The Page
+is currently disabled by the user and must stay disabled until they change it.

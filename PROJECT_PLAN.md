@@ -10,15 +10,21 @@ https://echolinkbd.vercel.app/admin passed real login and local 4B connectivity
 tests. The November 4 outage was an expired Quick Tunnel and was repaired.
 GitHub main push and the complete Actions build/test/deploy run now pass.
 CLI 65.4.0 resolved the old pinned CLI's project-settings failure with the token.
-The automation remains paused/dry-run with the approved draft preserved.
-Facebook token/version, Sheets authorization, model factual-quality acceptance,
-stable hosting and the advanced integrations listed in the guide remain open.
-Earlier handoff entries below describe their dated state, not today's blockers.
+Facebook authorization and Google Sheets connection have since been completed.
+A real photo post and its delayed source comment were verified directly through
+Meta on November 4. The user's current Page configuration is disabled; preserve
+that choice and the configured 20-post daily cap, 60-minute gap, 09:00–23:00
+Asia/Dhaka window and five-minute comment delay. Live mode is configured, but a
+disabled Page must remain blocked. Factual-quality acceptance, semantic duplicate
+evaluation, stable hosting and the advanced integrations remain open. Earlier
+handoff entries below are historical and do not override this current state.
 
-Editorial operations follow-up: add explicit held Draft state, visible per-post
-Edit/Review/Approve/Schedule/Publish Now controls, accurate navigation counts,
-animated request/background activity, an operations center and a connection
-catalog that distinguishes working adapters from planned providers. Preserve
+Editorial operations implemented: held Draft state, per-post
+Edit/Review/Approve/Schedule/Publish Now controls, navigation counts,
+per-task stage/feed percentages, heartbeat recovery and event logs. Next: the
+requested visual redesign, favicon and Page-specific image branding, plus website
+publishing to https://www.fabrything.com/nobleseek. Design preferences, the logo
+asset and the website backend/schema are awaiting user clarification. Preserve
 posting gates, stale-edit detection and unknown-outcome protection. A selected
 photo must not silently fall back to text-only after Facebook rejection. Setup
 guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATIONS.md.
@@ -28,8 +34,8 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 | ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 verified publishers are enabled and linked to Noble Seek; real previews fetched 20 items with no failed feeds; RSS concurrency defaults to 4; see sources/VERIFIED.md |
 | নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic adapter exists; duplicate audit events now mirrored to Airtable; real semantic evaluation awaits model |
 | কোনো সাইট ব্লক করলে ফলব্যাক সিস্টেম চালু হয়ে যায় | Primary timeout/HTTP/parse failure tries configured permitted fallback; RSS text survives article fetch failure; both failures logged | Blocked/malformed feed fallback tests passed; configured alternate-publisher backups imported visibly; they do not recover the exact blocked article |
-| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified; factual contradictions found and flagged, so editorial quality acceptance remains open |
-| ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, durable delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Durable delayed queue implemented; due-time, dry-run and quiet-hour gates tested; Facebook live delivery awaits user credentials/authorization |
+| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified. Unapproved captions with explicit conflict warnings or unsupported numbers now require review even on automatic Pages; relationship/name/attribution accuracy and real benchmark acceptance remain open |
+| ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, durable delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Real photo post and delayed comment verified through Meta on November 4; next extend the comment to the published NobleSeek website article URL |
 | সব রেকর্ড Airtable-এ: posted/skipped/failed | Article log plus bounded duplicate/failure audit entries; comment states | Article/approval roundtrip tested; audit-event mirroring and source-comment state fields implemented |
 | শুধু নির্ধারিত সময়ে পোস্ট; স্প্যাম নয় | Page timezone/window, daily cap, minimum inter-post gap, source-comment timing policy, approvals and durable reservations | Window/cap/approval and minimum-gap enforcement implemented; default 30-minute post gap and 5-minute comment delay; comments also respect quiet hours |
 
@@ -55,11 +61,55 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 - Keep the installed local model running and review its Bangla factual quality.
 - Sign into Meta, authorize the app, provide Page access and satisfy any review.
 - Approve sensitive content and explicitly decide when to enable live posting.
+- Provide the website backend/schema and a restricted publishing connection;
+  choose dashboard styling and provide an approved NobleSeek logo asset.
 
 The agent handles code, migration testing, table setup, workflow imports, UI,
 integration probes, feed validation and documented operating instructions.
 
-## Current handoff
+## Website publishing and branding extension — current work
+
+- Add an authenticated website connection and connection test to the dashboard.
+  Inspect the actual website schema and publish rules before choosing a driver or
+  writing records; do not assume this website uses EchoLink's Neon database.
+- Publish a reviewed article, image and relevant hashtags to the website before
+  Facebook delivery when website publishing is enabled. Confirm the desired
+  draft/review timing with the user. Keep the current approval, window, cap and
+  minimum-gap gates; changing the destination must not bypass them.
+- Persist the website record ID and canonical public article URL separately from
+  the original publisher URL. Reuse that website record on retries, and hold
+  Facebook delivery if the required website publication fails or is uncertain.
+- Put the canonical website news link into the durable delayed Facebook comment.
+  Preserve original-source attribution in the website article and existing logs.
+  Do not invent article slugs, alter comments on existing posts, or bulk-publish
+  the existing queue without an explicit user action.
+- Show separate website and Facebook delivery states, actionable errors and
+  task progress. Test a website draft first, then a user-reviewed live article
+  and its Facebook comment. Actual acceptance needs a publicly reachable article.
+- Add a favicon and reusable per-Page logo/watermark controls, with a preview of
+  the exact image being approved. Respect image rights and preserve source
+  attribution. Confirm logo placement and the dashboard design before redesign.
+
+Connection checklist and delivery contract:
+[WEBSITE_PUBLISHING.md](docs/WEBSITE_PUBLISHING.md).
+
+## Latest verification — 2026-11-04 editorial gate
+
+- `npm test`: 35 passed, zero failed. `npm run build`: passed.
+- `node scripts/validate-migration.mjs`: all 12 required tables, concurrent
+  scheduler claims, newsroom transitions, durable photo/comment delivery,
+  progress recovery and the new editorial holds passed on a disposable Neon
+  branch. The branch was removed. Facebook and AI responses were mocked in this
+  integration test; no production test post was created.
+- A read-only production audit detected the saved polling draft's explicit
+  conflict warning. Its existing matching human approval was preserved. This
+  does not constitute factual-quality acceptance or certify the approved text.
+- The local worker was restarted only after stopping scheduled ticks and
+  confirming no task was running. Its health check passed and the previously
+  active n8n pipeline was restored. Worker, bridge, tunnel, public dashboard,
+  Ollama and n8n connectivity checks passed. The user's Page stays disabled.
+
+## Historical handoff (superseded by the current state above)
 
 The local admin dashboard passed a real Edge browser check, including login,
 model/page policy controls, 20+ feed rows, masked secrets and mobile layout.
