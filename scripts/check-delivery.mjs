@@ -2,18 +2,18 @@ import '../src/env.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {query,closePools} from '../src/db.mjs';
-import {hash} from '../src/core.mjs';
+import {hash,candidateGenerationBody} from '../src/core.mjs';
 import {articleAction} from '../src/newsroom-actions.mjs';
-import {processQueue,comments} from '../src/jobs.mjs';
+import {processQueue,comments,generate} from '../src/jobs.mjs';
 import {deliveryGate,clearDeliveryPause} from '../src/facebook.mjs';
 if(!process.env.ECHOLINK_TEST_BRANCH)throw new Error('Disposable test branch required');
 const originalFetch=globalThis.fetch,calls=[];
 let response={id:'123_456'},responseStatus=200,responseHeaders={};
-let modelResponse;
+let modelResponse,modelCalls=0;
 // This test exercises real HTTP payload generation and durable DB transitions,
 // but never makes a Facebook request or alters the production database.
 globalThis.fetch=async(url,options)=>{
-  if(new URL(url).hostname==='127.0.0.1'&&new URL(url).pathname==='/v1/chat/completions'&&modelResponse)return Response.json({choices:[{message:{content:JSON.stringify(modelResponse)}}]});
+  if(new URL(url).hostname==='127.0.0.1'&&new URL(url).pathname==='/v1/chat/completions'&&modelResponse){modelCalls++;return Response.json({choices:[{message:{content:JSON.stringify(modelResponse)}}]});}
   if(new URL(url).hostname!=='graph.facebook.com')throw new Error('External adapters disabled in delivery test');
   if(String(url).includes('/debug_token'))return Response.json({data:{is_valid:true,type:'PAGE',scopes:['pages_read_engagement','pages_manage_posts','pages_manage_engagement']}});
   if(String(url).includes('/me?'))return Response.json({id:'123',name:'Delivery probe'});
@@ -55,6 +55,18 @@ try{
   assert.equal((await processQueue({pageId,articleId:unsupported})).pages[0].pending,unsupported);
   assert.match((await query('SELECT last_error FROM echolink.articles WHERE id=$1',[unsupported])).rows[0].last_error,/37/);
   assert.equal(calls.length,noWrites,'An unsupported figure must not trigger a Facebook write');
+  for(const check of [
+    {body:'হার ৫৩ শতাংশ থেকে ৪২ শতাংশে নেমেছে।',caption:'হার ৪২ শতাংশ থেকে ৫৩ শতাংশে উঠেছে।',reason:/reverses a numeric transition/},
+    {body:'অনুষ্ঠানের তারিখ ঘোষণা করা হয়নি।',caption:'কর্তৃপক্ষ বলেছে, “আগামী শনিবার থেকে অনুষ্ঠান শুরু হবে।”',reason:/direct quotation/},
+    {body:'জরিপের পরিবর্তনের কারণ উল্লেখ করা হয়নি।',caption:'স্থানীয় প্রশাসন ভবনগুলোর সংস্কার ও তদারকির ওপর জোর দিচ্ছে।',reason:/not described in the supplied source/},
+    {body:'আগের মাসে হার ৫৩ শতাংশ। চলতি মাসে হার ৪২ শতাংশ।',caption:'চলতি মাসে হার বেড়ে ৪২ শতাংশ হয়েছে, যেখানে আগের মাসে এই হার ছিল ৫৩ শতাংশ।',reason:/increase\/decrease wording/},
+    {body:'আগের মাসে হার ৫৩ শতাংশ। চলতি মাসে হার ৪২ শতাংশ।',caption:'বর্তমানে হার কমে ৪২ শতাংশ হয়েছে।',analysis:'হার ৪১ শতাংশ কমেছে।',reason:/analysis numbers.*41/}
+  ]){
+    const id=await make('Queued');await query('UPDATE echolink.articles SET body=$2,caption=$3,caption_hash=$4,analysis=$5,approval_hash=NULL WHERE id=$1',[id,check.body,check.caption,hash(check.caption),check.analysis||null]);
+    assert.equal((await processQueue({pageId,articleId:id})).pages[0].pending,id);
+    assert.match((await query('SELECT last_error FROM echolink.articles WHERE id=$1',[id])).rows[0].last_error,check.reason);
+    assert.equal(calls.length,noWrites,'A factual review signal must hold before Facebook');
+  }
   const flagged=await make('Queued');
   await query("UPDATE echolink.articles SET analysis='EDITORIAL REVIEW REQUIRED: conflicting figures 53% versus 42%',approval_hash=NULL WHERE id=$1",[flagged]);
   assert.equal((await processQueue({pageId,articleId:flagged})).pages[0].pending,flagged);
@@ -63,11 +75,14 @@ try{
   assert.equal((await processQueue({pageId,articleId:flagged})).pages[0].posted,flagged,'Explicit matching human approval may release the hold');
   await reset();const generated=await make('Queued');
   await query("UPDATE echolink.articles SET caption=NULL,caption_hash=NULL,approval_hash=NULL,body='সূত্রে ২০ জনের উল্লেখ আছে।' WHERE id=$1",[generated]);
-  modelResponse={caption:'সংবাদে ২০ জনের উপস্থিতির তথ্য জানানো হয়েছে। বিষয়টি সম্পর্কে সূত্রে পাওয়া তথ্য অনুযায়ী এই সংক্ষিপ্ত প্রতিবেদন তৈরি করা হয়েছে।\n\nপ্রতিবেদনের সংখ্যাগত তথ্য যাচাই করে দেখা প্রয়োজন। মূল সূত্রে বর্ণিত ঘটনাটি নিয়ে আরও বিস্তারিত তথ্য নিশ্চিত না হওয়া পর্যন্ত কোনো অতিরিক্ত দাবি করা হচ্ছে না।',analysis:'EDITORIAL REVIEW REQUIRED: source figures require verification.',image_prompt:'Neutral editorial illustration'};
+  modelResponse={caption:'সংবাদে ২০ জনের উপস্থিতির তথ্য জানানো হয়েছে। বিষয়টি সম্পর্কে সূত্রে পাওয়া তথ্য অনুযায়ী এই সংক্ষিপ্ত প্রতিবেদন তৈরি করা হয়েছে।\n\nপ্রতিবেদনের সংখ্যাগত তথ্য যাচাই করে দেখা প্রয়োজন। মূল সূত্রে বর্ণিত ঘটনাটি নিয়ে আরও বিস্তারিত তথ্য নিশ্চিত না হওয়া পর্যন্ত কোনো অতিরিক্ত দাবি করা হচ্ছে না।',analysis:'EDITORIAL REVIEW REQUIRED: সূত্রের একই ঘটনার সংখ্যাগত তথ্য পরস্পরবিরোধী; প্রকাশের আগে তা মিলিয়ে দেখা প্রয়োজন।',image_prompt:'Neutral editorial illustration'};
   const beforeGeneration=calls.length;
   assert.equal((await processQueue({pageId,articleId:generated})).pages[0].pending,generated);
   const held=(await query('SELECT status,caption,analysis,last_error FROM echolink.articles WHERE id=$1',[generated])).rows[0];
   assert.equal(held.caption,modelResponse.caption);assert.match(held.analysis,/EDITORIAL REVIEW REQUIRED/);assert.match(held.last_error,/analysis flags/);
   assert.equal(calls.length,beforeGeneration,'A freshly generated warning must hold within the same run');
-  console.log('PASS delivery on disposable DB: Publish Now → photo post → durable 5-minute source comment → exactly-once comment; spacing gate; persistent rate cooldown; credential pause/resume; missed-schedule hold; live-mode preview review; unsupported-number/source-conflict holds on approval-free Pages, same-run generation hold and explicit human release. Facebook and AI were mocked.');
+  await reset();
+  modelResponse={...modelResponse,analysis:'The source requires additional verification before publication.'};const priorModelCalls=modelCalls,priorWrites=calls.length;
+  await assert.rejects(generate(automaticPage,{title:'Diagnostic fixture',body:'সূত্রে ২০ জনের উল্লেখ আছে।'},{bodyBuilder:candidateGenerationBody,checkAnalysisLanguage:true}),/Analysis does not use/);assert.equal(modelCalls-priorModelCalls,2,'One corrected retry is allowed for candidate language validation');assert.equal(calls.length,priorWrites);
+  console.log('PASS delivery on disposable DB: Publish Now → photo post → durable 5-minute source comment → exactly-once comment; spacing/cooldown/credential/missed-schedule gates; live previews; unsupported figures, reversed numeric transitions, unsupported quotes and source conflicts hold before Facebook; matching human approval releases review; non-Bangla analysis retries once and fails without publishing. Facebook and AI were mocked.');
 }finally{globalThis.fetch=originalFetch;await closePools();}

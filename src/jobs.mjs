@@ -141,19 +141,25 @@ function aiEndpoint(page) {
   if (page.infrastructure === 'Neon AI Gateway') return { url: `${process.env.NEON_AI_GATEWAY_BASE_URL}/v1/chat/completions`, token: process.env.NEON_AI_GATEWAY_TOKEN };
   return { url: page.endpoint, token: tokens('AI_TOKENS_JSON')[page.aiSecret] };
 }
-async function generate(page, article) {
+export async function generate(page, article,{onRetry=async()=>{},onAttempt=async()=>{},bodyBuilder=generationBody,checkAnalysisLanguage=false}={}) {
   const endpoint = aiEndpoint(page);
   const gateway = page.infrastructure === 'Neon AI Gateway';
   const hosts = gateway ? [new URL(process.env.NEON_AI_GATEWAY_BASE_URL).hostname] : hostList('ALLOWED_AI_HOSTS');
   let lastError;
   for(let attempt=0;attempt<2;attempt++){
-    const body=generationBody(page,article);
-    body.messages[0].content+=' If the supplied article contains conflicting figures or unresolved factual contradictions, do not resolve them by guessing. Start analysis with the exact marker EDITORIAL REVIEW REQUIRED and explain the uncertainty.';
-    if(attempt)body.messages[0].content+=' Your previous output was incomplete or too short. Return a complete JSON object and a substantial 2-paragraph caption of at least 180 characters; summarize only facts in the supplied article.';
+    if(attempt)await onRetry(lastError,attempt);
+    const body=bodyBuilder(page,article);
+    if(bodyBuilder===generationBody)body.messages[0].content+=' If the supplied article contains conflicting figures or unresolved factual contradictions, do not resolve them by guessing. Start analysis with the exact marker EDITORIAL REVIEW REQUIRED and explain the uncertainty.';
+    if(attempt)body.messages[0].content+=bodyBuilder===generationBody
+      ?' Your previous output was incomplete or too short. Return a complete JSON object and a substantial 2-paragraph caption of at least 180 characters; summarize only facts in the supplied article.'
+      :page.language==='Bangla'
+      ?`\nআগের উত্তরের কাঠামোগত ত্রুটি: ${lastError?.message||'অসম্পূর্ণ উত্তর'}। আবার সম্পূর্ণ JSON দাও। post_text-এ অন্তত ১৮০ অক্ষরের পূর্ণ পোস্ট এবং analysis-এ সংক্ষিপ্ত তথ্য বাংলায় দাও। শুধু সূত্রের তথ্য ব্যবহার করো; বড় করার জন্য কিছু বানাবে না।`
+      :`\nPrevious output failed validation: ${lastError?.message||'Incomplete output'}. Return complete JSON and a caption of at least 180 characters using only source-supported facts in the requested language.`;
     let response;
     try{response=await jsonRequest(endpoint.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...bearer(endpoint.token) }, body: JSON.stringify(body) }, { hosts, local: !gateway, timeoutMs: Number(process.env.AI_TIMEOUT_MS || 300000) });}
     catch(error){if(!gateway&&attempt===0&&error instanceof HttpError&&[429,500,502,503].includes(error.status)){lastError=error;continue;}throw error;}
-    try{const result=generationResult(response.choices?.[0]?.message?.content,article);const error=draftQuality(result,page,article);if(error)throw new Error(error);return result;}catch(error){lastError=error;}
+    await onAttempt({attempt:attempt+1,text:String(response.choices?.[0]?.message?.content||'').slice(0,12000),finishReason:response.choices?.[0]?.finish_reason||null,usage:response.usage||null});
+    try{const result=generationResult(response.choices?.[0]?.message?.content,article);const error=draftQuality(result,page,article,{analysisLanguage:checkAnalysisLanguage});if(error)throw new Error(error);return result;}catch(error){lastError=error;}
   }
   throw lastError;
 }
@@ -239,7 +245,7 @@ export async function processQueue(options={}) {
       }
       if (!a.caption) {
         await stage(page,2,'Local AI is generating the caption','Waiting for the configured model. Stage percentage is not a prediction of inference time.');
-        const generated=await generate(page,a);generated.caption=withSuggestedHashtags(generated.caption,a,page.language);Object.assign(a,generated);a.caption_hash=hash(a.caption);
+        const generated=await generate(page,a,{onRetry:error=>stage(page,2,'Correcting the AI output — one retry',error?.message||'The model returned an incomplete result; no post has been sent')});generated.caption=withSuggestedHashtags(generated.caption,a,page.language);Object.assign(a,generated);a.caption_hash=hash(a.caption);
         await update(a.id, { ...generated, caption_hash: a.caption_hash,last_error:null,attempts:0 });
       }
       if (needsReview(page,a,preview)) {
@@ -301,7 +307,7 @@ export async function processQueue(options={}) {
       }
     } catch (e) {
       const attempts = a.attempts + 1;
-      const quality=/^(Caption is too short|Caption does not use|Caption copies|Incomplete model JSON|Invalid AI caption|Empty model output)/.test(e.message||'');
+      const quality=/^(Caption is too short|Caption does not use|Analysis does not use|Caption copies|Incomplete model JSON|Invalid AI caption|Empty model output)/.test(e.message||'');
       const reason=e instanceof WebsiteError||e instanceof SemanticError?e.message:e instanceof HttpError?e.message:quality?`${e.message}. Review the local model output or try a stronger model; no post was sent.`:'Pre-publish processing failed; verify endpoint, model and credentials';
       const retryAt=new Date(Date.now()+Math.min(3600,60*2**attempts)*1000);
       await update(a.id, { status: attempts >= 5 ? 'Failed' : a.status, attempts, next_attempt_at:retryAt, last_error:reason });

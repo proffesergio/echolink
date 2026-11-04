@@ -31,7 +31,8 @@
     "verify:cms": "node scripts/check-cms-ui.mjs",
     "verify:website": "node scripts/check-website-connection.mjs",
     "semantic:calibrate": "node scripts/check-semantic-quality.mjs",
-    "semantic:corpus": "node scripts/check-semantic-corpus.mjs"
+    "semantic:corpus": "node scripts/check-semantic-corpus.mjs",
+    "caption:diagnose": "node scripts/check-caption-quality.mjs"
   },
   "keywords": [],
   "author": "",

@@ -23,6 +23,11 @@ try{
   for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL','NOBLESEEK_DATABASE_URL'])if(process.env[key])assert.ok(!JSON.stringify({state,configuration}).includes(process.env[key]),`Leaked ${key}`);
   await page.getByRole('button',{name:'Drafts',exact:true}).click();
   await page.getByRole('heading',{name:'Drafts',exact:true,level:2}).waitFor();
+  await page.getByRole('button',{name:'Review queue',exact:true}).click();
+  const editor=page.locator('[data-cms="edit"]').first();
+  if(await editor.count()){
+    await editor.click();const notes=page.locator('textarea[name="analysis"]:visible').first();await notes.waitFor();assert.equal(await notes.getAttribute('maxlength'),'1800');
+  }
   await page.getByRole('button',{name:'Activity',exact:true}).click();
   await page.getByRole('heading',{name:'Run activity & results'}).waitFor();
   assert.deepEqual(errors,[]);

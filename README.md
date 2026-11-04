@@ -119,7 +119,7 @@ Keep the PC awake and n8n, the worker, your AI runner and the HTTPS bridge onlin
 
 | Available now | Optional / roadmap |
 | --- | --- |
-| Local runner adapters and Bangla draft generation | Better factual-quality evaluation and stronger local models |
+| Local runner adapters, Bangla drafts and [quality diagnostics](docs/CAPTION_QUALITY.md) | Reliable broader factual evaluation and stronger local models |
 | Editorial controls, photo delivery and calendar rules | Expanded network publishing through Postiz |
 | Airtable, Neon and Google Sheets integration | Qdrant/MCP semantic-memory migration |
 | Token-scope checks and task progress | Additional scraper/MCP adapters and paid providers |

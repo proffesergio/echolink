@@ -53,14 +53,17 @@ export async function editDraft(id,body){
     if(!['Draft','Pending Approval','Approved','Dry Run','Queued','Rejected','Failed'].includes(article.status))throw new Error('Article is no longer editable');
     if(body.expectedVersion&&new Date(body.expectedVersion).getTime()!==new Date(article.updated_at).getTime())throw new ContentActionError('This post changed in another session. Refresh before saving');
     const caption=String(body.caption??article.caption).trim();if(!caption||caption.length>1800)throw new Error('Caption must contain 1–1800 characters');
+    if(body.analysis!==undefined&&typeof body.analysis!=='string')throw new Error('Editorial notes must be text');
+    const analysis=body.analysis===undefined?article.analysis:String(body.analysis).trim()||null;
+    if(analysis&&analysis.length>1800)throw new Error('Editorial notes must contain at most 1800 characters');
     let image=body.imageURL===undefined?article.image_url:String(body.imageURL).trim()||null;
     if(image){const u=new URL(image);if(u.protocol!=='https:'||u.username||u.password)throw new Error('Use an HTTPS media URL');image=u.toString();}
     const scheduled=body.scheduledAt?new Date(body.scheduledAt):body.scheduledAt===''?null:article.scheduled_at;
     if(scheduled&&(!Number.isFinite(new Date(scheduled).getTime())||new Date(scheduled)<=new Date()))throw new Error('Choose a future scheduled time');
     // Clear old external approval while holding the approvals and page locks.
-    if(article.airtable_id)await airtable(tables().log,{method:'PATCH',body:{records:[{id:article.airtable_id,fields:{'Approval Decision':null,'AI Generated Caption':caption}}]}});
+    if(article.airtable_id)await airtable(tables().log,{method:'PATCH',body:{records:[{id:article.airtable_id,fields:{'Approval Decision':null,'AI Generated Caption':caption,'Editorial Analysis':analysis||''}}]}});
     const status=body.intent==='draft'?'Draft':'Pending Approval';
-    const saved=await query("UPDATE echolink.articles SET caption=$2,caption_hash=$3,image_url=$4,scheduled_at=$5,approval_hash=NULL,status=$6,attempts=0,last_error=NULL,next_attempt_at=now(),dirty=true,updated_at=now() WHERE id=$1 RETURNING updated_at",[id,caption,hash(caption),image,status==='Draft'?null:scheduled,status]);
+    const saved=await query("UPDATE echolink.articles SET caption=$2,caption_hash=$3,image_url=$4,scheduled_at=$5,analysis=$7,approval_hash=NULL,status=$6,attempts=0,last_error=NULL,next_attempt_at=now(),dirty=true,updated_at=now() WHERE id=$1 RETURNING updated_at",[id,caption,hash(caption),image,status==='Draft'?null:scheduled,status,analysis]);
     return {ok:true,status,updatedAt:saved.rows[0].updated_at,requiresFreshApproval:true};
   },{coordination:true});
 }

@@ -21,17 +21,18 @@ export function rankNews(articles,page,now=new Date()){
 export function generationResult(text,article={}){
   if(typeof text!=='string'||!text.trim())throw new Error('Empty model output');
   let parsed;const clean=text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');try{parsed=JSON.parse(clean);}catch{if(clean.startsWith('{')||clean.startsWith('['))throw new Error('Incomplete model JSON');}
-  const caption=(typeof parsed?.caption==='string'?parsed.caption:parsed?null:text)?.trim();
+  const caption=(Object.hasOwn(parsed||{},'post_text')?typeof parsed.post_text==='string'?parsed.post_text:null:typeof parsed?.caption==='string'?parsed.caption:parsed?null:text)?.replace(/(?:\\r)?\\n(?:[ \t]*(?:\\r)?\\n)+/g,'\n\n').trim();
   if(!caption||caption.length>4000)throw new Error('Invalid AI caption');
   const suggested=typeof parsed?.image_prompt==='string'?parsed.image_prompt:'';
   const imagePrompt=!suggested||/(photo|realistic|injur|blood|dramatic|distress|wreck|eyewitness)/i.test(suggested)?`Editorial illustration about: ${article.title||'this news story'}. Use symbolic shapes and a calm neutral composition, no recreated accident scene or injured people, no fabricated documentary evidence, no text overlay.`:`Illustration only, not documentary evidence. ${suggested}`;
   return {caption:caption.slice(0,1800),analysis:typeof parsed?.analysis==='string'?parsed.analysis.slice(0,1800):'Review facts, attribution and uncertainty against the linked source before approval.',image_prompt:imagePrompt.slice(0,1200)};
 }
-export function draftQuality(draft,page,article={}){
+export function draftQuality(draft,page,article={},{analysisLanguage=false}={}){
   if(draft.caption.length<180)return 'Caption is too short; a headline alone is not an editorial draft';
   if(page.language==='Bangla'){
-    const letters=draft.caption.match(/\p{L}/gu)||[],bangla=draft.caption.match(/[\u0980-\u09ff]/g)||[];
-    if(bangla.length/Math.max(1,letters.length)<0.6)return 'Caption does not use the requested Bangla language';
+    const ratio=text=>{const letters=String(text||'').match(/\p{L}/gu)||[];return letters.filter(letter=>/\p{Script=Bengali}/u.test(letter)).length/Math.max(1,letters.length);};
+    if(ratio(draft.caption)<0.6)return 'Caption does not use the requested Bangla language';
+    if(analysisLanguage&&ratio(String(draft.analysis||'').replace(/EDITORIAL[ _-]+REVIEW[ _-]+REQUIRED/gi,''))<0.6)return 'Analysis does not use the requested Bangla language';
   }
   const source=String(article.body||'').replace(/\s+/g,' ').trim();
   if(source&&draft.caption.split(/\n\s*\n/).some(p=>{const text=p.replace(/\s+/g,' ').trim();return text.length>200&&source.includes(text);}))return 'Caption copies a long source paragraph instead of rewriting it';

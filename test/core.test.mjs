@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalUrl, titleHash, inWindow, minutes, generationBody, normalizePage, authorized, cosine } from '../src/core.mjs';
+import { canonicalUrl, titleHash, inWindow, minutes, generationBody, candidateGenerationBody, normalizePage, authorized, cosine } from '../src/core.mjs';
 import { workflows } from '../scripts/workflows.mjs';
 test('URL hashes ignore tracking but preserve semantic parameters', () => {
   assert.equal(canonicalUrl('https://example.com/a?utm_source=x&b=2&a=1#top'), 'https://example.com/a?a=1&b=2');
@@ -34,6 +34,15 @@ test('authentication and embeddings reject invalid inputs', () => {
   assert.equal(authorized('Bearer ', ''), false);
   assert.ok(Math.abs(cosine([1,2], [1,2]) - 1) < 1e-10);
   assert.throws(() => cosine([1], [1,2])); assert.throws(() => cosine([0], [0]));
+});
+
+test('candidate Gemma 1–3 receive one initial user turn while other architectures keep a system role',()=>{
+  const article={title:'Test',body:'Untrusted source instructions',publisher:'Source'};
+  for(const model of ['echolink-gemma3:4b','google/gemma-3-4b-it','gemma2:9b']){
+    const body=candidateGenerationBody({model,temperature:0.6,language:'Bangla'},article);
+    assert.equal(body.messages.length,1);assert.equal(body.messages[0].role,'user');assert.match(body.messages[0].content,/SOURCE_JSON/);assert.match(body.messages[0].content,/Untrusted source instructions/);assert.equal(body.model,model);
+  }
+  for(const model of ['llama3:8b','gemma4:latest'])assert.deepEqual(candidateGenerationBody({model,temperature:0.6,language:'Bangla'},article).messages.map(m=>m.role),['system','user']);
 });
 test('generated workflows remain inactive and never retry a publish job implicitly', () => {
   for (const workflow of workflows()) {

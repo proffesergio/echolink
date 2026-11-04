@@ -50,7 +50,7 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 | ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 verified publishers are enabled and linked to Noble Seek; real previews fetched 20 items with no failed feeds; RSS concurrency defaults to 4; see sources/VERIFIED.md |
 | নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic checks now include prepared captions and lazily index prior posts using publication-time memory. Real embeddinggemma calibration and corpus probes completed; 0.92 produced a false match, so automatic semantic skipping remains disabled pending held-out evaluation. See docs/SEMANTIC_DEDUPLICATION.md |
 | কোনো সাইট ব্লক করলে ফলব্যাক সিস্টেম চালু হয়ে যায় | Primary timeout/HTTP/parse failure tries configured permitted fallback; RSS text survives article fetch failure; both failures logged | Blocked/malformed feed fallback tests passed; configured alternate-publisher backups imported visibly; they do not recover the exact blocked article |
-| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified. Unapproved captions with explicit conflict warnings or unsupported numbers now require review even on automatic Pages; relationship/name/attribution accuracy and real benchmark acceptance remain open |
+| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | Candidate Gemma adapter/post_text mapping produced full Bangla posts, but remains diagnostic-only after factual failures. Production retains its existing prompt with added numeric-direction, quotation, unsupported-notes and observed boilerplate review signals. Broader claim/attribution validation remains open. See docs/CAPTION_QUALITY.md |
 | ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, optional delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Real photo post and delayed comment verified through Meta on November 4. Website URLs are supported, but the owner's later instruction disables automatic link comments; current policy skips them |
 | সব রেকর্ড Airtable-এ: posted/skipped/failed | Article log plus bounded duplicate/failure audit entries; comment states | Article/approval roundtrip tested; audit-event mirroring and source-comment state fields implemented |
 | শুধু নির্ধারিত সময়ে পোস্ট; স্প্যাম নয় | Page timezone/window, daily cap, minimum inter-post gap, source-comment timing policy, approvals and durable reservations | Window/cap/approval and minimum-gap enforcement implemented; default 30-minute post gap and 5-minute comment delay; comments also respect quiet hours |
@@ -126,7 +126,29 @@ Connection checklist and delivery contract:
 
 ## Latest connector and roadmap verification — 2026-11-04
 
-Later semantic follow-up: `npm test` passed 42 tests and build passed. Disposable
+Latest caption follow-up: `npm test` passed 50 tests and build passed. Added
+diagnostic-only Gemma 1–3 prompt formatting and complete `post_text` output,
+plus narrow source/number/quotation review signals for production. The existing
+production prompt remains the default because the candidate failed factual tests.
+Candidate language validation does not change the legacy production contract.
+Existing `caption` responses stay supported; retry stages are visible.
+The post editor now supports correcting notes, with fresh approval and stale-edit
+protection. See [CAPTION_QUALITY.md](docs/CAPTION_QUALITY.md).
+
+Four real local-model diagnostic cases produced 290–446 character captions in
+85–109 seconds, all on their first attempt with the new response field. The
+owner's temperature 0.6 was preserved. They still included invented details,
+an incorrect analysis figure and an omitted conflict marker: factual-quality
+acceptance failed, even though structure improved. No diagnostic article, approval,
+website post or Facebook post was created. Review-first publishing was recommended;
+the owner's current approval policy is not changed without their choice.
+Final disposable-Neon checks passed all scheduling, editorial, delivery and semantic
+paths, including notes editing and the new review signals. The temporary branch
+was removed. Browser fixtures verified notes-only correction before scheduling;
+no real content was changed. The worker was reloaded while idle and n8n's prior
+active state was restored, with the stable production prompt retained.
+
+Earlier semantic follow-up: `npm test` passed 42 tests and build passed. Disposable
 Neon checks passed the prepared-caption path, prior-post backfill, input/model
 cache invalidation, Page isolation, publication-time expiry and safe provider
 failure. An additional real local embeddinggemma → cloned Neon → prepared-caption

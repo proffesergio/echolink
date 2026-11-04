@@ -19,12 +19,23 @@ test('today ranking excludes stale, missing and future dates and rewards indepen
 test('editorial response exposes caption, analysis and image suggestion without claiming generated media',()=>{
   const result=generationResult('```json\n'+JSON.stringify({caption:'একটি নতুন শিরোনাম',analysis:'উৎস যাচাই করুন',image_prompt:'Editorial illustration'})+'\n```');
   assert.equal(result.caption,'একটি নতুন শিরোনাম');assert.ok(result.analysis);assert.ok(result.image_prompt);
+  assert.equal(generationResult(JSON.stringify({post_text:'সম্পূর্ণ পোস্টের পাঠ্য',analysis:'সংক্ষিপ্ত তথ্য'})).caption,'সম্পূর্ণ পোস্টের পাঠ্য');
+  assert.equal(generationResult(JSON.stringify({post_text:'প্রথম অনুচ্ছেদ\\n\\nদ্বিতীয় অনুচ্ছেদ'})).caption,'প্রথম অনুচ্ছেদ\n\nদ্বিতীয় অনুচ্ছেদ');
+  assert.throws(()=>generationResult(JSON.stringify({post_text:'',caption:'A legacy headline cannot hide an empty post'})));
   assert.ok(generationResult('Plain caption',{title:'A story'}).image_prompt.includes('illustration'));
   assert.throws(()=>generationResult('{"analysis":"no caption"}'));
   assert.throws(()=>generationResult('{"caption":"truncated'));
   assert.ok(draftQuality({caption:'Only a headline'},{language:'Bangla'}));
-  assert.equal(draftQuality({caption:'বাংলাদেশের সংবাদ সম্পর্কে যাচাই করা তথ্য নিয়ে এই প্রতিবেদন। '.repeat(5)},{language:'Bangla'}),null);
+  assert.equal(draftQuality({caption:'বাংলাদেশের সংবাদ সম্পর্কে যাচাই করা তথ্য নিয়ে এই প্রতিবেদন। '.repeat(5),analysis:'সূত্রের প্রতিবেদনে ঘটনার তথ্য উল্লেখ করা হয়েছে।'},{language:'Bangla'}),null);
   assert.ok(generationResult(JSON.stringify({caption:'Caption',image_prompt:'Dramatic photo with injured students'}),{title:'News'}).image_prompt.startsWith('Editorial illustration'));
+});
+
+test('candidate Bangla generation validates analysis language after excluding the review marker',()=>{
+  const caption='সূত্রের সংবাদ সম্পর্কে পাওয়া তথ্য নিজের ভাষায় সংক্ষেপে তুলে ধরা হয়েছে। '.repeat(4);
+  assert.match(draftQuality({caption,analysis:'The article requires independent verification.'},{language:'Bangla'},{},{analysisLanguage:true}),/Analysis does not use/);
+  assert.match(draftQuality({caption,analysis:'EDITORIAL REVIEW REQUIRED: conflicting figures.'},{language:'Bangla'},{},{analysisLanguage:true}),/Analysis does not use/);
+  assert.equal(draftQuality({caption,analysis:'EDITORIAL REVIEW REQUIRED: একই প্রশ্নের উত্তরে দুটি পরস্পরবিরোধী হার দেওয়া হয়েছে।'},{language:'Bangla'},{},{analysisLanguage:true}),null);
+  assert.equal(draftQuality({caption,analysis:'Legacy English notes.'},{language:'Bangla'}),null,'Stable production keeps its existing analysis contract');
 });
 test('draft, scheduled and published panels reflect real underlying state',()=>{
   assert.equal(contentPanel({status:'Pending Approval',caption:'x'}),'Drafts');assert.equal(contentPanel({status:'Dry Run',caption:'x'}),'Drafts');

@@ -23,7 +23,7 @@ try{
   await page.route('https://example.com/test.jpg',route=>route.fulfill({status:204}));
   await page.route('**/admin/api/draft',async route=>{
     const body=route.request().postDataJSON();writes.push({type:'draft',body});await new Promise(resolve=>setTimeout(resolve,500));
-    article.caption=body.caption;article.image_url=body.imageURL;article.status=body.intent==='draft'?'Draft':'Pending Approval';article.updated_at=new Date(++version).toISOString();
+    article.caption=body.caption;article.analysis=body.analysis;article.image_url=body.imageURL;article.status=body.intent==='draft'?'Draft':'Pending Approval';article.updated_at=new Date(++version).toISOString();
     await route.fulfill({json:{ok:true,status:article.status,updatedAt:article.updated_at}});
   });
   await page.route('**/admin/api/article-action',async route=>{
@@ -40,19 +40,23 @@ try{
   assert.match(await page.locator('nav [data-tab="drafts"]').innerText(),/1/);
   await card.getByRole('button',{name:'Edit',exact:true}).click();
   await card.locator('textarea[name="caption"]').fill('Edited synthetic caption — no actual user record is changed.');
+  await card.locator('textarea[name="analysis"]').fill('Corrected synthetic editorial notes — no real article is changed.');
   await card.locator('form').getByRole('button',{name:'Save Draft',exact:true}).click();
   await page.locator('#work-progress').waitFor({state:'visible'});
   await page.getByText('Saved Draft. It is held out of the publishing queue.',{exact:true}).waitFor();assert.equal(article.status,'Draft');
   assert.equal(writes[0].body.imageURL,'https://example.com/test.jpg');
+  assert.equal(writes[0].body.analysis,'Corrected synthetic editorial notes — no real article is changed.');
   await card.getByRole('button',{name:'Review',exact:true}).click();assert.equal(article.status,'Draft','Review must not change publication state');
   await card.getByRole('button',{name:'Edit',exact:true}).click();await card.getByRole('button',{name:'Submit for Review',exact:true}).click();await page.getByText('Submitted for review. Logs are syncing in the background.',{exact:true}).waitFor();assert.equal(article.status,'Pending Approval');
   await card.getByRole('button',{name:'Approve',exact:true}).click();await page.waitForFunction(()=>document.querySelector('nav [data-tab="scheduled"]')?.innerText.includes('1'));
   assert.equal(article.status,'Approved');
   await card.getByRole('button',{name:'Schedule',exact:true}).click();
   const tomorrow=new Date(Date.now()+86400000),local=new Date(tomorrow-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  await card.locator('textarea[name="analysis"]').fill('Notes-only correction before scheduling.');
   await card.locator('input[name="scheduledAt"]').fill(local);await card.getByRole('button',{name:'Approve & Schedule',exact:true}).click();
   await page.getByText('Approved and scheduled. Posting hours, limits and dry-run still apply.',{exact:true}).waitFor();assert.ok(new Date(article.scheduled_at)>new Date());
   assert.ok(writes.some(w=>w.body.action==='schedule'&&w.body.confirmed));
+  assert.equal(writes.at(-2).body.analysis,'Notes-only correction before scheduling.','Notes-only changes must be saved before Schedule');
   await page.route('**/admin/api/schedule-slot',route=>route.fulfill({json:{ok:true,scheduledAt:tomorrow.toISOString(),timezone:'Asia/Dhaka'}}));
   await page.getByRole('button',{name:'Scheduled',exact:true}).click();await page.getByRole('heading',{name:'Publishing calendar'}).waitFor();
   assert.ok(await page.locator('[data-calendar-day]').count()>=28);await page.getByRole('button',{name:'Next month'}).click();await page.getByRole('button',{name:'Previous month'}).click();

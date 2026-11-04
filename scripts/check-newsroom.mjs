@@ -25,9 +25,12 @@ try{
   await assert.rejects(editDraft(id,{caption:'Stale overwrite',expectedVersion:savedDraft.updatedAt}),/another session/);
   await assert.rejects(articleAction(id,'publish',{confirmed:true}),/Dry-run/);
   assert.equal((await query('SELECT status FROM echolink.articles WHERE id=$1',[id])).rows[0].status,'Approved');
-  await editDraft(id,{caption:'Edited caption',imageURL:'',scheduledAt:at});
-  const row=(await query('SELECT status,caption,approval_hash,scheduled_at FROM echolink.articles WHERE id=$1',[id])).rows[0];
+  await editDraft(id,{caption:'Edited caption',analysis:'Corrected source-supported editorial notes',imageURL:'',scheduledAt:at});
+  const row=(await query('SELECT status,caption,analysis,approval_hash,scheduled_at FROM echolink.articles WHERE id=$1',[id])).rows[0];
   assert.equal(row.status,'Pending Approval');assert.equal(row.approval_hash,null);assert.equal(row.caption,'Edited caption');assert.equal(row.scheduled_at.toISOString(),at);
+  assert.equal(row.analysis,'Corrected source-supported editorial notes');
+  await assert.rejects(editDraft(id,{analysis:'x'.repeat(1801)}),/at most 1800/);
+  await assert.rejects(editDraft(id,{analysis:{text:'invalid'}}),/must be text/);
   await assert.rejects(editDraft(id,{scheduledAt:'2020-01-01'}));
   await query("UPDATE echolink.articles SET status='Approved',approval_hash=caption_hash WHERE id=$1",[id]);
   const result=await processQueue({pageId});assert.equal(result.pages[0].empty,true);

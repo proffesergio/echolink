@@ -1,5 +1,11 @@
 # Public dashboard, local AI and remaining work
 
+November 4 quality update: controlled 4B tests still produced unsupported details.
+The candidate prompt remains diagnostic-only. Production retains its existing
+prompt with additional review signals; the post editor now allows correcting
+editorial notes. Read [caption quality findings and diagnostics](CAPTION_QUALITY.md)
+before treating valid output as factually verified or changing the review policy.
+
 Open **https://echolinkbd.vercel.app/admin** and use the existing local
 `DASHBOARD_PASSWORD`. The November 4 outage was an expired Cloudflare Quick
 Tunnel: the old hostname stopped resolving and cloudflared reported
