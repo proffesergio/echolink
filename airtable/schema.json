@@ -324,6 +324,9 @@
               },
               {
                 "name": "Failed"
+              },
+              {
+                "name": "Skipped"
               }
             ]
           }
@@ -397,6 +400,34 @@
         {
           "name": "Dashboard Panel",
           "type": "singleLineText"
+        },
+        {
+          "name": "Website Article URL",
+          "type": "url"
+        },
+        {
+          "name": "Website Post ID",
+          "type": "singleLineText"
+        },
+        {
+          "name": "Website Status",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "name": "Draft"
+              },
+              {
+                "name": "Published"
+              },
+              {
+                "name": "Failed"
+              },
+              {
+                "name": "Unknown"
+              }
+            ]
+          }
         }
       ]
     }

@@ -1,5 +1,11 @@
 # First real Facebook post: dashboard and n8n walkthrough
 
+Current owner preference: automatic source/website link comments are disabled
+(`FB_AUTOMATIC_LINKS_ENABLED=false`). A post's comment status is therefore
+**Skipped**, not an error or a missing delayed job. Only opt in deliberately
+before testing automatic comments. Website publication is independently optional;
+see [WEBSITE_PUBLISHING.md](WEBSITE_PUBLISHING.md).
+
 Updated 2026-11-04. The imported workflow is **EchoLink — Complete pipeline**:
 http://localhost:5678/workflow/echolinkPipeline01
 

@@ -16,9 +16,11 @@ try{
   const response=await page.request.get(base+'/admin/api/state');
   assert.equal(response.status(),200);
   const state=await response.json();assert.ok(state.pages?.length);assert.ok(state.feeds?.length);
+  const configResponse=await page.request.get(base+'/admin/api/configuration');assert.equal(configResponse.status(),200);
+  const configuration=await configResponse.json();
   const cookies=await page.context().cookies();
   assert.ok(cookies.some(cookie=>cookie.secure&&cookie.httpOnly),'Expected secure HttpOnly login cookie');
-  for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL'])if(process.env[key])assert.ok(!JSON.stringify(state).includes(process.env[key]),`Leaked ${key}`);
+  for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL','NOBLESEEK_DATABASE_URL'])if(process.env[key])assert.ok(!JSON.stringify({state,configuration}).includes(process.env[key]),`Leaked ${key}`);
   await page.getByRole('button',{name:'Drafts',exact:true}).click();
   await page.getByRole('heading',{name:'Drafts',exact:true,level:2}).waitFor();
   await page.getByRole('button',{name:'Activity',exact:true}).click();

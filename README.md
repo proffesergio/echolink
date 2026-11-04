@@ -37,6 +37,13 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 ## How it fits together
 
+The next platform phases add multiple niches, content/language profiles, optional
+per-Page websites, branded image/quote formats and future YouTube video workflows.
+The current working module remains the news newsroom; planned adapters are
+tracked separately in the [creator platform roadmap](docs/PLATFORM_ROADMAP.md).
+The [NobleSeek connector guide](docs/WEBSITE_PUBLISHING.md) covers local database
+settings and the owner's automatic-link opt-out.
+
 ```mermaid
 flowchart LR
     R[RSS sources + fallback] --> W[Local EchoLink worker]

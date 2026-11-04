@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {rankNews,publishedAt,generationResult,draftQuality,contentPanel} from '../src/newsroom.mjs';
-import {sheetWrites,sheetHeaders} from '../src/sheets.mjs';
+import {sheetWrites,sheetHeaders,compatibleSheetHeader,sheetRow} from '../src/sheets.mjs';
 import {needsReview} from '../src/publishing-policy.mjs';
 test('preview always requires review even when live mode or approval-free Pages are used',()=>{
   assert.equal(needsReview({approval:false},{caption_hash:'a',approval_hash:'a'},true),true);
@@ -33,7 +33,11 @@ test('draft, scheduled and published panels reflect real underlying state',()=>{
 test('Sheets upserts keep the existing article row and add new IDs without formula interpretation',()=>{
   const row=id=>({id,page_id:'page',status:'Pending Approval',caption:'=IMPORTXML("bad")',title:'News',updated_at:new Date('2026-11-03')});
   const writes=sheetWrites([sheetHeaders,['one'],['two']],[row('two'),row('new'),row('one')],"Page's posts");
-  assert.deepEqual(writes.map(w=>w.range),["'Page''s posts'!A3:S3","'Page''s posts'!A4:S4","'Page''s posts'!A2:S2"]);
+  assert.deepEqual(writes.map(w=>w.range),["'Page''s posts'!A3:U3","'Page''s posts'!A4:U4","'Page''s posts'!A2:U2"]);
   assert.equal(writes[0].values[0][7],'=IMPORTXML("bad")'); // Written with valueInputOption RAW.
   assert.throws(()=>sheetWrites([sheetHeaders,['one'],['one']],[row('one')],'posts'));
+  assert.equal(compatibleSheetHeader(sheetHeaders.slice(0,19)),true);
+  assert.equal(compatibleSheetHeader(sheetHeaders),true);
+  assert.equal(compatibleSheetHeader(['Automation ID','Unrelated data']),false);
+  assert.deepEqual(sheetRow({...row('one'),website_url:'https://example.com/news',website_status:'Published'}).slice(19),['https://example.com/news','Published']);
 });

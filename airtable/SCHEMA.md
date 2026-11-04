@@ -62,7 +62,7 @@ CSV files contain headers only; JSON includes field types, select choices and li
 | FB Post ID Reference | singleLineText |  |
 | Timestamp Logged | dateTime |  |
 | Timestamp Published | dateTime |  |
-| Source Comment Status | singleSelect | Queued, Sending, Sent, Unknown, Failed |
+| Source Comment Status | singleSelect | Queued, Sending, Sent, Unknown, Failed, Skipped |
 | Source Comment ID | singleLineText |  |
 | Source Comment Due At | dateTime |  |
 | Outcome Detail | multilineText |  |
@@ -73,4 +73,7 @@ CSV files contain headers only; JSON includes field types, select choices and li
 | Selection Score | number |  |
 | Selection Reason | multilineText |  |
 | Dashboard Panel | singleLineText |  |
+| Website Article URL | url |  |
+| Website Post ID | singleLineText |  |
+| Website Status | singleSelect | Draft, Published, Failed, Unknown |
 

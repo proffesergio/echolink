@@ -28,7 +28,8 @@
     "public:check": "node scripts/check-local-services.mjs",
     "public:repair": "powershell -NoProfile -File scripts/repair-public-dashboard.ps1",
     "verify:public": "node scripts/check-public-dashboard.mjs",
-    "verify:cms": "node scripts/check-cms-ui.mjs"
+    "verify:cms": "node scripts/check-cms-ui.mjs",
+    "verify:website": "node scripts/check-website-connection.mjs"
   },
   "keywords": [],
   "author": "",

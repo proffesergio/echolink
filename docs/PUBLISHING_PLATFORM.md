@@ -4,7 +4,13 @@ Open https://echolinkbd.vercel.app/admin. The Windows worker, n8n, Ollama, inter
 
 ## Current Page settings
 
-Noble Seek is configured for live publishing, 2 posts per local day, a 60-minute minimum gap, 09:00–23:00 Asia/Dhaka, human approval, and a source comment 5 minutes after successful publication. These are your operating limits, not Meta-provided safe limits or a guarantee against restrictions. Other posts made directly on Facebook are not counted by EchoLink.
+NobleSeek's latest saved policy is live mode, 20 posts per local day, a 60-minute minimum gap, 09:00–23:00 Asia/Dhaka and general approval off. The Page itself is disabled by the owner. Automatic source/website link comments are now disabled by explicit owner choice; the five-minute delay remains available if links are enabled later. These are operating settings, not Meta-provided safe limits or a guarantee against restrictions. Other posts made directly on Facebook are not counted by EchoLink.
+
+Website posting is optional for each Page. The NobleSeek connector uses a Page
+allowlist; an optional website failure does not block native Facebook delivery
+unless the owner sets it as a required dependency. See
+[WEBSITE_PUBLISHING.md](WEBSITE_PUBLISHING.md) and the expanded
+[creator platform roadmap](PLATFORM_ROADMAP.md).
 
 In **Pages & models**, select your Page and change:
 

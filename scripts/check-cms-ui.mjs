@@ -9,9 +9,12 @@ try{
   await page.goto(base+'/admin');await page.getByLabel('password',{exact:true}).fill(process.env.DASHBOARD_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByRole('heading',{name:"Today's top story → your draft"}).waitFor();
   const state=await (await page.request.get(base+'/admin/api/state')).json(),pageId=state.pages[0].id;
+  assert.ok(state.articles.every(article=>Object.hasOwn(article,'website_status')&&Object.hasOwn(article,'website_url')),'The real API must expose website delivery fields');
   state.configuration.dryRun=true;state.dryRun=true;state.runs=[];
+  state.pages[0].fields['Active Status']=true; // Intercepted browser fixture only.
   const id='11111111-1111-4111-8111-111111111111';let version=Date.now();
   const article={id,page_id:pageId,title:'CMS interface test — never persisted',caption:'A synthetic editorial draft for interface verification only.',status:'Pending Approval',source_url:'https://example.com/test',image_url:'https://example.com/test.jpg',analysis:'Synthetic review data',image_prompt:'Symbolic illustration suggestion',updated_at:new Date(version).toISOString()};
+  article.website_status='Published';article.website_url='https://www.fabrything.com/nobleseek/ui-fixture-not-created';
   const writes=[];
   const snapshot=()=>({...state,calendar:article.scheduled_at?[{...article}]:[],articles:[{...article,panel:article.status==='Posted'?'Published':article.status==='Approved'?'Scheduled':'Drafts'}],navCounts:{queue:article.status==='Pending Approval'?1:0,drafts:['Draft','Pending Approval'].includes(article.status)?1:0,scheduled:article.status==='Approved'?1:0,published:article.status==='Posted'?1:0,inbox:0,total:1}});
   // Browser fixtures do not mutate the user's actual articles, approve anything
@@ -31,6 +34,7 @@ try{
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   await page.getByRole('button',{name:'Review queue',exact:true}).click();
   const card=page.locator(`[data-article="${id}"]`);await card.waitFor();
+  assert.equal(await card.getByRole('link',{name:'Open website article ↗'}).getAttribute('href'),article.website_url);
   for(const name of ['Edit','Save Draft','Review','Approve','Schedule','Publish Now'])assert.equal(await card.getByRole('button',{name,exact:true}).count(),1,'Missing or duplicate visible action: '+name);
   assert.equal(await card.getByRole('button',{name:'Publish Now',exact:true}).isDisabled(),true);
   assert.match(await page.locator('nav [data-tab="drafts"]').innerText(),/1/);
@@ -72,6 +76,8 @@ try{
   await mkdir('.codex/logs',{recursive:true});await page.screenshot({path:'.codex/logs/cms-operations.png',fullPage:true});
   await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Connection center',exact:true}).waitFor();await page.getByRole('heading',{name:'Facebook Page token: start here'}).waitFor();
   await page.getByLabel('Find a connection',{exact:true}).fill('Bright Data');assert.equal(await page.locator('[data-connection-name]:visible').count(),1);
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  const apiKey=page.locator('input[name="n8nAPIKey"]');assert.equal(await apiKey.getAttribute('autocomplete'),'new-password');assert.equal(await apiKey.inputValue(),'');
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Review queue',exact:true}).click();await card.waitFor();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Mobile layout overflows');
   await page.screenshot({path:'.codex/logs/cms-mobile.png',fullPage:true});

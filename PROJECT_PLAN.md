@@ -1,8 +1,22 @@
-# EchoLink main project goal and implementation plan
+# EchoLink creator platform: main project goal and implementation plan
 
-Updated: 2026-11-04. This file is the working acceptance plan. The user's seven
-Bangla requirements are mandatory; the reference image defines the desired
-pipeline shape, not a claim that every pictured node has been reproduced.
+Updated: 2026-11-04. EchoLink is being expanded into a multi-niche creator
+operations platform: multiple brands/Pages/channels, languages, content types and
+post formats, with optional per-Page website publication and link sharing. The
+news pipeline remains its first working module. Its seven Bangla requirements
+remain the news acceptance track; the reference image describes that pipeline,
+not the boundaries of the whole product.
+
+The detailed phased architecture, researched monetization experiments, local
+media feasibility and future YouTube plan are in
+[PLATFORM_ROADMAP.md](docs/PLATFORM_ROADMAP.md). That roadmap distinguishes working
+features from planned adapters and preserves the existing publishing behavior.
+
+Current owner preference: **automatic Facebook source/website link comments are
+disabled**. Website posting and linking must be separate per-Page choices. Keep
+the publishing path direct; enforce configured policies and actual platform
+responses without inventing universal daily/link limits. Existing approvals,
+per-Page schedules and disabled states remain authoritative.
 
 Current operating guide and prioritized remaining work:
 [PRODUCTION_TESTING.md](docs/PRODUCTION_TESTING.md). The public dashboard at
@@ -22,9 +36,10 @@ handoff entries below are historical and do not override this current state.
 Editorial operations implemented: held Draft state, per-post
 Edit/Review/Approve/Schedule/Publish Now controls, navigation counts,
 per-task stage/feed percentages, heartbeat recovery and event logs. Next: the
-requested visual redesign, favicon and Page-specific image branding, plus website
-publishing to https://www.fabrything.com/nobleseek. Design preferences, the logo
-asset and the website backend/schema are awaiting user clarification. Preserve
+requested visual redesign, favicon and Page-specific image branding, plus live
+website delivery acceptance for https://www.fabrything.com/nobleseek. The website
+schema and logo assets have been located; branding controls and design choices
+remain open. Preserve
 posting gates, stale-edit detection and unknown-outcome protection. A selected
 photo must not silently fall back to text-only after Facebook rejection. Setup
 guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATIONS.md.
@@ -35,11 +50,24 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 | নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic adapter exists; duplicate audit events now mirrored to Airtable; real semantic evaluation awaits model |
 | কোনো সাইট ব্লক করলে ফলব্যাক সিস্টেম চালু হয়ে যায় | Primary timeout/HTTP/parse failure tries configured permitted fallback; RSS text survives article fetch failure; both failures logged | Blocked/malformed feed fallback tests passed; configured alternate-publisher backups imported visibly; they do not recover the exact blocked article |
 | AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified. Unapproved captions with explicit conflict warnings or unsupported numbers now require review even on automatic Pages; relationship/name/attribution accuracy and real benchmark acceptance remain open |
-| ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, durable delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Real photo post and delayed comment verified through Meta on November 4; next extend the comment to the published NobleSeek website article URL |
+| ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, optional delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Real photo post and delayed comment verified through Meta on November 4. Website URLs are supported, but the owner's later instruction disables automatic link comments; current policy skips them |
 | সব রেকর্ড Airtable-এ: posted/skipped/failed | Article log plus bounded duplicate/failure audit entries; comment states | Article/approval roundtrip tested; audit-event mirroring and source-comment state fields implemented |
 | শুধু নির্ধারিত সময়ে পোস্ট; স্প্যাম নয় | Page timezone/window, daily cap, minimum inter-post gap, source-comment timing policy, approvals and durable reservations | Window/cap/approval and minimum-gap enforcement implemented; default 30-minute post gap and 5-minute comment delay; comments also respect quiet hours |
 
-## Delivery order
+## Platform delivery order
+
+1. Finish/test the optional NobleSeek website connector and link opt-out.
+2. Introduce content profiles, independent destinations and multi-niche/language
+   configuration while retaining existing news/Page compatibility.
+3. Add brand kits, favicon/logo/watermark and image/quote formats with exact
+   media previews; then campaign planning and creator performance tracking.
+4. Build an original-video MVP using scripts, suitable narration, subtitles and
+   composition before evaluating large generative-video models on appropriate
+   hardware. YouTube delivery begins with a private authorized upload.
+5. Expand rendering, optional paid providers, teams and measurable revenue
+   experiments after the earlier paths are verified. No earnings guarantees.
+
+## Original news delivery order and acceptance
 
 1. Finish the local authenticated admin UI and single-canvas n8n pipeline.
 2. Add durable delayed source comments, minimum post gap and operational logs.
@@ -61,26 +89,28 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 - Keep the installed local model running and review its Bangla factual quality.
 - Sign into Meta, authorize the app, provide Page access and satisfy any review.
 - Approve sensitive content and explicitly decide when to enable live posting.
-- Provide the website backend/schema and a restricted publishing connection;
-  choose dashboard styling and provide an approved NobleSeek logo asset.
+- Keep the supplied website connection valid; choose dashboard styling and
+  initial niche/content profiles. The website repository supplies NobleSeek logo
+  assets; their placement and per-Page branding controls still need implementation.
 
 The agent handles code, migration testing, table setup, workflow imports, UI,
 integration probes, feed validation and documented operating instructions.
 
 ## Website publishing and branding extension — current work
 
-- Add an authenticated website connection and connection test to the dashboard.
-  Inspect the actual website schema and publish rules before choosing a driver or
-  writing records; do not assume this website uses EchoLink's Neon database.
+- Website source/schema inspection is complete: Django/PostgreSQL with the
+  supplied separate connection. Add the connection test, deterministic-slug
+  writer, delivery fields, mirrors and existing-card status/link display.
 - Publish a reviewed article, image and relevant hashtags to the website before
-  Facebook delivery when website publishing is enabled. Confirm the desired
-  draft/review timing with the user. Keep the current approval, window, cap and
-  minimum-gap gates; changing the destination must not bypass them.
+  optional Facebook delivery. Website failure only holds Facebook when explicitly
+  configured as required; the default is independent optional delivery. Keep the
+  current approval, window, cap and minimum-gap gates.
 - Persist the website record ID and canonical public article URL separately from
   the original publisher URL. Reuse that website record on retries, and hold
   Facebook delivery if the required website publication fails or is uncertain.
-- Put the canonical website news link into the durable delayed Facebook comment.
-  Preserve original-source attribution in the website article and existing logs.
+- Support the canonical website URL in the delayed Facebook comment when the
+  owner opts in. The current owner opted out: skip automatic link comments and
+  expose the URL for manual sharing. Preserve original-source attribution.
   Do not invent article slugs, alter comments on existing posts, or bulk-publish
   the existing queue without an explicit user action.
 - Show separate website and Facebook delivery states, actionable errors and
@@ -93,7 +123,41 @@ integration probes, feed validation and documented operating instructions.
 Connection checklist and delivery contract:
 [WEBSITE_PUBLISHING.md](docs/WEBSITE_PUBLISHING.md).
 
-## Latest verification — 2026-11-04 editorial gate
+## Latest connector and roadmap verification — 2026-11-04
+
+- Expanded product direction: multi-niche content profiles, Pages/channels,
+  languages, image/quote/video formats, independent optional website destinations,
+  creator performance experiments and phased YouTube support. These future
+  modules are planned, not marked implemented.
+- `npm test`: 39 passed; build passed. Disposable Neon checks proved website-first
+  publication, required versus optional website failure, idempotent retry, skipped
+  automatic comments, dry-run safety and a second Facebook-only Page working
+  even with an invalid website connection. Remote APIs were mocked.
+- The real website database passed 28-column validation and a DRAFT insert/read/
+  retry/rollback probe; no test article was retained. Public listing matched the
+  database, but existing Bangla-slug detail URLs returned 404. A new live public
+  article URL remains unverified; do not claim full website delivery acceptance.
+- Migration 008 and Airtable website fields/Skipped comment state were applied.
+  Optional website delivery is configured only for NobleSeek. The owner-disabled
+  Page, 20/day cap and 60-minute gap were preserved. An actual comments job returned
+  `policyDisabled:true` with zero sent. Sheets upgraded its dedicated header and
+  synchronized 64 rows successfully.
+- Local worker/bridge/tunnel/dashboard/Ollama/n8n connectivity and the CMS browser
+  regression passed. The browser tested website status/link display and publishing
+  controls with intercepted writes, not a real post.
+- Repeated n8n API HTTP 401 was traced to the dashboard password replacing the
+  API key. The latest full secret passed a real HTTP 200 check. Credential fields
+  now use password-manager hints separate from login, and the backend rejects a
+  dashboard password in the n8n key field before changing memory or disk. Both
+  plaintext/hash password modes passed isolated regression tests. The running
+  worker also rejected the autofilled password with HTTP 400 while leaving
+  `.env.local` unchanged. Dashboard Start/Stop/Start passed against n8n, and the
+  original active workflow state was restored. Browser checks confirmed the
+  Settings key field is blank and uses the new credential hints.
+- `embeddinggemma` was downloaded successfully for later Bangla semantic testing;
+  semantic mode remains disabled and its accuracy is not accepted yet.
+
+## Earlier verification — 2026-11-04 editorial gate
 
 - `npm test`: 35 passed, zero failed. `npm run build`: passed.
 - `node scripts/validate-migration.mjs`: all 12 required tables, concurrent

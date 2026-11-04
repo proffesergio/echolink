@@ -15,5 +15,6 @@ export const schema = {
 };
 schema.tables[0].fields.push(number('Source Comment Delay Minutes'), number('Minimum Minutes Between Posts'));
   schema.tables[2].fields.find(f=>f.name==='Status').options.choices.push({name:'Draft'});
-  schema.tables[2].fields.push(select('Source Comment Status',['Queued','Sending','Sent','Unknown','Failed']),text('Source Comment ID'),date('Source Comment Due At'),long('Outcome Detail'));
+  schema.tables[2].fields.push(select('Source Comment Status',['Queued','Sending','Sent','Unknown','Failed','Skipped']),text('Source Comment ID'),date('Source Comment Due At'),long('Outcome Detail'));
 schema.tables[2].fields.push(date('Source Published At'),date('Scheduled At'),long('Editorial Analysis'),long('Image Suggestion'),number('Selection Score',2),long('Selection Reason'),text('Dashboard Panel'));
+schema.tables[2].fields.push({name:'Website Article URL',type:'url'},text('Website Post ID'),select('Website Status',['Draft','Published','Failed','Unknown']));

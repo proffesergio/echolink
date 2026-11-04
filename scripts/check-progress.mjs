@@ -13,6 +13,9 @@ try{
   await finishRun(id,{late:true});assert.equal((await query('SELECT status FROM echolink.job_runs WHERE id=$1',[id])).rows[0].status,'Interrupted','Late completion cannot resurrect an expired run');
   const failed=await startRun('publish-now','test');await updateProgress(failed,3,5,'Sending to Facebook');await finishRun(failed,{pages:[{failed:'probe'}]});
   row=(await query('SELECT * FROM echolink.job_runs WHERE id=$1',[failed])).rows[0];assert.equal(row.status,'Needs attention');assert.equal(row.progress,60,'Failure must not become 100%');
+  const partial=await startRun('publish-now','test');await updateProgress(partial,4,5,'Facebook confirmed');
+  await finishRun(partial,{pages:[{posted:'probe',websiteWarning:'Optional website unavailable'}]});
+  row=(await query('SELECT * FROM echolink.job_runs WHERE id=$1',[partial])).rows[0];assert.equal(row.status,'Needs attention');assert.equal(row.result.pages[0].posted,'probe');
   await runJob('progress-probe',async()=>{await reportProgress(1,2,'Preparing outputs');return {ok:true};},'n8n schedule');
   row=(await query("SELECT * FROM echolink.job_runs WHERE job='progress-probe'")).rows[0];assert.equal(row.progress,100);assert.equal(row.status,'Succeeded');assert.match(row.events[0].phase,/n8n/);assert.ok(row.events.some(e=>e.percent===50));
   console.log('PASS task progress: calculated stage percentages, event history, n8n initiation, failed-run percentage preserved, stale heartbeat interrupted, late completion ignored.');

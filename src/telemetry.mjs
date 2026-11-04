@@ -33,7 +33,7 @@ export async function recoverExpiredRuns(force=false){
 export async function finishRun(id,result,error){
   clearInterval(timers.get(id));timers.delete(id);
   const blocked=!!result?.blocked||!!result?.reason||!!result?.busy;
-  const failed=!!error||Number(result?.failedFeeds)>0||!!result?.sheets?.failed||(Array.isArray(result?.pages)&&result.pages.some(p=>p.failed||p.unknown));
+  const failed=!!error||Number(result?.failedFeeds)>0||!!result?.sheets?.failed||(Array.isArray(result?.pages)&&result.pages.some(p=>p.failed||p.unknown||p.websiteWarning));
   const status=error?'Failed':failed?'Needs attention':blocked?'Blocked':'Succeeded';
   if(status==='Succeeded')await updateProgress(id,1,1,'Completed','Output saved; inspect the result below');
   const phase=status==='Succeeded'?'Completed':status==='Blocked'?'Stopped — rule or connection blocked this task':status==='Needs attention'?'Stopped — review task results':'Task failed';

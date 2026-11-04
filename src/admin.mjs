@@ -5,6 +5,8 @@ import { allRecords, airtable, tables } from './airtable.mjs';
 import { query,resetPools } from './db.mjs';
 import { jsonRequest, hostList } from './net.mjs';
 import { saveSettings } from './settings.mjs';
+import {websiteConfiguration,testWebsiteConnection,WebsiteError} from './website.mjs';
+import {automaticLinksEnabled} from './link-policy.mjs';
 import { sync, mirror, approvals, jobs } from './jobs.mjs';
 import {passwordHash,authenticatePassword,passwordConfigured,passwordSource,issueSession,validSession,sessionCookie,readSession} from './admin-auth.mjs';
 import {publicConfiguration,jobNames} from './runtime.mjs';
@@ -74,7 +76,8 @@ export async function admin(req) {
       await saveSettings({DASHBOARD_PASSWORD:'',DASHBOARD_PASSWORD_HASH:await passwordHash(password)});
       return reply({ok:true},200,{'Set-Cookie':loginCookie(req)});
     }
-    if(path==='/admin/api/configuration'&&req.method==='GET')return reply({...publicConfiguration(),facebookAliases:Object.keys(maps('FB_TOKENS_JSON')),aiAliases:Object.keys(maps('AI_TOKENS_JSON')),graphVersion:process.env.META_GRAPH_VERSION||'',workflow:workflowStatus()});
+    if(path==='/admin/api/configuration'&&req.method==='GET')return reply({...publicConfiguration(),website:websiteConfiguration(),automaticLinksEnabled:automaticLinksEnabled(),facebookAliases:Object.keys(maps('FB_TOKENS_JSON')),aiAliases:Object.keys(maps('AI_TOKENS_JSON')),graphVersion:process.env.META_GRAPH_VERSION||'',workflow:workflowStatus()});
+    if(path==='/admin/api/test-website'&&req.method==='POST'){try{return reply(await testWebsiteConnection());}catch(error){return reply({error:error instanceof WebsiteError?error.message:'Website connection check failed'},400);}}
     if(path==='/admin/api/preview'&&req.method==='POST'){const {pageId}=await req.json();return reply(await startPreview(pageId),202);}
     if(path==='/admin/api/enable-feeds'&&req.method==='POST'){const {pageId,confirmed}=await req.json();if(confirmed!==true)return reply({error:'Confirm enabling the verified Bangla catalog'},400);return reply(await enableBanglaFeeds(pageId));}
     if(path==='/admin/api/draft'&&req.method==='POST'){const {id,...body}=await req.json();const result=await editDraft(id,body);queueEditorialMirror();return reply(result);}
@@ -99,7 +102,10 @@ export async function admin(req) {
     if(path==='/admin/api/test-airtable'&&req.method==='POST')return reply({ok:true,pages:(await allRecords(tables().pages)).length,feeds:(await allRecords(tables().feeds)).length});
     if(path==='/admin/api/settings'&&req.method==='POST'){
       const body=await req.json(),values={};
-      if(body.n8nAPIKey)values.N8N_API_KEY=String(body.n8nAPIKey);
+      if(body.n8nAPIKey){
+        if(await authenticatePassword(body.n8nAPIKey))return reply({error:'The n8n API key field contains your dashboard password, likely from browser autofill. Saved credentials were not changed. Clear this field or paste the full n8n API key.'},400);
+        values.N8N_API_KEY=String(body.n8nAPIKey).trim();
+      }
       const numeric={pageConcurrency:['PAGE_CONCURRENCY',1,3],feedConcurrency:['FEED_CONCURRENCY',1,8],maxItemsPerFeed:['MAX_ITEMS_PER_FEED',1,25],aiTimeoutMs:['AI_TIMEOUT_MS',1000,600000],articleTimeoutMs:['ARTICLE_TIMEOUT_MS',1000,600000],semanticTTLDays:['SEMANTIC_TTL_DAYS',1,30]};
       for(const [key,[env,min,max]]of Object.entries(numeric))if(body[key]!==undefined){const value=Number(body[key]);if(!Number.isInteger(value)||value<min||value>max)return reply({error:`${key} must be an integer from ${min} to ${max}`},400);values[env]=String(value);}
       if(body.semanticThreshold!==undefined){const value=Number(body.semanticThreshold);if(!(value>0&&value<=1))return reply({error:'Semantic threshold must be between 0 and 1'},400);values.SEMANTIC_THRESHOLD=String(value);}
@@ -131,7 +137,7 @@ export async function admin(req) {
       const names=['pages','feeds','articles','counts','audit','scheduler','runs','calendar','delivery'];
       const results = await Promise.allSettled([
         allRecords(tables().pages), allRecords(tables().feeds),
-        query('SELECT a.id,a.page_id,a.title,a.source_url,a.image_url,a.caption,a.status,a.fb_post_id,a.last_error,a.created_at,a.updated_at,a.source_published_at,a.publisher,a.selection_score,a.selection_reason,a.analysis,a.image_prompt,a.scheduled_at,a.published_at,c.status AS comment_status,c.due_at AS comment_due,c.remote_id AS comment_id FROM echolink.articles a LEFT JOIN echolink.source_comments c ON c.article_id=a.id ORDER BY (a.caption IS NOT NULL) DESC,a.updated_at DESC LIMIT 200'),
+        query('SELECT a.id,a.page_id,a.title,a.source_url,a.image_url,a.caption,a.status,a.fb_post_id,a.last_error,a.created_at,a.updated_at,a.source_published_at,a.publisher,a.selection_score,a.selection_reason,a.analysis,a.image_prompt,a.scheduled_at,a.published_at,a.website_post_id,a.website_url,a.website_status,c.status AS comment_status,c.due_at AS comment_due,c.remote_id AS comment_id FROM echolink.articles a LEFT JOIN echolink.source_comments c ON c.article_id=a.id ORDER BY (a.caption IS NOT NULL) DESC,a.updated_at DESC LIMIT 200'),
         query('SELECT status,count(*)::int AS count,count(*) FILTER (WHERE caption IS NOT NULL)::int AS caption_count FROM echolink.articles GROUP BY status'),
         query('SELECT id,page_id,title,source_url,status,detail,occurrences,created_at FROM echolink.ingestion_events ORDER BY updated_at DESC LIMIT 50'),
         planTick(),
