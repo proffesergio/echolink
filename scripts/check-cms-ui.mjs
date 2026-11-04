@@ -40,7 +40,8 @@ try{
   await page.locator('#work-progress').waitFor({state:'visible'});
   await page.getByText('Saved Draft. It is held out of the publishing queue.',{exact:true}).waitFor();assert.equal(article.status,'Draft');
   assert.equal(writes[0].body.imageURL,'https://example.com/test.jpg');
-  await card.getByRole('button',{name:'Review',exact:true}).click();await page.getByText('Test action saved',{exact:true}).waitFor();assert.equal(article.status,'Pending Approval');
+  await card.getByRole('button',{name:'Review',exact:true}).click();assert.equal(article.status,'Draft','Review must not change publication state');
+  await card.getByRole('button',{name:'Edit',exact:true}).click();await card.getByRole('button',{name:'Submit for Review',exact:true}).click();await page.getByText('Submitted for review. Logs are syncing in the background.',{exact:true}).waitFor();assert.equal(article.status,'Pending Approval');
   await card.getByRole('button',{name:'Approve',exact:true}).click();await page.waitForFunction(()=>document.querySelector('nav [data-tab="scheduled"]')?.innerText.includes('1'));
   assert.equal(article.status,'Approved');
   await card.getByRole('button',{name:'Schedule',exact:true}).click();

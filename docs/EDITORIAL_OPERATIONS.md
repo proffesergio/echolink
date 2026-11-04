@@ -15,8 +15,8 @@ with generated posts first; its shown count reflects those loaded/filter matches
   leave **Include this photo** checked to include it. Uncheck it for text-only.
 - **Save Draft** stores an unpublished, held `Draft`. It clears approval and
   schedule and cannot be picked up by the publishing worker.
-- **Review / Submit for Review** moves a held item to review. On an item already
-  awaiting approval, Review opens its editorial notes for inspection.
+- **Review** opens editorial notes without changing approval or scheduling.
+  **Submit for Review** in the editor moves a held item to the approval queue.
 - **Approve** explicitly approves the current caption/photo for the next eligible
   processing run. It does not itself start n8n or override dry-run.
 - **Schedule** opens the date/time field. Choose a future browser-local time,

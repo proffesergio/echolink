@@ -61,7 +61,7 @@ async function handleCMSAction(button){
   const id=button.dataset.id,action=button.dataset.cms,article=state.articles.find(a=>a.id===id),form=draftForm(id),editor=document.querySelector(`[data-editor="${id}"]`);
   if(action==='edit'||action==='show-schedule'){cmsState.openEditors.add(id);editor.open=true;editor.scrollIntoView({behavior:'smooth',block:'center'});form.elements[action==='edit'?'caption':'scheduledAt'].focus();return;}
   if(action==='draft'){await submitCMSDraft(form,'draft');return;}
-  if(action==='review'&&article.status==='Pending Approval'){document.querySelector(`[data-review="${id}"]`).open=true;notice('Check the source, caption and photo, then choose Approve or Edit.');return;}
+  if(action==='review'){document.querySelector(`[data-review="${id}"]`).open=true;notice('Review the source, caption and photo. This does not change approval or scheduling.');return;}
   if(['approve','publish'].includes(action)&&!confirm(action==='publish'?'Publish this reviewed post now, including its selected photo? This sends a real Facebook post if all Page rules pass.':'Approve this saved caption and photo for the next eligible processing run?'))return;
   let version=article.updated_at;
   if(form){

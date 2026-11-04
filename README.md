@@ -3,6 +3,9 @@
 Public dashboard: https://echolinkbd.vercel.app/admin (requires the local
 worker and tunnel). See [deployment and CI instructions](docs/CI_CD.md).
 Start with [production testing and remaining work](docs/PRODUCTION_TESTING.md).
+Manage posts with [the editorial operations guide](docs/EDITORIAL_OPERATIONS.md).
+Account setup: [Facebook Page token](docs/FACEBOOK_TOKEN.md) and
+[Google Sheets service account](docs/GOOGLE_SHEETS.md).
 
 Open the local admin UI with `npm run dashboard` while the worker is running.
 It manages page/feed configuration, local model discovery/testing, token aliases
