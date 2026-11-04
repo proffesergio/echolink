@@ -50,6 +50,8 @@ The comment status is visible on the post card. Posted/Draft/Pending Approval/Sc
 
 ## Facebook errors and restrictions
 
+**Publishing preflight:** Page identity alone is insufficient. Test Facebook connection and Publish Now inspect the actual granted scopes with Meta's token debugger. `pages_manage_posts` and `pages_read_engagement` are required to publish; source comments additionally need `pages_manage_engagement`. A token with only Ads permissions is rejected before a publication request. See the [Ads-only app troubleshooting steps](FACEBOOK_TOKEN.md#2-generate-a-user-token-with-page-permissions).
+
 - Explicit rate-limit rejections queue the same post/comment after a persistent cooldown. `Retry-After` and usage headers can extend the wait; the local fallback is 15 minutes. Usage at 90% triggers a five-minute pause. App-wide throttles pause all Pages using this worker.
 - Token, permission and policy errors pause Page delivery until repaired. Check Operations center → Facebook delivery controls, repair the problem, then **Acknowledge repair & Resume**. This acknowledgement preserves any server-requested cooldown; it cannot remove a restriction imposed by Meta.
 - Other definite photo/post rejections are **Failed** and need editorial/operator action. No immediate retries or automatic text-only fallback.
@@ -61,6 +63,14 @@ Meta warns against excessive hashtags, unrelated captions, repetitive spam netwo
 ## n8n authentication
 
 If Start/Stop reports HTTP 401, create a new API key at **n8n → Settings → n8n API** and save it in **EchoLink → Settings → n8nAPIKey**. Saving through the dashboard applies immediately. If editing `.env.local` instead, restart the worker after inference finishes. The combined workflow is `echolinkPipeline01`; keep older EchoLink schedules inactive.
+
+## Task progress and logs
+
+The dashboard shows one determinate meter for each active task. Percentages use completed stages or feeds, with the task's stage name, elapsed time and heartbeat. Network requests move through response received, result validation and acknowledgement; HTTP acknowledgement is separate from a durable background job's completion.
+
+Preview tasks show Page loading, feed collection, model preparation, local AI and output/log saving. Publishing shows Page-rule checks, caption/media preparation, the Facebook request, confirmed delivery and log persistence. Activity includes a bounded timestamped event history and the saved result or blocking reason. Failed tasks keep their last completed percentage; they never become 100% success.
+
+AI completion time cannot be predicted from these stages. Its meter stays at the current percentage while the model runs, with a refreshed heartbeat and elapsed time. No fake timer drives it toward 99%. A heartbeat missing for 90 seconds or a reached task deadline becomes Interrupted; expired scheduling leases are released when no matching task is still running. Check real Facebook state before retrying uncertain publication. Current default task deadlines are 30 minutes for preview/process, 10 minutes for Publish Now and 15 minutes for other jobs.
 
 ## Verification
 

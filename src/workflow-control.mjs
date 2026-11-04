@@ -17,7 +17,16 @@ async function cli(command,id){
   const base=new URL(process.env.N8N_BASE_URL||'http://localhost:5678');
   if(!['127.0.0.1','localhost','[::1]'].includes(base.hostname))throw new Error('Use a localhost n8n API endpoint');
   if(!process.env.N8N_API_KEY)throw new Error('Save an n8n API key in Settings or publish the workflow directly in n8n');
-  const response=await fetch(new URL('/api/v1/workflows/'+id+'/'+(command==='publish:workflow'?'activate':'deactivate'),base),{method:'POST',headers:{'X-N8N-API-KEY':process.env.N8N_API_KEY},signal:AbortSignal.timeout(20000)});
+  const active=command==='publish:workflow',headers={'X-N8N-API-KEY':process.env.N8N_API_KEY,Connection:'close'};
+  const send=()=>fetch(new URL('/api/v1/workflows/'+id+'/'+(active?'activate':'deactivate'),base),{method:'POST',headers,signal:AbortSignal.timeout(10000)});
+  let response;
+  try{response=await send();}catch{
+    // Activation can succeed before a local socket closes. Read state before
+    // retrying this idempotent control operation; never apply this to publishing.
+    const checked=await fetch(new URL('/api/v1/workflows/'+id,base),{headers,signal:AbortSignal.timeout(5000)});
+    if(checked.ok&&(await checked.json()).active===active)return;
+    response=await send();
+  }
   if(!response.ok)throw new Error('n8n API rejected the change (HTTP '+response.status+'). Check the saved API key and workflow permissions.');
 }
 let pending=Promise.resolve();

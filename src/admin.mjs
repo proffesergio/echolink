@@ -10,13 +10,13 @@ import {passwordHash,authenticatePassword,passwordConfigured,passwordSource,issu
 import {publicConfiguration,jobNames} from './runtime.mjs';
 import {planTick} from './scheduler.mjs';
 import {workflowStatus,controlWorkflow} from './workflow-control.mjs';
-import {runJob} from './telemetry.mjs';
+import {runJob,recoverExpiredRuns} from './telemetry.mjs';
 import {contentPanel,generationResult} from './newsroom.mjs';
 import {startPreview,enableBanglaFeeds,editDraft,articleAction,ContentActionError} from './newsroom-actions.mjs';
 import {integrationCatalog} from './integrations.mjs';
 import {validateGoogleCredentials,testSheet,syncSheet} from './sheets.mjs';
 import {suggestSlot} from './calendar.mjs';
-import {clearDeliveryPause} from './facebook.mjs';
+import {clearDeliveryPause,clearConnectionPause,checkFacebookConnection,FacebookError} from './facebook.mjs';
 import {suggestedHashtags} from './publishing-policy.mjs';
 const tickets = new Map();
 let loginFailures=0,loginResetAt=0;
@@ -127,6 +127,7 @@ export async function admin(req) {
       return reply({ok:true,configuration:publicConfiguration()});
     }
     if (path === '/admin/api/state' && req.method === 'GET') {
+      await recoverExpiredRuns();
       const names=['pages','feeds','articles','counts','audit','scheduler','runs','calendar','delivery'];
       const results = await Promise.allSettled([
         allRecords(tables().pages), allRecords(tables().feeds),
@@ -134,7 +135,7 @@ export async function admin(req) {
         query('SELECT status,count(*)::int AS count,count(*) FILTER (WHERE caption IS NOT NULL)::int AS caption_count FROM echolink.articles GROUP BY status'),
         query('SELECT id,page_id,title,source_url,status,detail,occurrences,created_at FROM echolink.ingestion_events ORDER BY updated_at DESC LIMIT 50'),
         planTick(),
-        query("SELECT id,job,trigger_source,status,started_at,finished_at,result,error FROM echolink.job_runs WHERE id IN (SELECT id FROM echolink.job_runs ORDER BY started_at DESC LIMIT 50) OR id=(SELECT id FROM echolink.job_runs WHERE job='preview' ORDER BY started_at DESC LIMIT 1) ORDER BY started_at DESC"),
+        query("SELECT id,job,trigger_source,status,started_at,finished_at,result,error,progress,phase,progress_detail,events,heartbeat_at,deadline_at FROM echolink.job_runs WHERE status='Running' OR id IN (SELECT id FROM echolink.job_runs ORDER BY started_at DESC LIMIT 50) OR id=(SELECT id FROM echolink.job_runs WHERE job='preview' ORDER BY started_at DESC LIMIT 1) ORDER BY started_at DESC"),
         query("SELECT id,page_id,title,status,scheduled_at,published_at FROM echolink.articles WHERE (status='Approved' AND scheduled_at IS NOT NULL) OR (status='Posted' AND published_at>=now()-interval '90 days') ORDER BY COALESCE(scheduled_at,published_at) LIMIT 2000"),
         query('SELECT page_id,cooldown_until,paused_reason,last_code FROM echolink.facebook_delivery'),
       ]);
@@ -237,9 +238,11 @@ export async function admin(req) {
       if(!/^\d+$/.test(pageId||''))return reply({error:'Enter the numeric Facebook Page ID under Pages & models. Use the id returned by GET /me/accounts, not the app ID or Page username'},400);
       if(!secret)return reply({error:`No Page token is saved for alias “${alias||'(empty)'}”. Open Connections → Facebook Page token, save it under that alias, then retry`},400);
       if(!/^v\d+\.\d+$/.test(version||''))return reply({error:'Save graphVersion in Connections → Facebook Page token using the version selected in Graph API Explorer (format vNN.N)'},400);
-      const identity = await jsonRequest(`https://graph.facebook.com/${version}/me?fields=id,name`, { headers: { Authorization: `Bearer ${secret}` } }, { hosts: ['graph.facebook.com'] });
-      if (String(identity.id) !== pageId) return reply({ error: 'This token does not identify the selected Page; use a Page access token' }, 400);
-      return reply({ ok: true, name: identity.name, id: identity.id });
+      const connection=await checkFacebookConnection({fbSecret:alias,fbPageId:pageId});
+      if(!connection.publishReady)return reply({error:connection.reason,...connection},409);
+      const linked=(await query("SELECT id FROM echolink.configurations WHERE kind='page' AND config->>'fbSecret'=$1 AND config->>'fbPageId'=$2",[alias,pageId])).rows;
+      for(const p of linked)await clearConnectionPause(p.id);
+      return reply(connection);
     }
     if (path === '/admin/api/decision' && req.method === 'POST') {
       const { id, decision } = await req.json();
@@ -269,6 +272,7 @@ export async function admin(req) {
     }
     return reply({ error: 'Not found' }, 404);
   } catch (e) {
+    if(e instanceof FacebookError)return reply({error:e.diagnostic,code:e.code,subcode:e.subcode},409);
     if(e instanceof ContentActionError)return reply({error:e.message},e.status);
     console.error('Admin operation failed:', e.status || e.code || 'configuration/upstream');
     const fieldErrors=new Set(['Enable dry-run before generating a preview','Choose an enabled Page first','Choose a Page first','Review sync is running. Retry shortly','Only an unpublished draft can be edited','Page processing is running. Retry shortly','Article is no longer editable','Caption must contain 1–1800 characters','Use an HTTPS media URL','Choose a future scheduled time','Provide a Google service-account JSON key']);

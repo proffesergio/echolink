@@ -13,6 +13,8 @@ let response={id:'123_456'},responseStatus=200,responseHeaders={};
 // but never makes a Facebook request or alters the production database.
 globalThis.fetch=async(url,options)=>{
   if(new URL(url).hostname!=='graph.facebook.com')throw new Error('External adapters disabled in delivery test');
+  if(String(url).includes('/debug_token'))return Response.json({data:{is_valid:true,type:'PAGE',scopes:['pages_read_engagement','pages_manage_posts','pages_manage_engagement']}});
+  if(String(url).includes('/me?'))return Response.json({id:'123',name:'Delivery probe'});
   calls.push({url:String(url),body:JSON.parse(options.body)});
   return Response.json(response,{status:responseStatus,headers:responseHeaders});
 };

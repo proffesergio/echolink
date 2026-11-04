@@ -33,6 +33,8 @@ try {
     console.log(newsroom.stdout.trim());if(newsroom.status!==0)throw new Error('Newsroom validation failed');
     const delivery=spawnSync(process.execPath,['scripts/check-delivery.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:60000});
     console.log(delivery.stdout.trim());if(delivery.status!==0){console.error(delivery.stderr.slice(-3000));throw new Error('Delivery validation failed');}
+    const progress=spawnSync(process.execPath,['scripts/check-progress.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:60000});
+    console.log(progress.stdout.trim());if(progress.status!==0){console.error(progress.stderr.slice(-3000));throw new Error('Progress validation failed');}
   } finally { await c.end(); }
 } catch (e) { console.error(e.message); process.exitCode = 1; }
 finally {

@@ -3,7 +3,7 @@ import {query,transaction} from './db.mjs';
 import {airtable,allRecords,tables} from './airtable.mjs';
 import {sync,ingest,processQueue,mirror,publicationReadiness} from './jobs.mjs';
 import {hash} from './core.mjs';
-import {startRun,finishRun,runJob} from './telemetry.mjs';
+import {startRun,finishRun,runJob,updateProgress,withRun} from './telemetry.mjs';
 import {validateSlot} from './calendar.mjs';
 export async function enableBanglaFeeds(pageId){
   if(!/^rec[A-Za-z0-9]+$/.test(pageId||''))throw new Error('Choose a Page first');
@@ -24,10 +24,14 @@ export async function startPreview(pageId,articleId){
   if(!result.existing){
     void (async()=>{
       try{
+        await updateProgress(result.runId,0,6,'Loading Page configuration');
         await runJob('sync',sync,'preview');
+        await updateProgress(result.runId,1,6,'Collecting today’s news from configured feeds');
         const ingestion=articleId?{selectedArticle:articleId}:await runJob('ingest',()=>ingest({pageId,limitPerFeed:1}),'preview');
         if(ingestion.blocked){await finishRun(result.runId,ingestion);return;}
+        await updateProgress(result.runId,3,6,'Ranking news and preparing AI output','The separate process task shows model progress');
         const processing=await runJob('process',()=>processQueue({preview:true,pageId,articleId}),'preview');
+        await updateProgress(result.runId,5,6,'Saving draft, photo and external logs');
         const mirrored=await runJob('mirror',mirror,'preview');
         const draftIds=(processing.pages||[]).map(p=>p.pending).filter(Boolean);
         await finishRun(result.runId,{ingestion,processing,mirrored,draftIds,...(!draftIds.length?{blocked:true,reason:processing.reason||'No new eligible draft. Review existing drafts and Activity errors.'}:{})});
@@ -95,7 +99,7 @@ export async function articleAction(id,action,body={}){
     // Synchronize existing external approvals under the same locks before
     // changing canonical state. Held Draft rows never enter the processing queue.
     if(a.airtable_id)await airtable(tables().log,{method:'PATCH',body:{records:[{id:a.airtable_id,fields:{'Approval Decision':approved?'Approved':null,'AI Generated Caption':a.caption}}]}});
-    await query('UPDATE echolink.articles SET status=$2,approval_hash=$3,scheduled_at=$4,next_attempt_at=now(),dirty=true,updated_at=now() WHERE id=$1',[id,status,approved?hash(a.caption):null,at]);
+    await query('UPDATE echolink.articles SET status=$2,approval_hash=$3,scheduled_at=$4,next_attempt_at=now(),last_error=NULL,attempts=0,dirty=true,updated_at=now() WHERE id=$1',[id,status,approved?hash(a.caption):null,at]);
     return {...a,status};
   },{coordination:true});
   if(action==='generate')return startPreview(article.page_id,id);
@@ -103,7 +107,8 @@ export async function articleAction(id,action,body={}){
     const runId=await startRun('publish-now','dashboard');
     void(async()=>{
       try{
-        const result=await processQueue({pageId:article.page_id,articleId:id});
+        const result=await withRun(runId,()=>processQueue({pageId:article.page_id,articleId:id}));
+        await updateProgress(runId,result.pages?.some(p=>p.posted)?5:0,6,'Saving publication result to external logs');
         const mirrored=await mirror().catch(()=>({failed:true,reason:'Publication state saved; mirroring will retry'}));
         await finishRun(runId,{...result,articleId:id,mirrored});
       }catch(error){await finishRun(runId,{articleId:id},error).catch(()=>{});}

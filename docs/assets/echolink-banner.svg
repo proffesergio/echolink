@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="title desc">
+  <title id="title">EchoLink — Your newsroom, connected</title>
+  <desc id="desc">RSS sources, local AI, editorial review, scheduled publishing and durable records connected in one newsroom.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#091622"/><stop offset="1" stop-color="#12382f"/></linearGradient><linearGradient id="accent"><stop stop-color="#64cfe9"/><stop offset="1" stop-color="#8bf0bd"/></linearGradient></defs>
+  <rect width="1280" height="400" rx="24" fill="url(#bg)"/>
+  <circle cx="1090" cy="100" r="210" fill="none" stroke="#6ddab2" stroke-opacity=".1" stroke-width="50"/>
+  <circle cx="1090" cy="100" r="130" fill="none" stroke="#6ddab2" stroke-opacity=".12" stroke-width="2"/>
+  <circle cx="91" cy="98" r="26" fill="none" stroke="#7fe8bb" stroke-width="5"/><circle cx="91" cy="98" r="15" fill="#7fe8bb"/>
+  <g font-family="Segoe UI,Arial,sans-serif"><text x="137" y="114" font-size="58" font-weight="700" fill="#e9fff7">EchoLink</text>
+  <text x="65" y="166" font-size="15" letter-spacing="4" fill="#92c9c2">YOUR NEWSROOM, CONNECTED</text>
+  <text x="65" y="224" font-size="28" fill="#c7e0e9">From news feeds to reviewed social posts.</text>
+  <text x="65" y="261" font-size="20" fill="#95b9c8">Local AI. One n8n canvas. You control what gets published.</text>
+  <path d="M130 332H1100" stroke="url(#accent)" stroke-width="2" opacity=".55"/>
+  <g fill="#112b35" stroke="#476b70"><rect x="65" y="306" width="180" height="52" rx="12"/><rect x="295" y="306" width="180" height="52" rx="12"/><rect x="525" y="306" width="180" height="52" rx="12"/><rect x="755" y="306" width="180" height="52" rx="12"/><rect x="985" y="306" width="230" height="52" rx="12"/></g>
+  <g font-size="18" fill="#b5f3dc" text-anchor="middle"><text x="155" y="339">RSS sources</text><text x="385" y="339">Local AI</text><text x="615" y="339">Review</text><text x="845" y="339">Publish</text><text x="1100" y="339">Logs + feedback</text></g></g>
+</svg>

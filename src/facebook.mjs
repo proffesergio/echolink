@@ -1,9 +1,38 @@
 import {HttpError} from './net.mjs';
 import {query} from './db.mjs';
+import {createHash} from 'node:crypto';
+const connectionCache=new Map();
+export function facebookFailure({code,subcode,message=''}){
+  const missing=[...new Set(String(message).match(/pages_manage_posts|pages_manage_engagement|pages_read_engagement/g)||[])];
+  if(missing.length)return `Facebook permission missing or unavailable: ${missing.join(', ')}. Regenerate the Page token with these permissions in Graph API Explorer; check the app use case/App Review if unavailable. No post was sent.`;
+  if(code===190)return 'Facebook token expired or invalid (code 190). Replace the Page access token and test the connection before retrying.';
+  if([10,200].includes(code))return `Facebook denied Page publishing permissions (code ${code}${subcode?', subcode '+subcode:''}). Test the Page token permissions and Page access before retrying.`;
+  if(code===368)return 'Facebook temporarily restricted this action (code 368). Resolve the restriction with Meta; do not repeatedly retry.';
+  if([100,324].includes(code))return `Facebook rejected the selected media or request parameters (code ${code}). Check that the photo URL is public and points to a supported image. No text-only fallback was sent.`;
+  return `Facebook rejected publication${code?' (code '+code+')':''}. Test Page permissions and inspect the selected media before retrying.`;
+}
+export async function checkFacebookConnection(page,fetcher=fetch){
+  const token=JSON.parse(process.env.FB_TOKENS_JSON||'{}')[page.fbSecret],version=process.env.META_GRAPH_VERSION;
+  if(!token||!/^v\d+\.\d+$/.test(version||''))return {ok:false,publishReady:false,reason:'Save the Page token and Graph API version first'};
+  const key=createHash('sha256').update(token+'|'+version+'|'+page.fbPageId).digest('hex'),cached=connectionCache.get(key);
+  if(cached?.expires>Date.now())return cached.value;
+  const base='https://graph.facebook.com/'+version,headers={Authorization:'Bearer '+token};
+  const get=async path=>{const r=await fetcher(base+path,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});const j=await r.json();if(!r.ok||j.error)throw new FacebookError(r.status,{code:j.error?.code,diagnostic:facebookFailure({code:j.error?.code,message:j.error?.message})});return j;};
+  const identity=await get('/me?fields=id,name');
+  if(String(identity.id)!==String(page.fbPageId))return {ok:false,publishReady:false,reason:'This Page token belongs to a different Facebook Page. Save the matching Page ID/token pair.'};
+  const {data}=await get('/debug_token?input_token='+encodeURIComponent(token));
+  const scopes=Array.isArray(data?.scopes)?data.scopes.filter(s=>/^pages_[a-z_]+$/.test(s)):[];
+  const missing=['pages_read_engagement','pages_manage_posts'].filter(s=>!scopes.includes(s)),commentsReady=scopes.includes('pages_manage_engagement');
+  const valid=data?.is_valid===true&&data?.type==='PAGE';
+  const value={ok:valid&&!missing.length,publishReady:valid&&!missing.length,commentsReady,id:identity.id,name:identity.name,scopes,missing,
+    reason:!valid?'Save a valid Page access token, not a User token':missing.length?'Missing '+missing.join(', ')+'. Regenerate the Page token with publishing permissions; identity access alone cannot publish.':!commentsReady?'Publishing permission verified; add pages_manage_engagement for source comments':'Page identity, publishing and source-comment permissions verified'};
+  connectionCache.set(key,{value,expires:Date.now()+60000});if(connectionCache.size>100)connectionCache.delete(connectionCache.keys().next().value);
+  return value;
+}
 
 export class FacebookError extends HttpError {
-  constructor(status,{code,retryAfter=0,rateLimited=false,paused=false}={}){
-    super(status);this.code=code;this.retryAfter=retryAfter;this.rateLimited=rateLimited;this.paused=paused;
+  constructor(status,{code,subcode,diagnostic,retryAfter=0,rateLimited=false,paused=false}={}){
+    super(status);this.code=code;this.subcode=subcode;this.diagnostic=diagnostic||facebookFailure({code,subcode});this.retryAfter=retryAfter;this.rateLimited=rateLimited;this.paused=paused;
   }
 }
 export function responsePolicy(response,data={},now=Date.now()){
@@ -34,6 +63,9 @@ export async function clearDeliveryPause(pageId){
   // Explicit operator acknowledgement only; keep a server-requested cooldown.
   await query('UPDATE echolink.facebook_delivery SET paused_reason=NULL,last_code=NULL,updated_at=now() WHERE page_id=$1',[pageId]);
 }
+export async function clearConnectionPause(pageId){
+  await query('UPDATE echolink.facebook_delivery SET paused_reason=NULL,last_code=NULL,updated_at=now() WHERE page_id=$1 AND last_code IN (10,190,200)',[pageId]);
+}
 export async function graphRequest(pageId,url,options={},_policy={},fetcher=fetch){
   const endpoint=new URL(url);
   if(endpoint.protocol!=='https:'||endpoint.hostname!=='graph.facebook.com'||endpoint.username||endpoint.password)throw new Error('Invalid Facebook endpoint');
@@ -42,13 +74,14 @@ export async function graphRequest(pageId,url,options={},_policy={},fetcher=fetc
   const raw=await response.text();if(raw.length>2000000)throw new Error('Facebook response too large');
   let data;try{data=JSON.parse(raw);}catch{throw new Error('Invalid Facebook response; reconcile before retrying');}
   const rule=responsePolicy(response,data);
-  const reason=rule.paused?'Facebook publishing paused (code '+rule.code+'). Repair credentials/permissions or resolve the Page restriction, then acknowledge Resume in the dashboard.':null;
+  const subcode=Number(data.error?.error_subcode)||null,diagnostic=facebookFailure({code:rule.code,subcode,message:data.error?.message});
+  const reason=rule.paused?diagnostic:null;
   // Failure to persist the gate after a write remains an unknown outcome.
   await query(`INSERT INTO echolink.facebook_delivery(page_id,cooldown_until,paused_reason,last_code,last_request_at)
     VALUES($1,CASE WHEN $2::double precision>0 THEN now()+($2::double precision*interval '1 second') END,$3,$4,now())
     ON CONFLICT(page_id) DO UPDATE SET cooldown_until=GREATEST(echolink.facebook_delivery.cooldown_until,EXCLUDED.cooldown_until),paused_reason=COALESCE(EXCLUDED.paused_reason,echolink.facebook_delivery.paused_reason),last_code=EXCLUDED.last_code,last_request_at=now(),updated_at=now()`,[pageId,rule.retryAfter,reason,rule.code]);
   if(rule.global)await query(`INSERT INTO echolink.facebook_delivery(page_id,cooldown_until,last_code) VALUES('__global__',now()+($1::double precision*interval '1 second'),$2)
     ON CONFLICT(page_id) DO UPDATE SET cooldown_until=GREATEST(echolink.facebook_delivery.cooldown_until,EXCLUDED.cooldown_until),last_code=EXCLUDED.last_code,updated_at=now()`,[rule.retryAfter,rule.code]);
-  if(!response.ok||data.error)throw new FacebookError(response.status,{...rule});
+  if(!response.ok||data.error)throw new FacebookError(response.status,{...rule,subcode,diagnostic});
   return data;
 }

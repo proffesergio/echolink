@@ -1,21 +1,41 @@
 const cmsState={work:new Map(),search:'',page:'',bucket:'generated',openEditors:new Set()};
 const calendarState={month:new Date().getMonth(),year:new Date().getFullYear(),day:localDateInput(new Date()).slice(0,10)};
-function beginWork(label){const key=Symbol();cmsState.work.set(key,label);updateProgress();return key;}
-function endWork(key){cmsState.work.delete(key);updateProgress();}
+function beginWork(label){const key=Symbol();cmsState.work.set(key,{label,progress:0,phase:'Requesting worker',status:'Running',started_at:new Date().toISOString()});updateProgress();return key;}
+function setWorkProgress(key,percent,phase){const task=cmsState.work.get(key);if(!task)return;task.progress=Math.max(task.progress,percent);task.phase=phase;updateProgress();}
+function failWork(key,message){const task=cmsState.work.get(key);if(!task)return;task.status='Failed';task.phase=message;updateProgress();}
+function endWork(key){const task=cmsState.work.get(key);if(!task)return;if(task.status==='Running'){if(task.progress<100)task.phase='Request completed';task.progress=100;task.status='Succeeded';}task.finished_at=new Date().toISOString();updateProgress();setTimeout(()=>{cmsState.work.delete(key);updateProgress();},2500);}
+function taskCard(task,key){
+  const running=task.status==='Running',heartbeat=task.heartbeat_at||task.started_at;
+  const stale=running&&!key.startsWith('request-')&&(Date.now()-new Date(heartbeat)>90000||task.deadline_at&&new Date(task.deadline_at)<new Date());
+  const status=stale?'Connection lost / task stalled':task.status,percent=Number(task.progress)||(task.status==='Succeeded'?100:0);
+  const detail=task.progress_detail||{},phase=stale?'No recent heartbeat. Inspect Activity before retrying publication.':task.phase||'Waiting for stage updates';
+  return `<section class="task-card ${stale||['Failed','Needs attention','Interrupted'].includes(status)?'task-error':''}" data-task="${esc(key)}"><div class="section-head"><strong>${esc(task.label||task.job)}</strong><span class="badge">${esc(status)} · ${percent}%</span></div><progress max="100" value="${percent}" aria-label="${esc(task.label||task.job)} progress"></progress><p>${esc(phase)}</p>${detail.total?`<small>${detail.completed}/${detail.total} steps complete. ${esc(detail.detail||'')}</small>`:''}<small><span data-task-start="${esc(task.started_at)}" data-task-end="${esc(task.finished_at||'')}"></span>${heartbeat?' · Last update '+esc(new Date(heartbeat).toLocaleTimeString()):''}</small>${(task.events||[]).length?`<details data-task-log="${esc(key)}"><summary>Task log (${task.events.length})</summary><ol class="task-log">${task.events.map(e=>`<li><time>${esc(new Date(e.at).toLocaleTimeString())}</time> <strong>${Number(e.percent)}%</strong> ${esc(e.phase)}${e.detail?' — '+esc(e.detail):''}</li>`).join('')}</ol></details>`:''}${task.error?`<p>${esc(task.error)}</p>`:''}</section>`;
+}
 function updateProgress(){
   const el=document.querySelector('#work-progress');if(!el)return;
-  const running=(state?.runs||[]).filter(r=>r.status==='Running'),labels=[...new Set(running.map(r=>r.job))];
-  const active=cmsState.work.size>0||running.length>0;el.hidden=!active;
-  document.body.setAttribute('aria-busy',String(cmsState.work.size>0));
-  el.querySelector('.work-label').textContent=cmsState.work.size?[...cmsState.work.values()].at(-1):'Background work: '+labels.join(' · ');
-  el.querySelector('.work-detail').textContent=running.length?'Activity tracks the result. Local AI can take several minutes.':'Waiting for the worker to finish…';
-  const delivery=cmsState.publishRun&&(state?.runs||[]).find(r=>r.id===cmsState.publishRun);
+  cmsState.watchRuns ||= new Set();
+  const runs=state?.runs||[],running=runs.filter(r=>r.status==='Running');
+  const tracked=runs.filter(r=>cmsState.watchRuns.has(r.id));
+  const tasks=[...cmsState.work.values()].map((t,i)=>({task:t,key:'request-'+i}));
+  const ids=new Set();for(const task of [...running,...tracked])if(!ids.has(task.id)){ids.add(task.id);tasks.push({task,key:task.id});}
+  tasks.sort((a,b)=>Number(b.task.status==='Running')-Number(a.task.status==='Running'));
+  const active=tasks.filter(({task,key})=>task.status==='Running'&&(key.startsWith('request-')||Date.now()-new Date(task.heartbeat_at||task.started_at)<90000)&&(!task.deadline_at||new Date(task.deadline_at)>new Date())).length;
+  el.hidden=!tasks.length;document.body.setAttribute('aria-busy',String([...cmsState.work.values()].some(t=>t.status==='Running')));
+  el.querySelector('.work-label').textContent=`Tasks · ${active} active`;
+  el.querySelector('.work-detail').textContent='Percentages count completed stages or feeds, not elapsed time. Local AI stays at its current stage until output arrives.';
+  const logs=new Set([...el.querySelectorAll('details[open][data-task-log]')].map(e=>e.dataset.taskLog));
+  el.querySelector('.task-list').innerHTML=tasks.slice(0,8).map(({task,key})=>taskCard(task,key)).join('');
+  el.querySelectorAll('[data-task-log]').forEach(e=>{if(logs.has(e.dataset.taskLog))e.open=true;});updateTaskTimes();
+  const delivery=cmsState.publishRun&&runs.find(r=>r.id===cmsState.publishRun);
   if(delivery&&delivery.status!=='Running'){
     cmsState.publishRun=null;const results=delivery.result?.pages||[];
     const posted=results.some(r=>r?.posted),problem=results.find(r=>r?.failed||r?.unknown||r?.queued||r?.busy);
-    notice(posted?'Facebook confirmed publication. Open Published to see the post and delayed source-comment status.':delivery.error||problem?.reason||problem?.error||problem?.queued||'Publication was not confirmed. Check Activity and the post status before retrying.',!posted);
+    const message=posted?'Facebook confirmed publication. Open Published to see the post and delayed source-comment status.':delivery.error||problem?.reason||problem?.error||problem?.queued||'Publication was not confirmed. Check Activity and the post status before retrying.';
+    cmsState.deliveryNotice={message,error:!posted};notice(message,!posted);
   }
 }
+function updateTaskTimes(){document.querySelectorAll('[data-task-start]').forEach(el=>{const seconds=Math.max(0,Math.floor(((el.dataset.taskEnd?new Date(el.dataset.taskEnd).getTime():Date.now())-new Date(el.dataset.taskStart))/1000));el.textContent=`Elapsed ${Math.floor(seconds/60)}m ${seconds%60}s`;});}
+setInterval(updateTaskTimes,1000);
 function updateNavigationCounts(){
   document.querySelectorAll('nav [data-tab]').forEach(button=>{
     const name=button.getAttribute('aria-label')||button.textContent.trim();button.setAttribute('aria-label',name);
@@ -60,9 +80,10 @@ async function submitCMSDraft(form,intent){
   const work=beginWork(intent==='schedule'?'Saving schedule':'Saving draft');
   try{
     const result=await api('draft',formPayload(form,intent==='schedule'?'review':intent));
+    setWorkProgress(work,intent==='schedule'?50:100,'Draft saved');
     if(intent==='schedule')await api('article-action',{id:form.dataset.draft,action:'schedule',scheduledAt:new Date(form.elements.scheduledAt.value).toISOString(),expectedVersion:result.updatedAt,confirmed:true});
     formDirty=false;await refresh();notice(intent==='schedule'?'Approved and scheduled. Posting hours, limits and dry-run still apply.':intent==='draft'?'Saved Draft. It is held out of the publishing queue.':'Submitted for review. Logs are syncing in the background.');
-  }finally{endWork(work);}
+  }catch(error){failWork(work,error.message);throw error;}finally{endWork(work);}
 }
 async function handleCMSAction(button){
   const id=button.dataset.id,action=button.dataset.cms,article=state.articles.find(a=>a.id===id),form=draftForm(id),editor=document.querySelector(`[data-editor="${id}"]`);
@@ -71,6 +92,7 @@ async function handleCMSAction(button){
   if(action==='hashtags'){const result=await api('suggest-hashtags',{id,caption:form.elements.caption.value});const text=result.hashtags.join(' ');if(!text){notice('No specific topic tags found. You can add relevant tags in the caption.');return;}if(form.elements.caption.value.length+text.length+2>1800)throw new Error('Shorten the caption before adding tags');form.elements.caption.value+='\n\n'+text;formDirty=true;editor.open=true;cmsState.openEditors.add(id);notice('Hashtags added to the editor. Review and save them before publishing.');return;}
   if(action==='draft'){await submitCMSDraft(form,'draft');return;}
   if(action==='review'){document.querySelector(`[data-review="${id}"]`).open=true;notice('Review the source, caption and photo. This does not change approval or scheduling.');return;}
+  if(action==='publish')cmsState.deliveryNotice=null;
   if(['approve','publish'].includes(action)&&!confirm(action==='publish'?'Publish this reviewed post now, including its selected photo? This sends a real Facebook post if all Page rules pass.':'Approve this saved caption and photo for the next eligible processing run?'))return;
   let version=article.updated_at;
   if(form){
@@ -79,7 +101,7 @@ async function handleCMSAction(button){
     else version=body.expectedVersion;
   }
   const result=await api('article-action',{id,action,expectedVersion:version,confirmed:true});
-  if(action==='publish'&&result.runId)cmsState.publishRun=result.runId;
+  if(action==='publish'&&result.runId){cmsState.publishRun=result.runId;(cmsState.watchRuns ||= new Set()).add(result.runId);}
   formDirty=false;await refresh();notice(result.message||(action==='generate'?'Generation started. Watch Activity; the draft appears when ready.':'Post updated.'));
 }
 function operationsView(){

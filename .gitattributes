@@ -1,2 +1,3 @@
 # Migration checksums must survive Windows/Linux checkouts unchanged.
 sql/006-publishing-policy.sql text eol=lf
+sql/007-task-progress.sql text eol=lf

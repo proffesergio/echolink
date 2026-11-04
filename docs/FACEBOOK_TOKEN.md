@@ -20,6 +20,19 @@ an app with Page-management support; do not delete the existing app or Page.
 
 ## 2. Generate a User token with Page permissions
 
+### If Explorer only offers Ads permissions
+
+A list containing `ads_management`, `ads_read`, `business_management`, `pages_manage_ads`, `pages_show_list` and `pages_read_engagement` is insufficient for publishing posts. `pages_manage_ads` does not replace `pages_manage_posts`.
+
+1. Open **My Apps → your app → Use cases → Add use cases**, if offered.
+2. Look under **Content management** or the Page-management category for **Manage everything on your Page**. Open **Customize → Permissions and features** and add `pages_manage_posts` and `pages_manage_engagement`, retaining the required Page read/list permissions.
+3. If the existing app cannot add that use case, create a separate app supporting Page management. Keep the current app and Page; do not delete them. Select the new app in Graph API Explorer afterward.
+4. Follow any dependencies, app-role, Page-access, login-configuration or review requirements shown by Meta. Menus and available use cases depend on the account/app; changing an Ads token string cannot unlock an unavailable permission.
+5. Generate a **new User token after adding the permissions**, authorize the actual Page, then rerun `me/accounts?fields=id,name,access_token,tasks`. Copy the returned Page token, not a token from an earlier response.
+6. Save it under the Page's existing alias and run **Test Facebook connection**. EchoLink now checks the token's granted scopes as well as Page identity; an identity-only connection no longer passes as publishing-ready.
+
+Meta's [Pages app use-case guide](https://developers.facebook.com/docs/development/create-an-app/pages-use-case/) may require login or return rate-limit errors. Follow the requirements shown in your own app dashboard rather than requesting unrelated Ads permissions.
+
 In Explorer's token panel, choose **User Token / Get User Access Token** under
 User or Page. Add the permissions offered by your app:
 
@@ -82,9 +95,12 @@ Click **Save Facebook token**. Then open **Pages & models**, choose the Page:
 - Keep **Require Human Approval** enabled.
 - Save the Page, then click **Test Facebook connection**.
 
-The test calls `me?fields=id,name` with the saved token and compares the
-returned ID with the configured Page ID. It should show the Page's real name
-and ID. It does not publish anything. Credentials are applied immediately when
+The test calls `me?fields=id,name`, compares the returned Page ID and inspects
+the token with `debug_token`. Publishing requires a valid Page token with
+`pages_manage_posts` and `pages_read_engagement`; source comments additionally
+need `pages_manage_engagement`. It reports missing permissions without publishing
+anything. Successful checks can clear a prior token/permission pause; policy
+restrictions and server cooldowns remain protected. Credentials apply when
 saved through the dashboard. Manual `.env.local` edits need a worker restart.
 
 ## Troubleshooting

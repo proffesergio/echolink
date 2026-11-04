@@ -1,6 +1,8 @@
 import {query} from './db.mjs';
 import {jobNames,intervals} from './runtime.mjs';
+import {recoverExpiredRuns} from './telemetry.mjs';
 export async function planTick(force=false){
+  await recoverExpiredRuns();
   const rows=(await query('SELECT job,next_due,lease_until,last_success,last_error FROM echolink.job_schedule')).rows;
   const now=Date.now(),due={};
   for(const job of jobNames){const row=rows.find(r=>r.job===job);due[job]=(!row?.lease_until||new Date(row.lease_until).getTime()<=now)&&(force||!row||new Date(row.next_due).getTime()<=now);}
