@@ -2,10 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {rankNews,publishedAt,generationResult,draftQuality,contentPanel} from '../src/newsroom.mjs';
 import {sheetWrites,sheetHeaders} from '../src/sheets.mjs';
-import {processQueue} from '../src/jobs.mjs';
-test('preview never falls through to live processing if publishing mode changes',async()=>{
-  const prior=process.env.DRY_RUN;process.env.DRY_RUN='false';
-  try{const result=await processQueue({preview:true,pageId:'recNoDatabaseNeeded'});assert.equal(result.blocked,true);assert.match(result.reason,/no publication attempted/);}finally{if(prior===undefined)delete process.env.DRY_RUN;else process.env.DRY_RUN=prior;}
+import {needsReview} from '../src/publishing-policy.mjs';
+test('preview always requires review even when live mode or approval-free Pages are used',()=>{
+  assert.equal(needsReview({approval:false},{caption_hash:'a',approval_hash:'a'},true),true);
+  assert.equal(needsReview({approval:true},{caption_hash:'a',approval_hash:'a'},true),true);
+  assert.equal(needsReview({approval:true},{caption_hash:'a',approval_hash:'b'}),true);
+  assert.equal(needsReview({approval:true},{caption_hash:'a',approval_hash:'a'}),false);
 });
 test('today ranking excludes stale, missing and future dates and rewards independent related coverage',()=>{
   const now=new Date('2026-11-03T12:00:00Z'),page={timezone:'Asia/Dhaka'};

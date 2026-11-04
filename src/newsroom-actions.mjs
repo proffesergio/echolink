@@ -4,6 +4,7 @@ import {airtable,allRecords,tables} from './airtable.mjs';
 import {sync,ingest,processQueue,mirror,publicationReadiness} from './jobs.mjs';
 import {hash} from './core.mjs';
 import {startRun,finishRun,runJob} from './telemetry.mjs';
+import {validateSlot} from './calendar.mjs';
 export async function enableBanglaFeeds(pageId){
   if(!/^rec[A-Za-z0-9]+$/.test(pageId||''))throw new Error('Choose a Page first');
   const catalog=JSON.parse(await readFile(new URL('../sources/bangla-rss-catalog.json',import.meta.url),'utf8'));
@@ -13,7 +14,6 @@ export async function enableBanglaFeeds(pageId){
   await sync();return {enabled:feeds.length,pageId};
 }
 export async function startPreview(pageId,articleId){
-  if(process.env.DRY_RUN==='false')throw new Error('Enable dry-run before generating a preview');
   if(!/^rec[A-Za-z0-9]+$/.test(pageId||''))throw new Error('Choose an enabled Page first');
   const result=await transaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('echolink:preview-start',0))");
@@ -84,7 +84,13 @@ export async function articleAction(id,action,body={}){
     let at=action==='approve'?a.scheduled_at:null;
     if(action==='schedule'){
       at=new Date(body.scheduledAt);if(!Number.isFinite(at.getTime())||at<=new Date())throw new ContentActionError('Choose a future scheduled time',400);
+      const conflict=await validateSlot(a.page_id,at,a.id);if(conflict)throw new ContentActionError(conflict,409);
     }
+    if(action==='approve'&&at){
+      if(new Date(at)<=new Date())throw new ContentActionError('Scheduled time has passed. Choose a future Schedule time or Publish Now');
+      const conflict=await validateSlot(a.page_id,at,a.id);if(conflict)throw new ContentActionError(conflict,409);
+    }
+    if(action==='publish'){const conflict=await validateSlot(a.page_id,new Date(),a.id);if(conflict)throw new ContentActionError(conflict,409);}
     const approved=['approve','schedule','publish'].includes(action),status=action==='draft'?'Draft':approved?'Approved':'Pending Approval';
     // Synchronize existing external approvals under the same locks before
     // changing canonical state. Held Draft rows never enter the processing queue.

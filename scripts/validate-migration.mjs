@@ -24,13 +24,15 @@ try {
   try {
     await c.connect();
     const tables = await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema='echolink'");
-    const expected = ['configurations','articles','publish_attempts','analytics','service_probes','migrations','source_comments','ingestion_events','job_schedule','job_runs','sheet_sync'];
+    const expected = ['configurations','articles','publish_attempts','analytics','service_probes','migrations','source_comments','ingestion_events','job_schedule','job_runs','sheet_sync','facebook_delivery'];
     if (expected.some(name => !tables.rows.some(row => row.table_name === name))) throw new Error('Migration tables missing');
     console.log(`PASS migration branch: all ${expected.length} required tables available`);
     const scheduler=spawnSync(process.execPath,['scripts/check-scheduler.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:60000});
     console.log(scheduler.stdout.trim());if(scheduler.status!==0)throw new Error('Scheduler validation failed');
     const newsroom=spawnSync(process.execPath,['scripts/check-newsroom.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:60000});
     console.log(newsroom.stdout.trim());if(newsroom.status!==0)throw new Error('Newsroom validation failed');
+    const delivery=spawnSync(process.execPath,['scripts/check-delivery.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:60000});
+    console.log(delivery.stdout.trim());if(delivery.status!==0){console.error(delivery.stderr.slice(-3000));throw new Error('Delivery validation failed');}
   } finally { await c.end(); }
 } catch (e) { console.error(e.message); process.exitCode = 1; }
 finally {

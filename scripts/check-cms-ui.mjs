@@ -9,10 +9,11 @@ try{
   await page.goto(base+'/admin');await page.getByLabel('password',{exact:true}).fill(process.env.DASHBOARD_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByRole('heading',{name:"Today's top story → your draft"}).waitFor();
   const state=await (await page.request.get(base+'/admin/api/state')).json(),pageId=state.pages[0].id;
+  state.configuration.dryRun=true;state.dryRun=true;state.runs=[];
   const id='11111111-1111-4111-8111-111111111111';let version=Date.now();
   const article={id,page_id:pageId,title:'CMS interface test — never persisted',caption:'A synthetic editorial draft for interface verification only.',status:'Pending Approval',source_url:'https://example.com/test',image_url:'https://example.com/test.jpg',analysis:'Synthetic review data',image_prompt:'Symbolic illustration suggestion',updated_at:new Date(version).toISOString()};
   const writes=[];
-  const snapshot=()=>({...state,articles:[{...article,panel:article.status==='Posted'?'Published':article.status==='Approved'?'Scheduled':'Drafts'}],navCounts:{queue:article.status==='Pending Approval'?1:0,drafts:['Draft','Pending Approval'].includes(article.status)?1:0,scheduled:article.status==='Approved'?1:0,published:article.status==='Posted'?1:0,inbox:0,total:1}});
+  const snapshot=()=>({...state,calendar:article.scheduled_at?[{...article}]:[],articles:[{...article,panel:article.status==='Posted'?'Published':article.status==='Approved'?'Scheduled':'Drafts'}],navCounts:{queue:article.status==='Pending Approval'?1:0,drafts:['Draft','Pending Approval'].includes(article.status)?1:0,scheduled:article.status==='Approved'?1:0,published:article.status==='Posted'?1:0,inbox:0,total:1}});
   // Browser fixtures do not mutate the user's actual articles, approve anything
   // on the server, or call Facebook. Real transitions are tested on a DB branch.
   await page.route('**/admin/api/state',route=>route.fulfill({json:snapshot()}));
@@ -24,8 +25,7 @@ try{
   });
   await page.route('**/admin/api/article-action',async route=>{
     const body=route.request().postDataJSON();writes.push({type:'action',body});
-    assert.notEqual(body.action,'publish','Browser test must never publish');
-    article.status=body.action==='draft'?'Draft':body.action==='review'?'Pending Approval':'Approved';article.scheduled_at=body.scheduledAt||null;article.updated_at=new Date(++version).toISOString();
+    article.status=body.action==='publish'?'Posted':body.action==='draft'?'Draft':body.action==='review'?'Pending Approval':'Approved';article.scheduled_at=body.scheduledAt||null;article.updated_at=new Date(++version).toISOString();
     await route.fulfill({json:{ok:true,status:article.status,message:'Test action saved'}});
   });
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
@@ -49,6 +49,14 @@ try{
   await card.locator('input[name="scheduledAt"]').fill(local);await card.getByRole('button',{name:'Approve & Schedule',exact:true}).click();
   await page.getByText('Approved and scheduled. Posting hours, limits and dry-run still apply.',{exact:true}).waitFor();assert.ok(new Date(article.scheduled_at)>new Date());
   assert.ok(writes.some(w=>w.body.action==='schedule'&&w.body.confirmed));
+  await page.route('**/admin/api/schedule-slot',route=>route.fulfill({json:{ok:true,scheduledAt:tomorrow.toISOString(),timezone:'Asia/Dhaka'}}));
+  await page.getByRole('button',{name:'Scheduled',exact:true}).click();await page.getByRole('heading',{name:'Publishing calendar'}).waitFor();
+  assert.ok(await page.locator('[data-calendar-day]').count()>=28);await page.getByRole('button',{name:'Next month'}).click();await page.getByRole('button',{name:'Previous month'}).click();
+  await page.locator('#calendar-schedule [name="articleId"]').selectOption(id);await page.getByRole('button',{name:'Find available time',exact:true}).click();await page.getByText(/Available time found/).waitFor();
+  await page.getByRole('button',{name:'Approve & Schedule selected post'}).click();await page.getByText('Post scheduled. The calendar reservation and external logs will update automatically.',{exact:true}).waitFor();
+  state.configuration.dryRun=false;state.dryRun=false;await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await card.getByRole('button',{name:'Publish Now',exact:true}).click();await page.waitForFunction(()=>document.querySelector('nav [data-tab="published"]')?.innerText.includes('1'));
+  assert.equal(writes.at(-1).body.action,'publish');assert.equal(writes.at(-1).body.confirmed,true);assert.equal(article.image_url,'https://example.com/test.jpg');
   const background={id:'browser-only-run',job:'preview',status:'Running',trigger_source:'fixture',started_at:new Date().toISOString()};state.runs.unshift(background);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.work-label')?.textContent.startsWith('Background work:'));
   assert.equal(await page.locator('#work-progress').isVisible(),true,'Background progress must remain visible after HTTP requests finish');
@@ -61,6 +69,6 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Mobile layout overflows');
   await page.screenshot({path:'.codex/logs/cms-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS CMS browser: visible post actions, Edit/Save Draft/Review/Approve/Schedule, photo preservation, disabled dry-run publish, navigation counts, animated work indicator, operations/connection centers and mobile layout. Browser mutations were fixtures only.');
-}catch(error){console.error('FAIL CMS browser:',error.name,error.message.split('\n')[0]);process.exitCode=1;}
+  console.log('PASS CMS browser: editorial controls, monthly calendar, available-slot selection, confirmed Schedule and Publish Now, photo preservation, dry-run gate, counters, progress, operations and mobile. All writes intercepted; no Facebook publishing.');
+}catch(error){console.error('FAIL CMS browser:',error.stack);await page.screenshot({path:'.codex/logs/cms-failure.png',fullPage:true}).catch(()=>{});process.exitCode=1;}
 finally{await browser.close()}

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { query, transaction } from './db.mjs';
 import { allRecords, airtable, tables } from './airtable.mjs';
 import { hash, canonicalUrl, titleHash, normalizePage, inWindow, generationBody, cosine, sourceCommentReady } from './core.mjs';
+import {graphRequest,deliveryGate,FacebookError} from './facebook.mjs';
+import {withSuggestedHashtags,needsReview} from './publishing-policy.mjs';
 import { request, jsonRequest, hostList, HttpError } from './net.mjs';
 import {publishedAt,rankNews,generationResult,draftQuality,contentPanel} from './newsroom.mjs';
 import {syncSheet} from './sheets.mjs';
@@ -173,7 +175,7 @@ function graphBase() {
   if (!/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION || '')) throw new Error('Set a supported META_GRAPH_VERSION');
   return `https://graph.facebook.com/${process.env.META_GRAPH_VERSION}`;
 }
-export async function publish(page, article, transport=jsonRequest) {
+export async function publish(page, article, transport=(url,options,policy)=>graphRequest(page.id,url,options,policy)) {
   const token = tokens('FB_TOKENS_JSON')[page.fbSecret];
   if (!token) throw new Error('Facebook token alias is missing');
   const base = graphBase();
@@ -192,6 +194,7 @@ export async function publicationReadiness(pageId){
   if(!/^\d+$/.test(page.fbPageId||''))return {ready:false,reason:'Save a numeric Facebook Page ID under Pages & models'};
   if(!tokens('FB_TOKENS_JSON')[page.fbSecret])return {ready:false,reason:'Save a Page access token under Connections using this Page’s FB Secret Alias'};
   if(!/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION||''))return {ready:false,reason:'Save the Graph API version in Connections → Facebook Page token'};
+  const gate=await deliveryGate(pageId);if(!gate.ready)return gate;
   if(!inWindow(new Date(),page))return {ready:false,reason:'Outside this Page’s posting window. Choose Schedule instead'};
   if(await dailyCount(page)>=page.dailyMax)return {ready:false,reason:'This Page has reached its daily posting cap'};
   if(!await gapSatisfied(page))return {ready:false,reason:'Minimum post spacing or an unresolved publication blocks this Page'};
@@ -199,7 +202,6 @@ export async function publicationReadiness(pageId){
 }
 export async function processQueue(options={}) {
   const preview=options.preview===true;
-  if(preview&&!dryRun())return {blocked:true,reason:'Preview stopped because live mode was enabled; no publication attempted'};
   await query("UPDATE echolink.articles SET status='Publish Unknown',dirty=true WHERE status='Publishing' AND updated_at<now()-interval '20 minutes'");
   const pages = (await settings('page')).filter(r => r.config.active&&(!options.pageId||r.id===options.pageId));
   const results = [];
@@ -207,25 +209,30 @@ export async function processQueue(options={}) {
   const configured = Number(process.env.PAGE_CONCURRENCY || 1);
   const concurrency = Number.isInteger(configured) ? Math.max(1, Math.min(3, configured)) : 1;
   for (let i = 0; i < pages.length; i += concurrency) results.push(...await Promise.all(pages.slice(i, i + concurrency).map(({ config: page }) => locked(`page:${page.id}`, async () => {
+    if(!preview){const gate=await deliveryGate(page.id);if(!gate.ready)return {page:page.id,queued:gate.reason};}
     if (!preview&&!inWindow(new Date(), page)) return { page: page.id, queued: 'outside window' };
     if (!preview&&await dailyCount(page) >= page.dailyMax) return { page: page.id, queued: 'daily cap' };
     if (!preview&&!await gapSatisfied(page)) return { page: page.id, queued: 'minimum post gap or unresolved publication' };
-    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) AND ($2::uuid IS NULL OR id=$2) ORDER BY source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id,options.articleId||null]);
+    // Hold severely late schedules for fresh editorial review instead of flooding
+    // the Page with yesterday's backlog after the PC or tunnel returns.
+    if(!preview)await query("UPDATE echolink.articles SET status='Draft',approval_hash=NULL,scheduled_at=NULL,last_error='Scheduled time missed by over 6 hours. Held as Draft: review freshness and schedule again.',dirty=true,updated_at=now() WHERE page_id=$1 AND status='Approved' AND scheduled_at<now()-interval '6 hours'",[page.id]);
+    const r = await query("SELECT id,title,body,source_url,image_url,caption,caption_hash,approval_hash,status,attempts,source_published_at,publisher,scheduled_at FROM echolink.articles WHERE page_id=$1 AND status IN ('Queued','Approved') AND next_attempt_at<=now() AND (scheduled_at IS NULL OR scheduled_at<=now()) AND ($2::uuid IS NULL OR id=$2) ORDER BY (status='Approved') DESC,scheduled_at ASC NULLS LAST,source_published_at DESC NULLS LAST,created_at DESC LIMIT 200", [page.id,options.articleId||null]);
     const ranked=rankNews(r.rows.filter(a=>!preview||!a.caption),page);
     const a=options.articleId?r.rows[0]:(!preview&&r.rows.find(a=>a.status==='Approved'))||ranked[0];
     if (!a) return { page: page.id, empty: true,reason:r.rows.length?'No eligible news dated today. Missing/old publication dates are excluded from top-news selection.':'Queue empty. Run ingestion with enabled feeds first.' };
+    if(!preview&&!a.caption&&page.approval){const pending=(await query("SELECT count(*)::int AS n FROM echolink.articles WHERE page_id=$1 AND status='Pending Approval'",[page.id])).rows[0].n;if(pending>=3)return {page:page.id,queued:'Review queue has 3 drafts. Approve, hold as Draft or reject one before automatic generation continues.'};}
     if(a.selection_score!==undefined)await update(a.id,{selection_score:a.selection_score,selection_reason:a.selection_reason});
     try {
       if (!a.caption) {
         if (await semanticDuplicate(page, a)) { await update(a.id, { status: 'Skipped (Duplicate)' }); return { duplicate: a.id }; }
-        const generated=await generate(page,a);a.caption=generated.caption;a.caption_hash=hash(a.caption);
+        const generated=await generate(page,a);generated.caption=withSuggestedHashtags(generated.caption,a,page.language);a.caption=generated.caption;a.caption_hash=hash(a.caption);
         await update(a.id, { ...generated, caption_hash: a.caption_hash,last_error:null,attempts:0 });
       }
-      if (preview||(page.approval && a.approval_hash !== a.caption_hash)) {
+      if (needsReview(page,a,preview)) {
         await update(a.id, { status: 'Pending Approval' }); return { page:page.id,pending: a.id,title:a.title,selectedFrom:ranked.length,score:a.selection_score,reason:a.selection_reason,preview };
       }
       if (!inWindow(new Date(), page) || await dailyCount(page) >= page.dailyMax || !await gapSatisfied(page)) return { queued: a.id };
-      if (dryRun()) { await update(a.id, { status: 'Dry Run' }); return { dryRun: a.id }; }
+      if (dryRun()) { if(!a.scheduled_at)await update(a.id, { status: 'Dry Run' }); return { dryRun: a.id }; }
       // Validate all preconditions before creating a publish reservation.
       if (!tokens('FB_TOKENS_JSON')[page.fbSecret]) throw new Error('Facebook token alias is missing');
       graphBase();
@@ -246,6 +253,11 @@ export async function processQueue(options={}) {
         });
         return { posted: a.id };
       } catch(error) {
+        if(error instanceof FacebookError&&error.rateLimited){
+          await update(a.id,{status:'Approved',next_attempt_at:new Date(Date.now()+error.retryAfter*1000),last_error:'Facebook rejected this attempt due to rate limits. Waiting for the server cooldown; no immediate retry.'});
+          await query("UPDATE echolink.publish_attempts SET outcome='Throttled' WHERE id=$1",[attempt]);
+          return {page:page.id,queued:a.id,reason:'Facebook cooldown'};
+        }
         if(error instanceof HttpError&&error.status>=400&&error.status<500&&error.status!==408){
           await update(a.id,{status:'Failed',last_error:`Facebook rejected publication (HTTP ${error.status}). Check Page permissions and the selected photo; no text-only fallback was sent`});
           await query("UPDATE echolink.publish_attempts SET outcome='Failed' WHERE id=$1",[attempt]);
@@ -318,11 +330,11 @@ export async function analytics() {
     const posts = (await query("SELECT a.id,a.page_id,a.fb_post_id FROM echolink.articles a LEFT JOIN echolink.analytics m ON a.id=m.article_id WHERE a.status='Posted' AND a.published_at>now()-interval '7 days' AND (m.collected_at IS NULL OR m.collected_at<now()-interval '6 hours') ORDER BY a.published_at DESC LIMIT 20")).rows;
     let collected = 0;
     for (const a of posts) {
-      const p = pages.get(a.page_id); if (!p?.active) continue;
+      const p = pages.get(a.page_id); if (!p?.active||!(await deliveryGate(p.id)).ready) continue;
       try {
         const url = new URL(`${graphBase()}/${encodeURIComponent(a.fb_post_id)}`);
         url.searchParams.set('fields', 'shares,comments.limit(0).summary(true),reactions.limit(0).summary(true)');
-        const metrics = await jsonRequest(url, { headers: bearer(tokens('FB_TOKENS_JSON')[p.fbSecret]) }, { hosts: ['graph.facebook.com'] });
+        const metrics = await graphRequest(p.id,url, { headers: bearer(tokens('FB_TOKENS_JSON')[p.fbSecret]) }, { hosts: ['graph.facebook.com'] });
         await query('INSERT INTO echolink.analytics(article_id,metrics) VALUES($1,$2) ON CONFLICT(article_id) DO UPDATE SET metrics=excluded.metrics,collected_at=now()', [a.id, JSON.stringify(metrics)]);
         collected++;
       } catch { /* Permissions and fields differ by page; retry next scheduled run. */ }
@@ -330,15 +342,16 @@ export async function analytics() {
     return { collected };
   });
 }
-export async function comments() {
+export async function comments(options={}) {
   return locked('comments', async () => {
     if (dryRun()) return { skipped: 'dry run' };
     await query("WITH stale AS (UPDATE echolink.source_comments SET status='Unknown',last_error='Reconcile remote comment before retrying',updated_at=now() WHERE status='Sending' AND updated_at<now()-interval '20 minutes' RETURNING article_id) UPDATE echolink.articles SET dirty=true,updated_at=now() WHERE id IN (SELECT article_id FROM stale)");
     const pages = new Map((await settings('page')).filter(r=>r.config.active).map(r=>[r.id,r.config]));
-    const rows = (await query("SELECT DISTINCT ON(page_id) article_id,page_id,fb_post_id,message,due_at FROM echolink.source_comments WHERE status='Queued' AND due_at<=now() ORDER BY page_id,due_at LIMIT 50")).rows;
+    const rows = (await query("SELECT DISTINCT ON(page_id) article_id,page_id,fb_post_id,message,due_at FROM echolink.source_comments WHERE status='Queued' AND due_at<=now() AND ($1::text IS NULL OR page_id=$1) ORDER BY page_id,due_at LIMIT 50",[options.pageId||null])).rows;
     let sent=0,failed=0;
     for(const row of rows){const page=pages.get(row.page_id);if(!page||!sourceCommentReady(page,row.due_at,new Date(),dryRun()))continue;
       await locked(`page:${page.id}`,async()=>{
+        if(!(await deliveryGate(page.id)).ready)return;
         const token=tokens('FB_TOKENS_JSON')[page.fbSecret];
         let base;
         try {if(!token)throw new Error('missing token');base=graphBase();}
@@ -349,10 +362,11 @@ export async function comments() {
         }
         await query("UPDATE echolink.source_comments SET status='Sending',updated_at=now() WHERE article_id=$1",[row.article_id]);
         try{
-          const result=await jsonRequest(`${base}/${encodeURIComponent(row.fb_post_id)}/comments`,{method:'POST',headers:{'Content-Type':'application/json',...bearer(token)},body:JSON.stringify({message:row.message})},{hosts:['graph.facebook.com']});
+          const result=await graphRequest(page.id,`${base}/${encodeURIComponent(row.fb_post_id)}/comments`,{method:'POST',headers:{'Content-Type':'application/json',...bearer(token)},body:JSON.stringify({message:row.message})},{hosts:['graph.facebook.com']});
           if(!result.id)throw new Error('No remote comment ID');
           await query("UPDATE echolink.source_comments SET status='Sent',remote_id=$2,updated_at=now() WHERE article_id=$1",[row.article_id,result.id]);sent++;
         }catch(e){
+          if(e instanceof FacebookError&&e.rateLimited){await query("UPDATE echolink.source_comments SET status='Queued',due_at=now()+($2::double precision*interval '1 second'),last_error='Facebook rate limit; awaiting cooldown',updated_at=now() WHERE article_id=$1",[row.article_id,e.retryAfter]);await query('UPDATE echolink.articles SET dirty=true,updated_at=now() WHERE id=$1',[row.article_id]);failed++;return;}
           const definite=e instanceof HttpError&&e.status>=400&&e.status<500&&![408,429].includes(e.status);
           await query('UPDATE echolink.source_comments SET status=$2,last_error=$3,updated_at=now() WHERE article_id=$1',[row.article_id,definite?'Failed':'Unknown',definite?`Facebook rejected source comment (HTTP ${e.status}); fix permissions or token before retrying`:'Inspect Facebook before retrying; comment delivery may have succeeded']);failed++;
         }

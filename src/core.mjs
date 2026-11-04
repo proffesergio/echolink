@@ -1,5 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 export const hash = text => createHash('sha256').update(text).digest('hex');
+const dateFormats=new Map();
+function dateFormat(timezone,kind){const key=timezone+':'+kind;if(!dateFormats.has(key))dateFormats.set(key,new Intl.DateTimeFormat(kind==='day'?'en-CA':'en-GB',kind==='day'?{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}:{timeZone:timezone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}));return dateFormats.get(key);}
 export function authorized(header, key) {
   if (!key || key.length < 32) return false;
   const a = Buffer.from(header || ''), b = Buffer.from(`Bearer ${key}`);
@@ -23,10 +25,10 @@ export function minutes(value) {
   return h * 60 + min;
 }
 export function localDay(date, timezone) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+  return dateFormat(timezone,'day').format(date);
 }
 export function inWindow(date, page) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: page.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(p => [p.type, p.value]));
+  const parts = Object.fromEntries(dateFormat(page.timezone,'time').formatToParts(date).map(p => [p.type, p.value]));
   const now = Number(parts.hour) * 60 + Number(parts.minute), start = minutes(page.start), end = minutes(page.end);
   return start === end || (start < end ? now >= start && now < end : now >= start || now < end);
 }

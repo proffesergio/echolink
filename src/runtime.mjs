@@ -1,7 +1,7 @@
 import {passwordConfigured,passwordSource} from './admin-auth.mjs';
 import {sheetsConfiguration} from './sheets.mjs';
 export const jobNames=['sync','ingest','approvals','process','comments','mirror','analytics'];
-const defaults={sync:15,ingest:10,approvals:1,process:2,comments:1,mirror:2,analytics:360};
+const defaults={sync:15,ingest:10,approvals:1,process:1,comments:1,mirror:2,analytics:360};
 export function intervals(){return Object.fromEntries(jobNames.map(job=>{const value=Number(process.env[`${job.toUpperCase()}_INTERVAL_MINUTES`]||defaults[job]);return[job,Number.isInteger(value)&&value>=1&&value<=1440?value:defaults[job]];}));}
 export function publicConfiguration(){
   const get=(key,fallback='')=>process.env[key]||fallback;

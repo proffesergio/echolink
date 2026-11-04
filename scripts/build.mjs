@@ -16,12 +16,22 @@ const dashboard=spawnSync(process.execPath,['deploy/vercel/build.mjs'],{encoding
 if(dashboard.status!==0)throw new Error('Vercel dashboard asset build failed');
 console.log(dashboard.stdout.trim());
 await mkdir('workflows', { recursive: true });
+async function writeManifest(file,workflow){
+  // Preserve canvas IDs across builds so CI and local exports only change when
+  // the workflow changes. New nodes still receive fresh IDs from the builder.
+  let prior;try{prior=JSON.parse(await readFile(file,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+  for(const node of workflow.nodes){
+    const old=prior?.nodes.find(n=>n.name===node.name);if(!old)continue;node.id=old.id;
+    node.parameters?.conditions?.conditions?.forEach((c,i)=>{const id=old.parameters?.conditions?.conditions?.[i]?.id;if(id)c.id=id;});
+  }
+  await writeFile(file,JSON.stringify(workflow,null,2)+'\n');
+}
 for (const [i, workflow] of [...workflows(), aiAdapter()].entries()) {
   const name = i < 6 ? ['sync','ingest','process','mirror','approvals','analytics'][i] : 'ai-adapter';
-  await writeFile(`workflows/${String(i + 1).padStart(2, '0')}-${name}.json`, JSON.stringify(workflow, null, 2) + '\n');
+  await writeManifest(`workflows/${String(i + 1).padStart(2, '0')}-${name}.json`,workflow);
 }
 const sql = await readFile('sql/001-initial.sql', 'utf8');
-await writeFile('workflows/00-complete-pipeline.json', JSON.stringify(pipeline(), null, 2) + '\n');
-await writeFile('workflows/08-source-comments.json', JSON.stringify(commentWorkflow(), null, 2) + '\n');
+await writeManifest('workflows/00-complete-pipeline.json',pipeline());
+await writeManifest('workflows/08-source-comments.json',commentWorkflow());
 if (!sql.includes('UNIQUE(page_id,url_hash)')) throw new Error('Missing tenant deduplication constraint');
 console.log('Build passed: JavaScript syntax checked; 9 inactive n8n workflow manifests generated; migrations present.');

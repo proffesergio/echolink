@@ -134,3 +134,8 @@ Public Edge acceptance passed using the existing local password: one Page,
 exposed secrets. Anonymous tunnel HTTP 401 confirmed. Build and 24 automated
 tests passed. Initial commit exists locally; GitHub rejected the main push
 with invalid saved credentials, so CI deployment is not yet verified.
+# Publishing platform update — 2026-11-04
+
+User criteria: immediate reviewed photo publishing; monthly calendar and automatic due delivery; Page-local daily cap and configurable hourly gap; relevant reviewed hashtags; delayed source citation; persistent Meta cooldowns and credential/policy pauses; no blind retry of uncertain writes. Implementation and operating guide: [PUBLISHING_PLATFORM.md](docs/PUBLISHING_PLATFORM.md).
+
+Saved live connections verified: Facebook token resolves to Noble Seek and Google Sheets metadata resolves to EchoLink Posts. Preserve the user's 2 posts/day, 60-minute gap, 09:00–23:00 Asia/Dhaka, required approval and 5-minute source-comment delay. User requested a fresh draft for review before the first live acceptance post; the overdue Senate-poll article is held as Draft because its stored editorial analysis flags contradictory figures. A new 4 November draft with photo/hashtags was generated, corrected against the stored source, left Pending Approval, and mirrored successfully to Airtable and Google Sheets. Do not claim a real Facebook post/comment has been accepted until it is reviewed and confirmed remotely. The initial n8n API HTTP 401 was resolved with the user's fresh key (HTTP 200); the updated single pipeline was saved and activated through the running API. Automatic generation pauses at three pending reviews; severely late schedules become held Drafts to prevent stale Airtable approvals from reactivating them.

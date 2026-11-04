@@ -15,6 +15,9 @@ import {contentPanel,generationResult} from './newsroom.mjs';
 import {startPreview,enableBanglaFeeds,editDraft,articleAction,ContentActionError} from './newsroom-actions.mjs';
 import {integrationCatalog} from './integrations.mjs';
 import {validateGoogleCredentials,testSheet,syncSheet} from './sheets.mjs';
+import {suggestSlot} from './calendar.mjs';
+import {clearDeliveryPause} from './facebook.mjs';
+import {suggestedHashtags} from './publishing-policy.mjs';
 const tickets = new Map();
 let loginFailures=0,loginResetAt=0;
 let editorialMirror=Promise.resolve();
@@ -124,7 +127,7 @@ export async function admin(req) {
       return reply({ok:true,configuration:publicConfiguration()});
     }
     if (path === '/admin/api/state' && req.method === 'GET') {
-      const names=['pages','feeds','articles','counts','audit','scheduler','runs'];
+      const names=['pages','feeds','articles','counts','audit','scheduler','runs','calendar','delivery'];
       const results = await Promise.allSettled([
         allRecords(tables().pages), allRecords(tables().feeds),
         query('SELECT a.id,a.page_id,a.title,a.source_url,a.image_url,a.caption,a.status,a.fb_post_id,a.last_error,a.created_at,a.updated_at,a.source_published_at,a.publisher,a.selection_score,a.selection_reason,a.analysis,a.image_prompt,a.scheduled_at,a.published_at,c.status AS comment_status,c.due_at AS comment_due,c.remote_id AS comment_id FROM echolink.articles a LEFT JOIN echolink.source_comments c ON c.article_id=a.id ORDER BY (a.caption IS NOT NULL) DESC,a.updated_at DESC LIMIT 200'),
@@ -132,6 +135,8 @@ export async function admin(req) {
         query('SELECT id,page_id,title,source_url,status,detail,occurrences,created_at FROM echolink.ingestion_events ORDER BY updated_at DESC LIMIT 50'),
         planTick(),
         query("SELECT id,job,trigger_source,status,started_at,finished_at,result,error FROM echolink.job_runs WHERE id IN (SELECT id FROM echolink.job_runs ORDER BY started_at DESC LIMIT 50) OR id=(SELECT id FROM echolink.job_runs WHERE job='preview' ORDER BY started_at DESC LIMIT 1) ORDER BY started_at DESC"),
+        query("SELECT id,page_id,title,status,scheduled_at,published_at FROM echolink.articles WHERE (status='Approved' AND scheduled_at IS NOT NULL) OR (status='Posted' AND published_at>=now()-interval '90 days') ORDER BY COALESCE(scheduled_at,published_at) LIMIT 2000"),
+        query('SELECT page_id,cooldown_until,paused_reason,last_code FROM echolink.facebook_delivery'),
       ]);
       const errors={};results.forEach((result,index)=>{if(result.status==='rejected')errors[names[index]]=result.reason?.status?`Upstream HTTP ${result.reason.status}; check connection and permissions`:'Connection unavailable; check Settings and local logs';});
       const data=index=>results[index].status==='fulfilled'?results[index].value:null;
@@ -146,9 +151,25 @@ export async function admin(req) {
       const navCounts={queue:count('Pending Approval'),drafts:counts.filter(c=>['Draft','Pending Approval','Dry Run','Queued'].includes(c.status)).reduce((sum,c)=>sum+c.caption_count,0),scheduled:count('Approved'),published:count('Posted'),inbox:count('Queued')-(counts.find(c=>c.status==='Queued')?.caption_count||0),total:counts.reduce((sum,c)=>sum+c.count,0)};
       const configuration=publicConfiguration();
       return reply({ pages: pages.map(p => ({ id: p.id, fields: pick(p.fields, pageFields) })), feeds, articles:(data(2)?.rows||[]).map(a=>({...a,panel:contentPanel(a)})), counts,navCounts,integrations:integrationCatalog(pages,configuration), audit:data(4)?.rows||[],scheduler:data(5),runs:data(6)?.rows||[],readiness:issues,serviceErrors:errors,configuration,workflow:workflowStatus(),
-        dryRun: process.env.DRY_RUN !== 'false', facebookAliases: Object.keys(maps('FB_TOKENS_JSON')), aiAliases: Object.keys(maps('AI_TOKENS_JSON')),
+        calendar:data(7)?.rows||[],delivery:data(8)?.rows||[],dryRun: process.env.DRY_RUN !== 'false', facebookAliases: Object.keys(maps('FB_TOKENS_JSON')), aiAliases: Object.keys(maps('AI_TOKENS_JSON')),
         graphVersion: process.env.META_GRAPH_VERSION || '', sourceHosts: process.env.ALLOWED_SOURCE_HOSTS || '',
       });
+    }
+    if(path==='/admin/api/suggest-hashtags'&&req.method==='POST'){
+      const body=await req.json();const article=(await query("SELECT title,page_id FROM echolink.articles WHERE id=$1",[body.id])).rows[0];
+      if(!article)return reply({error:'Post not found'},404);
+      const page=(await query("SELECT config FROM echolink.configurations WHERE kind='page' AND id=$1",[article.page_id])).rows[0]?.config;
+      const caption=String(body.caption||'').slice(0,1800),existing=new Set((caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[]).map(t=>t.toLowerCase()));
+      return reply({hashtags:suggestedHashtags({...article,caption},page?.language).filter(t=>!existing.has(t.toLowerCase()))});
+    }
+    if(path==='/admin/api/schedule-slot'&&req.method==='POST'){
+      const body=await req.json();if(!validId(body.pageId))return reply({error:'Choose a Page'},400);
+      if(body.from&&(!Number.isFinite(Date.parse(body.from))||new Date(body.from)<=new Date()||new Date(body.from)>Date.now()+90*86400000))return reply({error:'Choose a future starting time within 90 days'},400);
+      return reply(await suggestSlot(body.pageId,body.from,body.id));
+    }
+    if(path==='/admin/api/resume-facebook'&&req.method==='POST'){
+      const body=await req.json();if(!validId(body.pageId)||body.confirmed!==true)return reply({error:'Confirm the repaired Page connection before resuming'},400);
+      await clearDeliveryPause(body.pageId);return reply({ok:true,message:'Publishing pause acknowledged. Any server cooldown still applies.'});
     }
     if (path === '/admin/api/page' && req.method === 'POST') {
       const { id, fields } = await req.json();
