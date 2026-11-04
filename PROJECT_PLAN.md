@@ -1,8 +1,19 @@
 # EchoLink main project goal and implementation plan
 
-Updated: 2026-11-03. This file is the working acceptance plan. The user's seven
+Updated: 2026-11-04. This file is the working acceptance plan. The user's seven
 Bangla requirements are mandatory; the reference image defines the desired
 pipeline shape, not a claim that every pictured node has been reproduced.
+
+Current operating guide and prioritized remaining work:
+[PRODUCTION_TESTING.md](docs/PRODUCTION_TESTING.md). The public dashboard at
+https://echolinkbd.vercel.app/admin passed real login and local 4B connectivity
+tests. The November 4 outage was an expired Quick Tunnel and was repaired.
+GitHub main push and the complete Actions build/test/deploy run now pass.
+CLI 65.4.0 resolved the old pinned CLI's project-settings failure with the token.
+The automation remains paused/dry-run with the approved draft preserved.
+Facebook token/version, Sheets authorization, model factual-quality acceptance,
+stable hosting and the advanced integrations listed in the guide remain open.
+Earlier handoff entries below describe their dated state, not today's blockers.
 
 | Requirement | Acceptance check | Current state |
 | --- | --- | --- |

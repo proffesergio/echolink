@@ -1,7 +1,8 @@
 # EchoLink
 
-Public dashboard: https://echolink-green.vercel.app/admin (requires the local
+Public dashboard: https://echolinkbd.vercel.app/admin (requires the local
 worker and tunnel). See [deployment and CI instructions](docs/CI_CD.md).
+Start with [production testing and remaining work](docs/PRODUCTION_TESTING.md).
 
 Open the local admin UI with `npm run dashboard` while the worker is running.
 It manages page/feed configuration, local model discovery/testing, token aliases

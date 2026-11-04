@@ -1,5 +1,8 @@
 # Setup status — 2026-11-03
 
+Historical setup log. For the November 4 verified dashboard/AI/CI deployment
+and prioritized remaining work, read [PRODUCTION_TESTING.md](PRODUCTION_TESTING.md).
+
 ## Current verified setup
 
 - Neon production migration applied after passing on a temporary child branch.

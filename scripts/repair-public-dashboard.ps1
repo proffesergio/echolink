@@ -1,4 +1,3 @@
-param([switch]$UseCliLogin)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 function Test-LocalJson([string]$Url) {
@@ -17,16 +16,11 @@ if (!$bridgeOnline) {
 & powershell -NoProfile -File scripts/restart-tunnel.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Tunnel restart failed' }
 $configureArgs = @('scripts/configure-vercel.mjs')
-if ($UseCliLogin) { $configureArgs += '--use-cli-login' }
 & node @configureArgs
-if ($LASTEXITCODE -ne 0) { throw 'Vercel settings update failed; try npm run public:repair -- -UseCliLogin after vercel login' }
+if ($LASTEXITCODE -ne 0) { throw 'Vercel settings update failed; check VERCEL_TOKEN and project access' }
 & npm.cmd run build
 if ($LASTEXITCODE -ne 0) { throw 'Dashboard build failed' }
-Push-Location deploy/vercel
-try {
-    # The CLI uses the interactive login here. No credential is passed as an argument.
-    & vercel.cmd deploy --prod --yes
-    if ($LASTEXITCODE -ne 0) { throw 'Vercel deployment failed' }
-} finally { Pop-Location }
+& node scripts/deploy-dashboard.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Vercel deployment failed' }
 & node scripts/check-local-services.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Service checks failed; see the result above' }

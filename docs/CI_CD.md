@@ -1,9 +1,12 @@
 # Public dashboard and GitHub deployments
 
-The production dashboard is https://echolink-green.vercel.app/admin.
+The production dashboard is https://echolinkbd.vercel.app/admin.
 Use the existing `DASHBOARD_PASSWORD` from your local `.env.local`.
 The requested `echolink.vercel.app` could not be reliably assigned: Vercel
 reported a project conflict and a live HTTP check served another application.
+The replacement echolinkbd.vercel.app was added to the project and verified
+against the real dashboard/API. Use this new address for login. Follow
+[PRODUCTION_TESTING.md](PRODUCTION_TESTING.md) for local AI and remaining work.
 
 Only `deploy/vercel` is deployed. Your local n8n, worker, Ollama, database
 credentials and Facebook tokens are not deployed to Vercel. The public proxy
@@ -11,7 +14,7 @@ forwards signed sessions through an HTTPS tunnel to a bridge on 127.0.0.1:8788.
 The bridge requires a separate random server-only key and exposes dashboard
 API routes, excluding owner login tickets and worker job endpoints.
 
-## Finish GitHub CI authorization
+## GitHub CI deployment
 
 The repository is https://github.com/proffesergio/echolink, branch `main`.
 `.github/workflows/deploy-dashboard.yml` tests builds and all automated tests
@@ -30,14 +33,17 @@ tell the assistant once saved; do not paste it in chat. The assistant can then
 set the repository secrets and verify an actual Actions deployment.
 See [Vercel's CI workflow documentation](https://vercel.com/kb/guide/using-vercel-cli-for-custom-workflows).
 
-The initial local commit was created, but GitHub rejected the push with
-`Invalid username or token`. No Actions run has been verified yet. After the
-credentials above are ready, the assistant can run:
+GitHub authentication and the main push succeeded. The full Actions run passed
+build, 24 tests and production deployment. The earlier CLI 54.18.1 failed to
+retrieve project settings. Upgrading to 65.4.0 resolved deployment with the saved
+token. User-profile HTTP 404 did not establish that the project token was invalid;
+the access probe now checks project/deployment resources instead. Do not copy
+expiring CLI OAuth credentials into CI. To update secrets or deploy manually:
 
 ```powershell
 node scripts/configure-github-secrets.mjs
-gh auth setup-git
-git push -u origin main
+node scripts/check-vercel-access.mjs
+gh workflow run deploy-dashboard.yml --ref main --repo proffesergio/echolink
 gh run list --repo proffesergio/echolink
 ```
 
@@ -61,6 +67,9 @@ powershell -NoProfile -File scripts/restart-bridge.ps1
 
 The present tunnel is a temporary Cloudflare Quick Tunnel. It survives normal
 frontend deployments but changes hostname if the tunnel process restarts.
+It also expired while the process was still running on November 4. Diagnose
+with `npm run public:check`; recover in one command with
+`npm run public:repair`.
 Its executable is installed locally at `.codex/tools/cloudflared.exe`, excluded
 from Git. On a new PC install the official Windows amd64 cloudflared release
 at that path: https://github.com/cloudflare/cloudflared/releases.

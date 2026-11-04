@@ -1,10 +1,13 @@
 # Hosting EchoLink: Vercel dashboard with local n8n and free local AI
 
 Checked 2026-11-03. Deployment files are prepared under `deploy/vercel/`.
-The dashboard is deployed at https://echolink-green.vercel.app/admin with a
+The dashboard is deployed at https://echolinkbd.vercel.app/admin with a
 restricted local bridge and a temporary HTTPS tunnel. See [CI_CD.md](CI_CD.md)
 for current deployment, GitHub Actions authorization and tunnel restart steps.
 No cloud VM has been created; n8n, the worker and models remain on Windows.
+For the current tested commands, use [PRODUCTION_TESTING.md](PRODUCTION_TESTING.md).
+The longer hosting examples below describe alternatives, including a named
+tunnel; the current public tunnel targets the restricted bridge on port 8788.
 
 ## Which parts can be hosted where?
 

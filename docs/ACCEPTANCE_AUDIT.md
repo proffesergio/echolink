@@ -1,5 +1,9 @@
 # Goal acceptance audit — 2026-11-03
 
+Historical acceptance snapshot. The November 4 public dashboard, local-model
+connectivity and CI deployment are now verified; current blockers and remaining
+development are listed in [PRODUCTION_TESTING.md](PRODUCTION_TESTING.md).
+
 The full seven-criterion objective remains unchanged. Implemented mechanisms and
 verified live behavior are distinguished below.
 
