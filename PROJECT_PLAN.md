@@ -17,10 +17,10 @@ Earlier handoff entries below describe their dated state, not today's blockers.
 
 | Requirement | Acceptance check | Current state |
 | --- | --- | --- |
-| ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 distinct publishers verified from 56 candidates; imported disabled; RSS concurrency defaults to 4; see sources/VERIFIED.md |
+| ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 verified publishers are enabled and linked to Noble Seek; real previews fetched 20 items with no failed feeds; RSS concurrency defaults to 4; see sources/VERIFIED.md |
 | নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic adapter exists; duplicate audit events now mirrored to Airtable; real semantic evaluation awaits model |
 | কোনো সাইট ব্লক করলে ফলব্যাক সিস্টেম চালু হয়ে যায় | Primary timeout/HTTP/parse failure tries configured permitted fallback; RSS text survives article fetch failure; both failures logged | Blocked/malformed feed fallback tests passed; configured alternate-publisher backups imported visibly; they do not recover the exact blocked article |
-| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | Adapter and test UI built; user must install/start model and evaluate output |
+| AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified; factual contradictions found and flagged, so editorial quality acceptance remains open |
 | ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, durable delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Durable delayed queue implemented; due-time, dry-run and quiet-hour gates tested; Facebook live delivery awaits user credentials/authorization |
 | সব রেকর্ড Airtable-এ: posted/skipped/failed | Article log plus bounded duplicate/failure audit entries; comment states | Article/approval roundtrip tested; audit-event mirroring and source-comment state fields implemented |
 | শুধু নির্ধারিত সময়ে পোস্ট; স্প্যাম নয় | Page timezone/window, daily cap, minimum inter-post gap, source-comment timing policy, approvals and durable reservations | Window/cap/approval and minimum-gap enforcement implemented; default 30-minute post gap and 5-minute comment delay; comments also respect quiet hours |
@@ -44,7 +44,7 @@ Earlier handoff entries below describe their dated state, not today's blockers.
 ## User-owned actions
 
 - Choose the news publishers, target Facebook Pages and posting policy.
-- Install/start Ollama or LM Studio, download a suitable model, review Bangla quality.
+- Keep the installed local model running and review its Bangla factual quality.
 - Sign into Meta, authorize the app, provide Page access and satisfy any review.
 - Approve sensitive content and explicitly decide when to enable live posting.
 
