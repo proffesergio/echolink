@@ -26,4 +26,16 @@ try{
   assert.deepEqual(errors,[]);
   console.log(`PASS public dashboard: ${base}; real password login, Secure/HttpOnly session, ${state.pages.length} page(s), ${state.feeds.length} feeds, Drafts and Activity; no browser errors or secrets exposed.`);
   console.log('PASS public tunnel: anonymous access rejected (HTTP 401).');
+  if(process.argv.includes('--test-model')){
+    const fields=state.pages.find(p=>p.fields['Active Status'])?.fields||state.pages[0].fields;
+    const headers={Origin:base};
+    const discovery=await page.request.post(base+'/admin/api/models',{headers,data:{endpoint:fields['Local Endpoint URL'],alias:fields['AI Secret Alias']||''},timeout:30000});
+    assert.equal(discovery.status(),200);assert.ok((await discovery.json()).models.includes(fields['Model Identifier']));
+    const started=Date.now();
+    console.log('Testing configured local model through the public dashboard; no article or Facebook post will be created.');
+    const response=await page.request.post(base+'/admin/api/test-model',{headers,data:{fields},timeout:260000});
+    assert.equal(response.status(),200,`Model HTTP ${response.status()}`);
+    const generated=await response.json();assert.ok(generated.caption?.length>20,'Expected real generated text');
+    console.log(`PASS public AI: ${fields['Model Identifier']}; ${generated.caption.length} generated characters in ${Math.round((Date.now()-started)/1000)} seconds. Connectivity check only; factual accuracy is not certified.`);
+  }
 }finally{await browser.close()}

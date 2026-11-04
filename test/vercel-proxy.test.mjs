@@ -23,6 +23,11 @@ test('Vercel proxy forwards signed sessions and rejects foreign origins and work
     assert.equal((await request('ticket',{})).statusCode,404);
     assert.equal((await request('../../jobs/process',{})).statusCode,404);
     assert.equal((await request('login',{password:'x'.repeat(131073)})).statusCode,413);
+    globalThis.fetch=async()=>{throw Object.assign(new Error('Private endpoint detail'),{cause:{code:'ENOTFOUND'}});};
+    const offline=await request('auth');assert.equal(offline.statusCode,502);assert.match(offline.body.error,/public:repair/);assert.ok(!offline.body.error.includes('Private endpoint detail'));
+    globalThis.fetch=async()=>{throw Object.assign(new Error('private'),{name:'TimeoutError'});};
+    assert.equal((await request('auth')).statusCode,504);
+    delete process.env.WORKER_ORIGIN;assert.match((await request('auth')).body.error,/settings are missing/);
     process.env.WORKER_ORIGIN='http://localhost:8787';assert.equal((await request('auth')).statusCode,502);
   }finally{
     globalThis.fetch=originalFetch;

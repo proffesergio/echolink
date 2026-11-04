@@ -56,4 +56,4 @@ jobs:
         working-directory: deploy/vercel
         run: |
           vercel deploy --prebuilt --prod
-          echo "Dashboard: https://echolink-green.vercel.app" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dashboard: https://echolinkbd.vercel.app" >> "$GITHUB_STEP_SUMMARY"

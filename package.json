@@ -24,7 +24,10 @@
     "deploy": "neon deploy --env .env.local",
     "verify:workflow-control": "node scripts/check-workflow-control.mjs",
     "verify:password-ui": "node scripts/check-password-ui.mjs",
-    "verify:newsroom": "node scripts/check-newsroom-ui.mjs"
+    "verify:newsroom": "node scripts/check-newsroom-ui.mjs",
+    "public:check": "node scripts/check-local-services.mjs",
+    "public:repair": "powershell -NoProfile -File scripts/repair-public-dashboard.ps1",
+    "verify:public": "node scripts/check-public-dashboard.mjs"
   },
   "keywords": [],
   "author": "",
