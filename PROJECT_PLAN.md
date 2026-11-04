@@ -48,7 +48,7 @@ guides: docs/FACEBOOK_TOKEN.md, docs/GOOGLE_SHEETS.md and docs/EDITORIAL_OPERATI
 | Requirement | Acceptance check | Current state |
 | --- | --- | --- |
 | ১৯টিরও বেশি বাংলা নিউজ সোর্স থেকে RSS দিয়ে একসাথে খবর আসে | At least 20 distinct Bangla publishers, each with a recently fetched, parsed and language-checked feed; bounded concurrent ingestion | 20 verified publishers are enabled and linked to Noble Seek; real previews fetched 20 items with no failed feeds; RSS concurrency defaults to 4; see sources/VERIFIED.md |
-| নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic adapter exists; duplicate audit events now mirrored to Airtable; real semantic evaluation awaits model |
+| নিউজ একত্র করে গুছিয়ে নেয় এবং আগে পোস্ট হওয়া খবর বাদ দেয় | Tenant-scoped canonical URL/title constraints; historical posted checks; optional semantic similarity; explicit duplicate audit record | Exact constraints tested; semantic checks now include prepared captions and lazily index prior posts using publication-time memory. Real embeddinggemma calibration and corpus probes completed; 0.92 produced a false match, so automatic semantic skipping remains disabled pending held-out evaluation. See docs/SEMANTIC_DEDUPLICATION.md |
 | কোনো সাইট ব্লক করলে ফলব্যাক সিস্টেম চালু হয়ে যায় | Primary timeout/HTTP/parse failure tries configured permitted fallback; RSS text survives article fetch failure; both failures logged | Blocked/malformed feed fallback tests passed; configured alternate-publisher backups imported visibly; they do not recover the exact blocked article |
 | AI আর্টিকেল পড়ে আকর্ষণীয় বাংলা পোস্ট লিখে দেয় | A real installed model produces reviewed Bangla captions from article text without fabricated facts | gemma3:4b installed with an 8192-context profile; real full draft and public-dashboard inference verified. Unapproved captions with explicit conflict warnings or unsupported numbers now require review even on automatic Pages; relationship/name/attribution accuracy and real benchmark acceptance remain open |
 | ছবি থাকলে ছবিসহ অটো পোস্ট; পরে কমেন্টে সোর্স লিংক | Photo/text publish, optional delayed-comment job, configurable delay, remote IDs and ambiguous-outcome protection | Real photo post and delayed comment verified through Meta on November 4. Website URLs are supported, but the owner's later instruction disables automatic link comments; current policy skips them |
@@ -125,6 +125,22 @@ Connection checklist and delivery contract:
 [WEBSITE_PUBLISHING.md](docs/WEBSITE_PUBLISHING.md).
 
 ## Latest connector and roadmap verification — 2026-11-04
+
+Later semantic follow-up: `npm test` passed 42 tests and build passed. Disposable
+Neon checks passed the prepared-caption path, prior-post backfill, input/model
+cache invalidation, Page isolation, publication-time expiry and safe provider
+failure. An additional real local embeddinggemma → cloned Neon → prepared-caption
+skip integration passed with 768-dimensional vectors and no Facebook request.
+The temporary branch was removed; no production migration was needed. Eighteen
+synthetic pairs and twelve related real-feed
+pairs were measured without publication or article-state changes. At 0.95 the
+synthetic set had zero false matches and two missed duplicates; this is calibration,
+not accepted general accuracy. Semantic mode remains disabled. The implementation
+and remaining held-out evaluation are in
+[SEMANTIC_DEDUPLICATION.md](docs/SEMANTIC_DEDUPLICATION.md).
+The installed model and 0.95 calibration setting were saved without enabling
+semantic mode. Worker restart waited for idle tasks; the active n8n state was
+restored. Public login/session/privacy checks passed after the update.
 
 - Expanded product direction: multi-niche content profiles, Pages/channels,
   languages, image/quote/video formats, independent optional website destinations,

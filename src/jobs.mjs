@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { query, transaction } from './db.mjs';
 import { allRecords, airtable, tables } from './airtable.mjs';
-import { hash, canonicalUrl, titleHash, normalizePage, inWindow, generationBody, cosine, sourceCommentReady } from './core.mjs';
+import { hash, canonicalUrl, titleHash, normalizePage, inWindow, generationBody, sourceCommentReady } from './core.mjs';
 import {graphRequest,deliveryGate,FacebookError,checkFacebookConnection,clearConnectionPause} from './facebook.mjs';
 import {reportProgress} from './telemetry.mjs';
 import {withSuggestedHashtags,needsReview} from './publishing-policy.mjs';
@@ -11,6 +11,7 @@ import {automaticLinksEnabled,captionLinkProblem,sourceCommentMessage} from './l
 import { request, jsonRequest, hostList, HttpError } from './net.mjs';
 import {publishedAt,rankNews,generationResult,draftQuality,contentPanel} from './newsroom.mjs';
 import {syncSheet} from './sheets.mjs';
+import {findSemanticDuplicate,SemanticError} from './semantic.mjs';
 
 const tokens = key => JSON.parse(process.env[key] || '{}');
 const dryRun = () => process.env.DRY_RUN !== 'false';
@@ -156,21 +157,6 @@ async function generate(page, article) {
   }
   throw lastError;
 }
-async function semanticDuplicate(page, article) {
-  if (process.env.SEMANTIC_ENABLED !== 'true') return false;
-  const model = `${process.env.EMBEDDING_URL}|${process.env.EMBEDDING_MODEL}`;
-  const response = await jsonRequest(process.env.EMBEDDING_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', ...bearer(process.env.EMBEDDING_TOKEN) }, body: JSON.stringify({ model: process.env.EMBEDDING_MODEL, input: `${article.title}\n${article.body.slice(0, 7000)}` }) }, { hosts: hostList('ALLOWED_AI_HOSTS'), local: true });
-  const vector = response.data?.[0]?.embedding;
-  if (!Array.isArray(vector) || vector.length > 8192) throw new Error('Invalid embedding');
-  cosine(vector, vector);
-  const days = Number(process.env.SEMANTIC_TTL_DAYS || 7), threshold = Number(process.env.SEMANTIC_THRESHOLD || 0.92);
-  if (!(days > 0 && days <= 30) || !(threshold > 0 && threshold <= 1)) throw new Error('Invalid semantic settings');
-  const candidates = await query(`SELECT vector FROM echolink.articles WHERE page_id=$1 AND id<>$2 AND vector_model=$3
-    AND vector IS NOT NULL AND created_at>now()-($4::double precision*interval '1 day')
-    AND status NOT IN ('Rejected','Failed','Skipped (Duplicate)') ORDER BY created_at DESC LIMIT 500`, [page.id, article.id, model, days]);
-  await update(article.id, { vector: JSON.stringify(vector), vector_model: model });
-  return candidates.rows.some(row => cosine(vector, row.vector) >= threshold);
-}
 async function dailyCount(page) {
   const r = await query(`SELECT count(*)::int AS count FROM echolink.articles WHERE page_id=$1
     AND ((status='Posted' AND (published_at AT TIME ZONE $2)::date=(now() AT TIME ZONE $2)::date)
@@ -244,8 +230,14 @@ export async function processQueue(options={}) {
     if(a.selection_score!==undefined)await update(a.id,{selection_score:a.selection_score,selection_reason:a.selection_reason});
     try {
       await stage(page,1,'Preparing article and model input');
+      if(process.env.SEMANTIC_ENABLED==='true')await stage(page,1,'Checking similarity against prior posts','Indexing missing historical embeddings before comparing this Page’s published stories');
+      const duplicate=await findSemanticDuplicate(page,a);
+      if(duplicate){
+        const detail=`Semantic match to ${duplicate.status} article ${duplicate.id} (cosine ${duplicate.score.toFixed(4)}). Review the original story before reusing this item.`;
+        await update(a.id,{status:'Skipped (Duplicate)',last_error:detail});
+        return {page:page.id,duplicate:a.id,matchedArticle:duplicate.id,similarity:duplicate.score,reason:detail};
+      }
       if (!a.caption) {
-        if (await semanticDuplicate(page, a)) { await update(a.id, { status: 'Skipped (Duplicate)' }); return { duplicate: a.id }; }
         await stage(page,2,'Local AI is generating the caption','Waiting for the configured model. Stage percentage is not a prediction of inference time.');
         const generated=await generate(page,a);generated.caption=withSuggestedHashtags(generated.caption,a,page.language);Object.assign(a,generated);a.caption_hash=hash(a.caption);
         await update(a.id, { ...generated, caption_hash: a.caption_hash,last_error:null,attempts:0 });
@@ -310,7 +302,7 @@ export async function processQueue(options={}) {
     } catch (e) {
       const attempts = a.attempts + 1;
       const quality=/^(Caption is too short|Caption does not use|Caption copies|Incomplete model JSON|Invalid AI caption|Empty model output)/.test(e.message||'');
-      const reason=e instanceof WebsiteError?e.message:e instanceof HttpError?e.message:quality?`${e.message}. Review the local model output or try a stronger model; no post was sent.`:'Pre-publish processing failed; verify endpoint, model and credentials';
+      const reason=e instanceof WebsiteError||e instanceof SemanticError?e.message:e instanceof HttpError?e.message:quality?`${e.message}. Review the local model output or try a stronger model; no post was sent.`:'Pre-publish processing failed; verify endpoint, model and credentials';
       const retryAt=new Date(Date.now()+Math.min(3600,60*2**attempts)*1000);
       await update(a.id, { status: attempts >= 5 ? 'Failed' : a.status, attempts, next_attempt_at:retryAt, last_error:reason });
       return { page:page.id,failed: a.id,error:reason,retryAt:retryAt.toISOString() };

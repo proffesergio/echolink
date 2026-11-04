@@ -125,7 +125,7 @@ Keep the PC awake and n8n, the worker, your AI runner and the HTTPS bridge onlin
 | Token-scope checks and task progress | Additional scraper/MCP adapters and paid providers |
 | Vercel frontend + authenticated local bridge | Always-on worker hosting and richer team permissions |
 
-The optional semantic layer uses bounded local embeddings stored as JSON in Postgres; it can miss older or more distant duplicates. Qdrant, Postiz and scraper MCP options are plans, not advertised as connected services. The repository includes optional Neon AI Gateway, Object Storage and Function configuration; enable and verify these separately, considering provider availability and cost. See [integration notes](docs/integrations.md), [production testing](docs/PRODUCTION_TESTING.md) and the [project plan](PROJECT_PLAN.md).
+The optional semantic layer checks prior posts using bounded local embeddings stored as JSON in Postgres, including prepared captions and missing historical vectors. It remains disabled on the current installation: calibration found both false matches and missed duplicates. See the [semantic evaluation and setup](docs/SEMANTIC_DEDUPLICATION.md) before enabling it. Qdrant, Postiz and scraper MCP options are plans, not advertised as connected services. The repository includes optional Neon AI Gateway, Object Storage and Function configuration; enable and verify these separately, considering provider availability and cost. See [integration notes](docs/integrations.md), [production testing](docs/PRODUCTION_TESTING.md) and the [project plan](PROJECT_PLAN.md).
 
 ## Test with evidence
 

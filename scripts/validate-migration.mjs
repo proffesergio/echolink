@@ -15,7 +15,7 @@ try {
   cli(['branches', 'create', '--name', branch, '--parent', 'production', '--expires-at', new Date(Date.now() + 86400000).toISOString(), '--no-secrets', '--output', 'json']);
   created = true;
   cli(['env', 'pull', '--branch', branch, '--service', 'postgres', '--file', file]);
-  const env = { ...process.env, ...parseEnv(await readFile(file, 'utf8')),NOBLESEEK_ENABLED:'false',FB_AUTOMATIC_LINKS_ENABLED:'true' };
+  const env = { ...process.env, ...parseEnv(await readFile(file, 'utf8')),NOBLESEEK_ENABLED:'false',FB_AUTOMATIC_LINKS_ENABLED:'true',SEMANTIC_ENABLED:'false' };
   const result = spawnSync(process.execPath, ['scripts/migrate.mjs'], { env, encoding: 'utf8', timeout: 60000 });
   console.log(result.stdout.trim());
   if (result.status !== 0) throw new Error('Migration failed on temporary branch');
@@ -37,6 +37,8 @@ try {
     console.log(progress.stdout.trim());if(progress.status!==0){console.error(progress.stderr.slice(-3000));throw new Error('Progress validation failed');}
     const website=spawnSync(process.execPath,['scripts/check-website-branch.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:90000});
     console.log(website.stdout.trim());if(website.status!==0){console.error(website.stderr.slice(-3000));throw new Error('Website delivery validation failed');}
+    const semantic=spawnSync(process.execPath,['scripts/check-semantic-branch.mjs'],{env:{...env,ECHOLINK_TEST_BRANCH:branch},encoding:'utf8',timeout:90000});
+    console.log(semantic.stdout.trim());if(semantic.status!==0){console.error(semantic.stderr.slice(-3000));throw new Error('Semantic delivery validation failed');}
   } finally { await c.end(); }
 } catch (e) { console.error(e.message); process.exitCode = 1; }
 finally {
