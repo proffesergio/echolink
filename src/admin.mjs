@@ -4,7 +4,6 @@ import { authorized, normalizePage, hash } from './core.mjs';
 import { allRecords, airtable, tables } from './airtable.mjs';
 import { query,resetPools } from './db.mjs';
 import { jsonRequest, hostList } from './net.mjs';
-import { generationBody } from './core.mjs';
 import { saveSettings } from './settings.mjs';
 import { sync, mirror, approvals, jobs } from './jobs.mjs';
 import {passwordHash,authenticatePassword,passwordConfigured,passwordSource,issueSession,validSession,sessionCookie,readSession} from './admin-auth.mjs';
@@ -197,7 +196,10 @@ export async function admin(req) {
     if (path === '/admin/api/test-model' && req.method === 'POST') {
       const { fields } = await req.json(); const p = normalizePage({ id: 'test', fields: { ...fields, 'Active Status': false } });
       const secret = maps('AI_TOKENS_JSON')[p.aiSecret];
-      const data = await jsonRequest(p.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(secret ? { Authorization: `Bearer ${secret}` } : {}) }, body: JSON.stringify(generationBody(p, { title: 'Local connection test', body: 'This is a test of a local news caption system. It has successfully connected to a language model. No Facebook post is being published.' })) }, { hosts: hostList('ALLOWED_AI_HOSTS'), local: true, timeoutMs: Number(process.env.AI_TIMEOUT_MS || 300000) });
+      // Keep diagnostics short enough for a public HTTP request. Full editorial
+      // generation runs in the durable background preview instead.
+      const payload={model:p.model,temperature:p.temperature,stream:false,max_tokens:96,messages:[{role:'system',content:'This is a connection diagnostic. Reply with exactly one short sentence in '+(p.language==='Bangla'?'Bangla':'English')+'. Do not add analysis or JSON.'},{role:'user',content:'Say that the local AI model connection is working. This is a test, not a news story.'}]};
+      const data = await jsonRequest(p.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(secret ? { Authorization: `Bearer ${secret}` } : {}) }, body: JSON.stringify(payload) }, { hosts: hostList('ALLOWED_AI_HOSTS'), local: true, timeoutMs: Math.min(Number(process.env.AI_TIMEOUT_MS || 300000),100000) });
       return reply(generationResult(data.choices?.[0]?.message?.content));
     }
     if (path === '/admin/api/test-facebook' && req.method === 'POST') {

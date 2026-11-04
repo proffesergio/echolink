@@ -38,4 +38,5 @@ try{
     const generated=await response.json();assert.ok(generated.caption?.length>20,'Expected real generated text');
     console.log(`PASS public AI: ${fields['Model Identifier']}; ${generated.caption.length} generated characters in ${Math.round((Date.now()-started)/1000)} seconds. Connectivity check only; factual accuracy is not certified.`);
   }
-}finally{await browser.close()}
+}catch(error){console.error(`FAIL public dashboard check: ${error.code||error.name}. No request headers or session values logged.`);process.exitCode=1;}
+finally{await browser.close()}

@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Dashboard build failed' }
 Push-Location deploy/vercel
 try {
     # The CLI uses the interactive login here. No credential is passed as an argument.
-    & vercel.cmd deploy --prod --yes --scope omniteam1
+    & vercel.cmd deploy --prod --yes
     if ($LASTEXITCODE -ne 0) { throw 'Vercel deployment failed' }
 } finally { Pop-Location }
 & node scripts/check-local-services.mjs

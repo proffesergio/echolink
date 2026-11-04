@@ -8,7 +8,7 @@ for(const key of keys)if(!process.env[key])throw new Error(`Missing ${key}`);
 const childEnv={...process.env};
 if(process.argv.includes('--use-cli-login'))delete childEnv.VERCEL_TOKEN;
 for(const key of keys){
-  const args=['env','add',key,'production','--sensitive','--force','--yes','--scope','omniteam1'];
+  const args=['env','add',key,'production','--sensitive','--force','--yes'];
   const windows=process.platform==='win32';
   const command=windows?process.execPath:'vercel';
   if(windows)args.unshift(path.join(process.env.APPDATA,'npm','node_modules','vercel','dist','index.js'));
