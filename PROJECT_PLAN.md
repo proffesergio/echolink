@@ -32,6 +32,10 @@ requires an explicit unlock, and verifies the key against the local n8n API befo
 saving it. Dashboard passwords and rejected/unverified keys cannot overwrite it.
 The newly saved real key passed HTTP 200; no additional key copy is needed.
 
+Detailed runtime evidence, the two confirmed overdue scheduled photo posts,
+deployment checks and remaining limits are recorded in
+[RECOVERY_2026-11-05.md](docs/RECOVERY_2026-11-05.md).
+
 The detailed phased architecture, researched monetization experiments, local
 media feasibility and future YouTube plan are in
 [PLATFORM_ROADMAP.md](docs/PLATFORM_ROADMAP.md). That roadmap distinguishes working

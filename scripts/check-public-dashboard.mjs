@@ -20,7 +20,14 @@ try{
   const configuration=await configResponse.json();
   const cookies=await page.context().cookies();
   assert.ok(cookies.some(cookie=>cookie.secure&&cookie.httpOnly),'Expected secure HttpOnly login cookie');
-  for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL','NOBLESEEK_DATABASE_URL'])if(process.env[key])assert.ok(!JSON.stringify({state,configuration}).includes(process.env[key]),`Leaked ${key}`);
+  for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL','NOBLESEEK_DATABASE_URL','N8N_API_KEY','META_APP_SECRET','META_USER_ACCESS_TOKEN'])if(process.env[key])assert.ok(!JSON.stringify({state,configuration}).includes(process.env[key]),`Leaked ${key}`);
+  for(const token of Object.values(JSON.parse(process.env.FB_TOKENS_JSON||'{}')))assert.ok(!JSON.stringify({state,configuration}).includes(token),'Page token leaked');
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByRole('heading',{name:'n8n API connection',exact:true}).waitFor();
+  const keyField=page.getByLabel('n8nAPIKey',{exact:true});assert.ok(await keyField.isDisabled());assert.equal(await keyField.inputValue(),'');
+  assert.equal(await page.locator('#settings-form [name="n8nAPIKey"]').count(),0);
+  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Long-lived Facebook connection',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Workflow',exact:true}).click();await page.getByRole('button',{name:'Repair one-minute trigger',exact:true}).waitFor();
   await page.getByRole('button',{name:'Drafts',exact:true}).click();
   await page.getByRole('heading',{name:'Drafts',exact:true,level:2}).waitFor();
   await page.getByRole('button',{name:'Review queue',exact:true}).click();
@@ -31,7 +38,7 @@ try{
   await page.getByRole('button',{name:'Activity',exact:true}).click();
   await page.getByRole('heading',{name:'Run activity & results'}).waitFor();
   assert.deepEqual(errors,[]);
-  console.log(`PASS public dashboard: ${base}; real password login, Secure/HttpOnly session, ${state.pages.length} page(s), ${state.feeds.length} feeds, Drafts and Activity; no browser errors or secrets exposed.`);
+  console.log(`PASS public dashboard: ${base}; real login, Secure/HttpOnly session, locked and isolated n8n key form, Facebook lifecycle/reconnect, workflow repair control, ${state.pages.length} page(s), ${state.feeds.length} feeds, Drafts and Activity; no browser errors or secrets exposed.`);
   console.log('PASS public tunnel: anonymous access rejected (HTTP 401).');
   if(process.argv.includes('--test-model')){
     const fields=state.pages.find(p=>p.fields['Active Status'])?.fields||state.pages[0].fields;
