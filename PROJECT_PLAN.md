@@ -1,11 +1,36 @@
 # EchoLink creator platform: main project goal and implementation plan
 
-Updated: 2026-11-04. EchoLink is being expanded into a multi-niche creator
+Updated: 2026-11-05. EchoLink is being expanded into a multi-niche creator
 operations platform: multiple brands/Pages/channels, languages, content types and
 post formats, with optional per-Page website publication and link sharing. The
 news pipeline remains its first working module. Its seven Bangla requirements
 remain the news acceptance track; the reference image describes that pipeline,
 not the boundaries of the whole product.
+
+Current priority is the owner's three-part recovery and redesign request:
+
+1. Redesign the entire dashboard around the supplied Omniroute reference: compact
+   charcoal/coral shell, connection categories/search, accurate provider states,
+   and the existing editorial, Page, scheduling and workflow controls. A concrete
+   Superdesign draft is being prepared for review; source integration is pending.
+2. Replace the expired Facebook credential with verified long-lived Page
+   authorization and display its lifecycle. The November 5 real exchange passed
+   for Noble Seek with publishing/comment scopes; Meta reports no scheduled token
+   expiry and data access through February 3, 2027. Revocation remains possible.
+3. Restore automatic Approved/Scheduled delivery. The live n8n trigger had been
+   changed to hourly; it is now repaired to one minute, with node credentials,
+   graph references and activation state preserved. The subsequent real scheduled
+   execution published approved article `fecb10bb-71d9-45b2-afd3-5c4cc750dfe5`
+   with a photo at 09:32 Asia/Dhaka; Meta read-back returned HTTP 200 and media
+   type `photo` for post `236380006216214_122296938236198663`. Its optional website
+   article also returned public HTTP 200. Increasing a worker interval alone
+   cannot accelerate an hourly trigger. Google Sheets mirroring currently reports
+   a connection failure and remains a separate open issue.
+
+Credential recovery also isolates n8n key replacement from general Settings,
+requires an explicit unlock, and verifies the key against the local n8n API before
+saving it. Dashboard passwords and rejected/unverified keys cannot overwrite it.
+The newly saved real key passed HTTP 200; no additional key copy is needed.
 
 The detailed phased architecture, researched monetization experiments, local
 media feasibility and future YouTube plan are in
@@ -28,7 +53,8 @@ Facebook authorization and Google Sheets connection have since been completed.
 A real photo post and its delayed source comment were verified directly through
 Meta on November 4. A final November 4 read shows the Page enabled in Airtable;
 preserve the current owner-managed activation setting and the configured 20-post
-daily cap, 60-minute gap, 09:00–23:00 Asia/Dhaka window and five-minute comment
+daily cap. A fresh November 5 read shows the owner's newer **six-minute gap and
+03:00–23:59 Asia/Dhaka window**; preserve these latest values and five-minute comment
 delay. Live mode is configured; a disabled Page must remain blocked whenever the
 owner disables it. Factual-quality acceptance, semantic duplicate
 evaluation, stable hosting and the advanced integrations remain open. Earlier

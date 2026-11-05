@@ -239,7 +239,7 @@ independent intervals in Settings prevent running every job each minute.
 PostgreSQL leases prevent concurrent scheduled claims of the same job.
 
 For dashboard Start/Stop, create a key in n8n **Settings → n8n API**, then save it
-in dashboard **Settings → n8nAPIKey**. The key needs workflow read/activate/deactivate
+in dashboard **Settings → n8n API connection → Replace n8n API key → Verify & save n8n key**. The key needs workflow read/activate/deactivate
 permissions when the n8n edition supports scopes. Start stops older EchoLink
 schedules before activating the combined workflow through n8n's running HTTP API.
 Without a key, open the workflow link and publish it directly in n8n. CLI

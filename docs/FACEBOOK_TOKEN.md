@@ -103,6 +103,60 @@ anything. Successful checks can clear a prior token/permission pause; policy
 restrictions and server cooldowns remain protected. Credentials apply when
 saved through the dashboard. Manual `.env.local` edits need a worker restart.
 
+## Long-lived connection and code 190 recovery
+
+EchoLink can perform the server-side exchange and verify the selected Page before
+replacing its saved token. This creates no Facebook post.
+
+1. Find the **App ID** and **App Secret** in your Meta app's settings. Keep the
+   secret in the local worker environment.
+2. Generate a fresh **User token for that same app**, granting
+   `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, and
+   `pages_manage_engagement`. Authorize the actual Page during consent.
+3. Save these values in the worker `.env.local`, without posting them in chat:
+
+   ```dotenv
+   META_APP_ID=your_numeric_app_id
+   META_APP_SECRET=your_app_secret
+   META_USER_ACCESS_TOKEN=your_fresh_user_access_token
+   ```
+
+4. In **Connections → Long-lived Facebook connection**, enter the Page's saved
+   alias and numeric Page ID, then click **Reconnect & verify Page**. This action
+   reads the fresh credentials from the file, so it does not need a worker restart.
+   The Graph version must already be configured under **Facebook Page token**.
+5. The worker checks the User token's app/permissions, exchanges it, selects the
+   requested Page, and verifies its identity and publishing scopes. It saves only
+   the resulting Page token in the publishing map and clears the temporary User
+   token variable after success. A failed check preserves the existing Page token.
+6. Review **Token expiry**, **Data access expiry**, and **Last verified**. A
+   successful reconnection clears that Page's authorization pause; server cooldowns
+   and policy restrictions stay in force. The usual approval, window, gap and daily
+   cap still apply before publishing.
+
+For local CLI recovery, use the same environment variables and run:
+
+```powershell
+node scripts/connect-facebook.mjs primary-page YOUR_NUMERIC_PAGE_ID
+```
+
+If the worker was already running when the CLI updated its environment file,
+restart it after running tasks finish. The dashboard action applies the change
+to the running worker immediately.
+
+Meta may report `expires_at: 0`, displayed as **No scheduled expiry**. This is
+not an irrevocable connection: account security changes, app removal, revoked
+permissions, Page access changes or Meta restrictions can invalidate it. A
+separate data-access expiry can also be reported. Reauthorize before that date
+and whenever Meta requests it. Code **190/463** means the token expired;
+**190/460** identifies a password/security change. EchoLink surfaces these
+different recovery reasons without repeatedly retrying publication.
+
+On November 5, the actual Noble Seek exchange and subsequent connection test
+passed with publishing/comment scopes, no scheduled token expiry, and a reported
+data-access expiry of **2027-02-03 09:17 Asia/Dhaka**. This is an observed result,
+not a guarantee about other Pages or future authorization.
+
 ## Troubleshooting
 
 | Symptom | Check |

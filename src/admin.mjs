@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import {parseEnv} from 'node:util';
 import { authorized, normalizePage, hash } from './core.mjs';
 import { allRecords, airtable, tables } from './airtable.mjs';
 import { query,resetPools } from './db.mjs';
 import { jsonRequest, hostList } from './net.mjs';
 import { saveSettings } from './settings.mjs';
+import {validateN8nAPIKey,N8nCredentialError} from './n8n-credentials.mjs';
 import {websiteConfiguration,testWebsiteConnection,WebsiteError} from './website.mjs';
 import {automaticLinksEnabled} from './link-policy.mjs';
 import { sync, mirror, approvals, jobs } from './jobs.mjs';
@@ -19,6 +21,7 @@ import {integrationCatalog} from './integrations.mjs';
 import {validateGoogleCredentials,testSheet,syncSheet} from './sheets.mjs';
 import {suggestSlot} from './calendar.mjs';
 import {clearDeliveryPause,clearConnectionPause,checkFacebookConnection,FacebookError} from './facebook.mjs';
+import {exchangePageToken,tokenFingerprint} from './facebook-auth.mjs';
 import {suggestedHashtags} from './publishing-policy.mjs';
 const tickets = new Map();
 let loginFailures=0,loginResetAt=0;
@@ -92,7 +95,7 @@ export async function admin(req) {
     if(path==='/admin/api/sync-sheets'&&req.method==='POST')return reply({ok:true,result:await runJob('sheets',syncSheet,'dashboard')});
     if(path==='/admin/api/workflow'&&req.method==='POST'){
       const {action,confirmed}=await req.json();
-      if(confirmed!==true||!['start','stop'].includes(action))return reply({error:'Confirm Start or Stop before changing the workflow'},400);
+      if(confirmed!==true||!['start','stop','repair'].includes(action))return reply({error:'Confirm Start, Stop or schedule repair before changing the workflow'},400);
       return reply({ok:true,workflow:await controlWorkflow(action)});
     }
     if(path==='/admin/api/test-database'&&req.method==='POST'){
@@ -100,11 +103,19 @@ export async function admin(req) {
       return reply({ok:true,schema:result.rows[0]});
     }
     if(path==='/admin/api/test-airtable'&&req.method==='POST')return reply({ok:true,pages:(await allRecords(tables().pages)).length,feeds:(await allRecords(tables().feeds)).length});
+    if(path==='/admin/api/n8n-key'&&req.method==='POST'){
+      const {n8nAPIKey}=await req.json();
+      if(typeof n8nAPIKey==='string'&&await authenticatePassword(n8nAPIKey.trim()))return reply({error:'This is your dashboard password, likely from browser autofill. Paste the full n8n API key instead; the saved key was kept.'},400);
+      try{
+        const key=await validateN8nAPIKey(n8nAPIKey);
+        await saveSettings({N8N_API_KEY:key});
+        return reply({ok:true,verified:true});
+      }catch(error){if(error instanceof N8nCredentialError)return reply({error:error.message},400);throw error;}
+    }
     if(path==='/admin/api/settings'&&req.method==='POST'){
       const body=await req.json(),values={};
       if(body.n8nAPIKey){
-        if(await authenticatePassword(body.n8nAPIKey))return reply({error:'The n8n API key field contains your dashboard password, likely from browser autofill. Saved credentials were not changed. Clear this field or paste the full n8n API key.'},400);
-        values.N8N_API_KEY=String(body.n8nAPIKey).trim();
+        return reply({error:'API keys are no longer saved by the general Settings form to prevent browser autofill replacing them. Refresh the dashboard and use Verify & save n8n key. Saved credentials were not changed.'},400);
       }
       const numeric={pageConcurrency:['PAGE_CONCURRENCY',1,3],feedConcurrency:['FEED_CONCURRENCY',1,8],maxItemsPerFeed:['MAX_ITEMS_PER_FEED',1,25],aiTimeoutMs:['AI_TIMEOUT_MS',1000,600000],articleTimeoutMs:['ARTICLE_TIMEOUT_MS',1000,600000],semanticTTLDays:['SEMANTIC_TTL_DAYS',1,30]};
       for(const [key,[env,min,max]]of Object.entries(numeric))if(body[key]!==undefined){const value=Number(body[key]);if(!Number.isInteger(value)||value<min||value>max)return reply({error:`${key} must be an integer from ${min} to ${max}`},400);values[env]=String(value);}
@@ -238,6 +249,22 @@ export async function admin(req) {
     }
     if(path==='/admin/api/article-action'&&req.method==='POST'){
       const body=await req.json();const result=await articleAction(body.id,body.action,body);if(!['publish','generate'].includes(body.action))queueEditorialMirror();return reply(result,202);
+    }
+    if(path==='/admin/api/facebook-connect'&&req.method==='POST'){
+      const {alias,pageId}=await req.json();
+      if(!/^[a-zA-Z0-9_-]{1,64}$/.test(alias||'')||!/^\d+$/.test(pageId||''))return reply({error:'Enter the saved token alias and numeric Facebook Page ID.'},400);
+      // The owner can place a fresh User authorization in the file without
+      // restarting a worker that is currently generating or publishing content.
+      const fresh=parseEnv(await readFile('.env.local','utf8'));
+      const {token,connection}=await exchangePageToken({appId:fresh.META_APP_ID,appSecret:fresh.META_APP_SECRET,userToken:fresh.META_USER_ACCESS_TOKEN,pageId,version:process.env.META_GRAPH_VERSION});
+      await saveSettings({FB_TOKENS_JSON:JSON.stringify({...maps('FB_TOKENS_JSON'),[alias]:token}),
+        FB_CONNECTIONS_JSON:JSON.stringify({...maps('FB_CONNECTIONS_JSON'),[alias]:{...connection,fingerprint:tokenFingerprint(token)}}),META_USER_ACCESS_TOKEN:''});
+      let resumeWarning;
+      try{
+        const linked=(await query("SELECT id FROM echolink.configurations WHERE kind='page' AND config->>'fbSecret'=$1 AND config->>'fbPageId'=$2",[alias,pageId])).rows;
+        for(const p of linked)await clearConnectionPause(p.id);
+      }catch{resumeWarning='The verified token was saved, but the delivery pause could not be updated. Test the Facebook connection to resume it.';}
+      return reply({...connection,...(resumeWarning?{resumeWarning}:{})});
     }
     if (path === '/admin/api/test-facebook' && req.method === 'POST') {
       const { alias, pageId } = await req.json(), secret = maps('FB_TOKENS_JSON')[alias], version = process.env.META_GRAPH_VERSION;

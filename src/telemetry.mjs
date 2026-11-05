@@ -30,11 +30,16 @@ export async function recoverExpiredRuns(force=false){
   for(const {id} of expired.rows){clearInterval(timers.get(id));timers.delete(id);}
   if(expired.rowCount)await query("UPDATE echolink.job_schedule s SET lease_until=NULL,next_due=LEAST(next_due,now()),last_error='Prior task interrupted; inspect durable state' WHERE job=ANY($1::text[]) AND NOT EXISTS (SELECT 1 FROM echolink.job_runs r WHERE r.job=s.job AND r.status='Running')",[[...new Set(expired.rows.map(r=>r.job))]]);
 }
+export function runOutcome(result,error){
+  const pages=Array.isArray(result?.pages)?result.pages:[];
+  const blocked=!!result?.blocked||!!result?.reason||!!result?.busy||pages.some(p=>p.queued||p.held||p.blocked);
+  const failed=!!error||Number(result?.failedFeeds)>0||!!result?.sheets?.failed||(Array.isArray(result?.pages)&&result.pages.some(p=>p.failed||p.unknown||p.websiteWarning));
+  const completed=pages.some(p=>p.posted||p.pending||p.dryRun||p.duplicate);
+  return error?'Failed':failed||blocked&&completed?'Needs attention':blocked?'Blocked':'Succeeded';
+}
 export async function finishRun(id,result,error){
   clearInterval(timers.get(id));timers.delete(id);
-  const blocked=!!result?.blocked||!!result?.reason||!!result?.busy;
-  const failed=!!error||Number(result?.failedFeeds)>0||!!result?.sheets?.failed||(Array.isArray(result?.pages)&&result.pages.some(p=>p.failed||p.unknown||p.websiteWarning));
-  const status=error?'Failed':failed?'Needs attention':blocked?'Blocked':'Succeeded';
+  const status=runOutcome(result,error);
   if(status==='Succeeded')await updateProgress(id,1,1,'Completed','Output saved; inspect the result below');
   const phase=status==='Succeeded'?'Completed':status==='Blocked'?'Stopped — rule or connection blocked this task':status==='Needs attention'?'Stopped — review task results':'Task failed';
   await query('UPDATE echolink.job_runs SET finished_at=now(),heartbeat_at=now(),status=$2,phase=$3,result=$4,error=$5 WHERE id=$1 AND status=\'Running\'',[id,status,phase,JSON.stringify(result||{}),error?'Job failed; check configuration and connection status':null]);

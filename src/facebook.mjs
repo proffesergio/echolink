@@ -5,7 +5,9 @@ const connectionCache=new Map();
 export function facebookFailure({code,subcode,message=''}){
   const missing=[...new Set(String(message).match(/pages_manage_posts|pages_manage_engagement|pages_read_engagement/g)||[])];
   if(missing.length)return `Facebook permission missing or unavailable: ${missing.join(', ')}. Regenerate the Page token with these permissions in Graph API Explorer; check the app use case/App Review if unavailable. No post was sent.`;
-  if(code===190)return 'Facebook token expired or invalid (code 190). Replace the Page access token and test the connection before retrying.';
+  if(code===190&&subcode===463)return 'Facebook Page token expired (190/463). Reconnect using a fresh User authorization and the long-lived Page token setup; then test the connection.';
+  if(code===190&&subcode===460)return 'Facebook authorization was invalidated by a password or security change (190/460). Authorize the Meta app again and reconnect this Page.';
+  if(code===190)return 'Facebook token expired or invalid (code 190). Reconnect the Page and test the connection before retrying.';
   if([10,200].includes(code))return `Facebook denied Page publishing permissions (code ${code}${subcode?', subcode '+subcode:''}). Test the Page token permissions and Page access before retrying.`;
   if(code===368)return 'Facebook temporarily restricted this action (code 368). Resolve the restriction with Meta; do not repeatedly retry.';
   if([100,324].includes(code))return `Facebook rejected the selected media or request parameters (code ${code}). Check that the photo URL is public and points to a supported image. No text-only fallback was sent.`;
@@ -17,14 +19,16 @@ export async function checkFacebookConnection(page,fetcher=fetch){
   const key=createHash('sha256').update(token+'|'+version+'|'+page.fbPageId).digest('hex'),cached=connectionCache.get(key);
   if(cached?.expires>Date.now())return cached.value;
   const base='https://graph.facebook.com/'+version,headers={Authorization:'Bearer '+token};
-  const get=async path=>{const r=await fetcher(base+path,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});const j=await r.json();if(!r.ok||j.error)throw new FacebookError(r.status,{code:j.error?.code,diagnostic:facebookFailure({code:j.error?.code,message:j.error?.message})});return j;};
+  const get=async path=>{const r=await fetcher(base+path,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});const j=await r.json();if(!r.ok||j.error)throw new FacebookError(r.status,{code:j.error?.code,subcode:j.error?.error_subcode,diagnostic:facebookFailure({code:j.error?.code,subcode:j.error?.error_subcode,message:j.error?.message})});return j;};
   const identity=await get('/me?fields=id,name');
   if(String(identity.id)!==String(page.fbPageId))return {ok:false,publishReady:false,reason:'This Page token belongs to a different Facebook Page. Save the matching Page ID/token pair.'};
   const {data}=await get('/debug_token?input_token='+encodeURIComponent(token));
   const scopes=Array.isArray(data?.scopes)?data.scopes.filter(s=>/^pages_[a-z_]+$/.test(s)):[];
   const missing=['pages_read_engagement','pages_manage_posts'].filter(s=>!scopes.includes(s)),commentsReady=scopes.includes('pages_manage_engagement');
   const valid=data?.is_valid===true&&data?.type==='PAGE';
+  const toDate=value=>Number.isFinite(value)&&value>0?new Date(value*1000).toISOString():null;
   const value={ok:valid&&!missing.length,publishReady:valid&&!missing.length,commentsReady,id:identity.id,name:identity.name,scopes,missing,
+    expiryKnown:Number.isFinite(data?.expires_at),noScheduledExpiry:data?.expires_at===0,expiresAt:toDate(data?.expires_at),dataAccessExpiresAt:toDate(data?.data_access_expires_at),verifiedAt:new Date().toISOString(),
     reason:!valid?'Save a valid Page access token, not a User token':missing.length?'Missing '+missing.join(', ')+'. Regenerate the Page token with publishing permissions; identity access alone cannot publish.':!commentsReady?'Publishing permission verified; add pages_manage_engagement for source comments':'Page identity, publishing and source-comment permissions verified'};
   connectionCache.set(key,{value,expires:Date.now()+60000});if(connectionCache.size>100)connectionCache.delete(connectionCache.keys().next().value);
   return value;

@@ -1,5 +1,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import {join} from 'node:path';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {scheduleHealth,minuteSchedule} from './workflow-schedule.mjs';
 
 export const pipelineId='echolinkPipeline01';
 const legacyIds=[...Array.from({length:7},(_,i)=>`echolinkLocal${String(i+1).padStart(3,'0')}`),'echolinkComments1'];
@@ -8,8 +10,14 @@ export function workflowStatus(){
   try{
     const path=process.env.N8N_SQLITE_PATH||join(process.env.USERPROFILE||process.env.HOME,'.n8n','database.sqlite');
     db=new DatabaseSync(path,{readOnly:true});
-    const known=new Set([pipelineId,...legacyIds]),rows=db.prepare('SELECT id,name,active FROM workflow_entity').all().filter(row=>known.has(row.id));
-    return {available:true,controlConfigured:!!process.env.N8N_API_KEY,pipeline:rows.find(r=>r.id===pipelineId)||null,legacy:rows.filter(r=>r.id!==pipelineId),url:`${process.env.N8N_BASE_URL||'http://localhost:5678'}/workflow/${pipelineId}`};
+    const known=new Set([pipelineId,...legacyIds]),rows=db.prepare('SELECT id,name,active,nodes,versionId,activeVersionId FROM workflow_entity').all().filter(row=>known.has(row.id)).map(({nodes,...row})=>({...row,...(row.id===pipelineId?{schedule:scheduleHealth({nodes:JSON.parse(nodes)})}:{})}));
+    const pipeline=rows.find(r=>r.id===pipelineId)||null;
+    if(pipeline){
+      try{pipeline.lastTickAt=db.prepare("SELECT startedAt FROM execution_entity WHERE workflowId=? AND mode='trigger' ORDER BY startedAt DESC LIMIT 1").get(pipelineId)?.startedAt||null;}catch{pipeline.lastTickAt=null;}
+      pipeline.unpublishedChanges=!!pipeline.active&&pipeline.versionId!==pipeline.activeVersionId;
+      pipeline.tickStale=!!pipeline.active&&!!pipeline.lastTickAt&&Date.now()-new Date(/[zZ]|[+-]\d\d:\d\d$/.test(pipeline.lastTickAt)?pipeline.lastTickAt:pipeline.lastTickAt+'Z').getTime()>5*60000;
+    }
+    return {available:true,controlConfigured:!!process.env.N8N_API_KEY,pipeline,legacy:rows.filter(r=>r.id!==pipelineId),url:`${process.env.N8N_BASE_URL||'http://localhost:5678'}/workflow/${pipelineId}`};
   }catch{return {available:false,error:'Local n8n workflow database is unavailable. Check N8N_SQLITE_PATH and n8n installation.'};}
   finally{db?.close();}
 }
@@ -32,9 +40,27 @@ async function cli(command,id){
 let pending=Promise.resolve();
 export function controlWorkflow(action){
   const run=pending.then(async()=>{
-    if(!['start','stop'].includes(action))throw new Error('Unknown workflow control');
+    if(!['start','stop','repair'].includes(action))throw new Error('Unknown workflow control');
     const status=workflowStatus();if(!status.available||!status.pipeline)throw new Error('Import Complete pipeline before starting it');
-    if(action==='start'){
+    if(action==='repair'){
+      const base=new URL(process.env.N8N_BASE_URL||'http://localhost:5678');
+      if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname)||base.username||base.password)throw new Error('Use a localhost n8n API endpoint');
+      if(!process.env.N8N_API_KEY)throw new Error('Save an n8n API key in Settings before repairing the schedule');
+      const headers={'X-N8N-API-KEY':process.env.N8N_API_KEY,'Content-Type':'application/json',Connection:'close'};
+      const response=await fetch(new URL('/api/v1/workflows/'+pipelineId,base),{headers,redirect:'error',signal:AbortSignal.timeout(10000)});
+      if(!response.ok)throw new Error('n8n API rejected schedule inspection (HTTP '+response.status+').');
+      const workflow=await response.json();
+      if(!scheduleHealth(workflow).ready){
+        const fixed=minuteSchedule(workflow);
+        await mkdir('.codex/backups',{recursive:true});
+        await writeFile('.codex/backups/n8n-before-schedule-repair-'+Date.now()+'.json',JSON.stringify(workflow),{mode:0o600});
+        if(workflow.active)await cli('unpublish:workflow',pipelineId);
+        try{
+          const updated=await fetch(new URL('/api/v1/workflows/'+pipelineId,base),{method:'PUT',headers,redirect:'error',signal:AbortSignal.timeout(15000),body:JSON.stringify({name:fixed.name,nodes:fixed.nodes,connections:fixed.connections,settings:fixed.settings})});
+          if(!updated.ok)throw new Error('n8n API rejected schedule repair (HTTP '+updated.status+').');
+        }finally{if(workflow.active)await cli('publish:workflow',pipelineId);}
+      }
+    }else if(action==='start'){
       for(const row of status.legacy.filter(r=>r.active))await cli('unpublish:workflow',row.id);
       if(!status.pipeline.active)await cli('publish:workflow',pipelineId);
     }else{

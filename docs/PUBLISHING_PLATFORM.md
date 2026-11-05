@@ -87,7 +87,9 @@ Meta warns against excessive hashtags, unrelated captions, repetitive spam netwo
 
 ## n8n authentication
 
-If Start/Stop reports HTTP 401, create a new API key at **n8n → Settings → n8n API** and save it in **EchoLink → Settings → n8nAPIKey**. Saving through the dashboard applies immediately. If editing `.env.local` instead, restart the worker after inference finishes. The combined workflow is `echolinkPipeline01`; keep older EchoLink schedules inactive.
+If Start/Stop reports HTTP 401, create a new API key at **n8n → Settings → n8n API**. In **EchoLink → Settings → n8n API connection**, click **Replace n8n API key**, paste the full secret and click **Verify & save n8n key**. The worker verifies access to `echolinkPipeline01` before replacing the credential; rejected keys leave it untouched. Saving other settings never changes this key. Dashboard passwords are rejected in the API key form even if a password manager fills it. Saving a verified key applies immediately. If editing `.env.local` instead, restart the worker after inference finishes.
+
+The Workflow screen reports the stored trigger cadence and last scheduled tick. Use **Repair one-minute trigger** if the trigger was changed to hourly; increasing a worker job's frequency cannot make an hourly n8n trigger fire sooner. Repair backs up the graph locally, preserves existing node IDs and credentials, updates trigger-name references, and retains the workflow's activation state. A running task may finish during repair. Keep older EchoLink schedules inactive.
 
 ## Task progress and logs
 
