@@ -7,6 +7,7 @@ import {createApp} from '../server/index.mjs';
 import {query,transaction,closeDatabase} from '../server/db.mjs';
 import {reservePublication} from '../server/quotas.mjs';
 import {requireOwner} from '../server/auth.mjs';
+import {tickAutomations} from '../server/jobs.mjs';
 if(process.env.PLATFORM_BRANCH!=='echolink-platform-local'||new URL(process.env.DATABASE_URL).pathname!=='/creator_test')throw new Error('Integration tests require the isolated development branch.');
 const original={port:process.env.PLATFORM_PORT,origin:process.env.PLATFORM_ORIGIN,owner:process.env.PLATFORM_OWNER_EMAIL};
 process.env.SMTP_HOST=''; // Fixtures never send external email.
@@ -83,6 +84,25 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
     assert.equal((await call('/api/posts/'+postA.id+'/schedule',{method:'POST',cookie:a.cookie,body:{scheduled_at:new Date(Date.now()+8*86400000).toISOString()}})).status,402);
    }finally{process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
   });
+  await t.test('approval, scheduling, rescheduling and trash operate on the current version atomically',async()=>{
+   const prior=process.env.PLATFORM_PUBLISHING_ENABLED;process.env.PLATFORM_PUBLISHING_ENABLED='true';
+   try{
+    const p=(await call('/api/state',{cookie:a.cookie})).data.posts.find(p=>p.id===postA.id);
+    assert.equal((await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,approve:true,version:p.version-1}})).status,409);
+    const queued=await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,approve:true,version:p.version}});assert.equal(queued.status,200,JSON.stringify(queued.data));
+    const saved=(await call('/api/posts/'+p.id,{cookie:a.cookie})).data;assert.equal(saved.approved_version,saved.version);assert.equal(saved.status,'scheduled');
+    assert.equal((await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,version:p.version}})).status,200);
+    assert.equal((await transaction(a.workspace.id,db=>db.query("SELECT count(*)::int AS count FROM creator.tasks WHERE post_id=$1 AND kind='publish' AND status='queued'",[p.id]))).rows[0].count,1);
+    assert.equal((await call('/api/posts/'+p.id+'/delete',{method:'POST',cookie:b.cookie,body:{}})).status,404);
+    assert.equal((await call('/api/posts/'+p.id+'/delete',{method:'POST',cookie:a.cookie,body:{}})).status,200);
+    assert(!(await call('/api/state',{cookie:a.cookie})).data.posts.some(x=>x.id===p.id));assert((await call('/api/posts?bucket=trash',{cookie:a.cookie})).data.posts.some(x=>x.id===p.id));
+    assert.equal((await call('/api/posts/'+p.id+'/restore',{method:'POST',cookie:a.cookie,body:{}})).status,200);
+    const restored=(await call('/api/posts/'+p.id,{cookie:a.cookie})).data;assert.equal(restored.status,'draft');assert.equal(restored.approved_version,null);
+    const planned=await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,planOnly:true,version:restored.version}});assert.equal(planned.status,200);assert.equal(planned.data.planned,true);
+    assert.equal((await call('/api/posts/'+p.id+'/approve',{method:'POST',cookie:a.cookie,body:{version:restored.version}})).status,200);
+    assert.equal((await call('/api/posts/'+p.id,{cookie:a.cookie})).data.status,'scheduled');await call('/api/posts/'+p.id+'/draft',{method:'POST',cookie:a.cookie,body:{}});
+   }finally{process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
+  });
   await t.test('Page routine configuration and logging references are workspace protected',async()=>{
    assert.equal((await call('/api/automations',{method:'POST',cookie:b.cookie,body:{page_id:pageA.id,name:'Cross workspace',enabled:false}})).status,404);
    assert.equal((await call('/api/automations',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,name:'Education routine',enabled:false,topic:'Explain one useful learning habit.',make_creative:true,auto_publish:false}})).status,200);
@@ -95,6 +115,19 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    await transaction(a.workspace.id,db=>db.query("INSERT INTO creator.legacy_imports(workspace_id,source,kind,source_id,resource_id,detail) VALUES($1,'fixture','page','fixture',$2,'{\"requiresCutover\":true}')",[a.workspace.id,pageA.id]));
    assert.equal((await call('/api/pages/'+pageA.id,{method:'PUT',cookie:a.cookie,body:{...pageA,active:true}})).status,409,'a migrated Page cannot start alongside its original publisher');
    assert.equal((await call('/api/connections',{method:'POST',cookie:a.cookie,body:{name:'Untrusted Comfy graph',provider:'comfyui',config:{workflow:{},promptNode:'6'}}})).status,403);
+  });
+  await t.test('automation pauses at its backlog limit and does not exceed its small batch or polling cadence',async()=>{
+   await transaction(a.workspace.id,async db=>{await db.query('UPDATE creator.pages SET text_connection_id=$2 WHERE id=$1',[pageA.id,connectionA.id]);await db.query("UPDATE creator.automation_rules SET enabled=true,backlog_limit=1,next_run_at=now(),batch_size=2,daily_target=20 WHERE page_id=$1",[pageA.id]);});
+   assert.equal((await tickAutomations()).queued,0);const blocked=(await call('/api/state',{cookie:a.cookie})).data.automation_rules.find(r=>r.page_id===pageA.id);assert.match(blocked.last_message,/backlog is full/);
+   await transaction(a.workspace.id,db=>db.query('UPDATE creator.automation_rules SET backlog_limit=200,next_run_at=now() WHERE page_id=$1',[pageA.id]));
+   const generated=await tickAutomations();assert(generated.queued>0&&generated.queued<=2);assert.equal((await tickAutomations()).queued,0,'a second check cannot bypass next_run_at');await transaction(a.workspace.id,db=>db.query('UPDATE creator.automation_rules SET enabled=false WHERE page_id=$1',[pageA.id]));
+  });
+  await t.test('shared n8n permissions are owner controlled and hidden from clients by default',async()=>{
+   assert.equal((await call('/api/owner/integrations',{method:'PUT',cookie:a.cookie,body:{n8nEnabled:true,n8nVisibleToClients:true}})).status,403);
+   assert.equal((await call('/api/global-integrations/test',{method:'POST',cookie:a.cookie,body:{}})).status,403);
+   assert.equal((await call('/api/owner/integrations',{method:'PUT',cookie:o.cookie,body:{n8nEnabled:true,n8nVisibleToClients:true}})).status,200);
+   assert.equal((await call('/api/state',{cookie:a.cookie})).data.globalIntegrations.n8nVisible,true);
+   await call('/api/owner/integrations',{method:'PUT',cookie:o.cookie,body:{n8nEnabled:false,n8nVisibleToClients:false}});
   });
   await t.test('only owner may set pricing and approve manually verified payments, exactly once',async()=>{
    assert.equal((await call('/api/owner/state',{cookie:a.cookie})).status,403);assert.throws(()=>requireOwner({role:'super_admin',email_verified:false}));
@@ -119,7 +152,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
  }finally{
   try{await transaction(null,async db=>{
    await db.query('DELETE FROM creator.activity WHERE actor_id=ANY($1::uuid[])',[accounts.map(a=>a.id)]);
-   for(const account of accounts){const w=account.w;for(const table of ['mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
+   for(const account of accounts){const w=account.w;for(const table of ['checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
    for(const account of accounts)await db.query('DELETE FROM public.auth_user WHERE id=$1',[account.subject]);
   },{owner:true});}finally{
   await Promise.all(mailFiles.map(f=>unlink(f).catch(()=>{})));server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await closeDatabase();process.env.PLATFORM_PORT=original.port;process.env.PLATFORM_ORIGIN=original.origin;process.env.PLATFORM_OWNER_EMAIL=original.owner;

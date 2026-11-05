@@ -19,7 +19,7 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
  const overlays=[];
  if(background)overlays.push({input:await sharp(background,{limitInputPixels:40000000}).resize(width,height,{fit:'cover'}).modulate({brightness:0.3}).png().toBuffer(),left:0,top:0});
  if(image)overlays.push({input:await sharp(image,{limitInputPixels:40000000}).rotate().resize(...picture,{fit:'contain',background:{r:0,g:0,b:0,alpha:0}}).png().toBuffer(),left,top});
- if(brandLogo)overlays.push({input:await sharp(brandLogo,{limitInputPixels:10000000}).resize(55,55,{fit:'contain',background:{r:0,g:0,b:0,alpha:0}}).png().toBuffer(),left:55,top:48});
+ if(brandLogo)overlays.push({input:await sharp(brandLogo,{limitInputPixels:10000000}).resize(100,76,{fit:'contain',background:'#ffffff'}).extend({top:8,bottom:8,left:10,right:10,background:'#ffffff'}).png().toBuffer(),left:50,top:35});
  const textX=70,textY=newsSquare?740:height>width?Math.round(height*.66):220,font=newsSquare?48:height>width?62:48,max=newsSquare?38:height>width?28:20;
  // Pango wraps shaped glyphs by pixel width, including Bengali combining
  // marks. Character-count wrapping can overflow with different scripts.
@@ -28,7 +28,9 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
  overlays.push({input:headlineImage,left:textX,top:textTop});
  const headline='';
  const price=product?.price!==null&&product?.price!==undefined?`${product.currency||''} ${product.price}`:'';
- const svg=`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${brandLogo?'':`<rect x="55" y="55" width="7" height="42" fill="${color}"/>`}<text x="${brandLogo?128:82}" y="87" fill="${ink}" font-family="Segoe UI, Nirmala UI, sans-serif" font-size="29" font-weight="700">${escape(page.brand?.name||page.name)}</text><text x="${textX}" y="${textY}" fill="${ink}" font-family="Segoe UI, Nirmala UI, sans-serif" font-size="${font}" font-weight="${bold?900:700}">${headline}</text><text x="70" y="${height-140}" fill="${color}" font-size="40" font-family="Segoe UI, Nirmala UI, sans-serif" font-weight="700">${escape(price)}</text><rect x="65" y="${height-100}" width="350" height="58" rx="18" fill="${color}"/><text x="90" y="${height-62}" font-size="24" fill="#17191d" font-family="Segoe UI, Nirmala UI, sans-serif">${escape(post.creative.cta||(product?'Discover the collection':'Read · Reflect · Share'))}</text></svg>`;
+ const ctaInk=parseInt(color.slice(1,3),16)*.299+parseInt(color.slice(3,5),16)*.587+parseInt(color.slice(5,7),16)*.114<135?'#ffffff':'#17191d';
+ const priceInk=ctaInk==='#ffffff'&&!light?'#ffffff':color;
+ const svg=`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${brandLogo?'':`<rect x="55" y="55" width="7" height="42" fill="${color}"/>`}<text x="${brandLogo?190:82}" y="87" fill="${ink}" font-family="Segoe UI, Nirmala UI, sans-serif" font-size="29" font-weight="700">${escape(page.brand?.name||page.name)}</text><text x="${textX}" y="${textY}" fill="${ink}" font-family="Segoe UI, Nirmala UI, sans-serif" font-size="${font}" font-weight="${bold?900:700}">${headline}</text><text x="70" y="${height-140}" fill="${priceInk}" font-size="40" font-family="Segoe UI, Nirmala UI, sans-serif" font-weight="700">${escape(price)}</text><rect x="65" y="${height-100}" width="350" height="58" rx="18" fill="${color}"/><text x="90" y="${height-62}" font-size="24" fill="${ctaInk}" font-family="Segoe UI, Nirmala UI, sans-serif">${escape(post.creative.cta||(product?'Discover the collection':'Read · Reflect · Share'))}</text></svg>`;
  overlays.push({input:Buffer.from(svg),left:0,top:0});
  return {bytes:await sharp({create:{width,height,channels:4,background:bg}}).composite(overlays).jpeg({quality:90}).toBuffer(),width,height,sourcePhotoUsed:!!image};
 }

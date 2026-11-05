@@ -23,7 +23,7 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 > **Help build a better local newsroom.** If EchoLink is useful, [give it a star](https://github.com/proffesergio/echolink/stargazers), share a reproducible issue, improve a guide or contribute an adapter. Real-world reports help us make the project more reliable.
 
-> **v2 is available for public testing:** [Open EchoLink](https://echolinkbd.vercel.app/) for private creator workspaces, multiple Pages, niche-specific routines, product creatives and owner controls. Follow the [live testing guide](docs/LIVE_V2_TESTING.md) or [platform setup guide](platform/README.md). The protected Windows worker runs local inference and publication jobs.
+> **v2 is available for public testing:** [Open EchoLink](https://echolinkbd.vercel.app/) for private creator workspaces, multiple Pages, niche-specific routines, product creatives and owner controls. Start with [Page workspaces and the calendar](docs/PAGE_WORKSPACES.md), then follow the [live testing guide](docs/LIVE_V2_TESTING.md) or [platform setup guide](platform/README.md). The protected Windows worker runs local inference and publication jobs.
 
 ## A newsroom you can control
 

@@ -11,7 +11,8 @@ import {publicURL,remoteJSON} from './net.mjs';
 import {entitlements,requirePageCapacity,requireGenerationCapacity,reservePublication,releasePublication} from './quotas.mjs';
 import {enqueue,row} from './jobs.mjs';
 import {grantPlan,checkout,billingPortal} from './billing.mjs';
-import {inWindow} from './scheduling.mjs';
+import {nextSlot,wallTimeToInstant} from './scheduling.mjs';
+import {approve,queuePublication} from './planner.mjs';
 import {editorialWarnings} from './editorial.mjs';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
@@ -39,32 +40,45 @@ export async function api(request,path,body={},identityVerifier){
  if(method!=='GET')requireVerified(actor);
  if(path==='/api/state'&&method==='GET')return transaction(w,async db=>{
   const data={actor:{id:actor.id,name:actor.name,email:actor.email,role:actor.role,email_verified:actor.email_verified},workspace:actor.workspace,workspaces:actor.workspaces,entitlements:await entitlements(db,w,{allowExpired:true}),providers:connectionTypes.filter(p=>!p.ownerOnly||actor.role==='super_admin'),publishingEnabled:env().publishing,environment:env().production?'production':'development'};
-  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules'])data[table]=(await db.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':'created_at'} DESC LIMIT 300`,[w])).rows;
+  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules'])data[table]=(await db.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':'created_at'} DESC LIMIT 300`,[w])).rows;
   data.connections=(await db.query(`SELECT ${safeConnections} FROM creator.connections WHERE workspace_id=$1 ORDER BY created_at DESC`,[w])).rows;
   data.activity=(await db.query('SELECT * FROM creator.activity WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 100',[w])).rows;
-  data.postCounts=Object.fromEntries((await db.query('SELECT status,count(*)::int AS count FROM creator.posts WHERE workspace_id=$1 GROUP BY status',[w])).rows.map(r=>[r.status,r.count]));
+  data.postCounts=Object.fromEntries((await db.query('SELECT status,count(*)::int AS count FROM creator.posts WHERE workspace_id=$1 AND archived_at IS NULL AND deleted_at IS NULL GROUP BY status',[w])).rows.map(r=>[r.status,r.count]));
+  data.pagePostCounts=(await db.query('SELECT page_id,status,count(*)::int AS count FROM creator.posts WHERE workspace_id=$1 AND archived_at IS NULL AND deleted_at IS NULL GROUP BY page_id,status',[w])).rows;
+  data.archiveCounts=(await db.query('SELECT count(*) FILTER(WHERE archived_at IS NOT NULL AND deleted_at IS NULL)::int AS archived,count(*) FILTER(WHERE deleted_at IS NOT NULL)::int AS trash FROM creator.posts WHERE workspace_id=$1',[w])).rows[0];
+  data.pageConnections=(await db.query('SELECT * FROM creator.page_connections WHERE workspace_id=$1',[w])).rows;
+  data.calendar=(await db.query("SELECT id,page_id,type,title,status,version,approved_version,planned_at,scheduled_at,published_at,creative,caption,seo,last_error FROM creator.posts WHERE workspace_id=$1 AND deleted_at IS NULL AND archived_at IS NULL AND COALESCE(published_at,scheduled_at,planned_at) BETWEEN now()-interval '40 days' AND now()+interval '40 days' ORDER BY COALESCE(published_at,scheduled_at,planned_at)",[w])).rows;
+  const integrations=(await db.query("SELECT value FROM creator.platform_settings WHERE key='globalConnections'")).rows[0]?.value||{};data.globalIntegrations={n8nVisible:actor.role==='super_admin'||integrations.n8nVisibleToClients===true,n8nEnabled:integrations.n8nEnabled===true,n8nClientsAllowed:integrations.n8nVisibleToClients===true,n8nConfigured:!!process.env.N8N_BASE_URL&&!!process.env.N8N_API_KEY};
   data.pageMirrors=(await db.query('SELECT * FROM creator.page_mirrors WHERE workspace_id=$1',[w])).rows;
   data.mirrorStatus=(await db.query("SELECT post_id,connection_id,status,attempts,last_error FROM creator.mirror_outbox WHERE workspace_id=$1 AND status<>'synced' ORDER BY next_attempt_at LIMIT 50",[w])).rows;
   data.plans=(await db.query('SELECT * FROM creator.plans ORDER BY page_limit')).rows;data.paymentMethods=(await db.query('SELECT id,label,markets,instructions,enabled FROM creator.payment_methods ORDER BY id')).rows;return data;
  });
  if(path==='/api/posts'&&method==='GET'){
-  const params=new URL(request.url).searchParams,offset=Math.max(0,Math.min(100000,Number(params.get('offset'))||0)),limit=Math.max(1,Math.min(300,Number(params.get('limit'))||100));return transaction(w,async db=>({posts:(await db.query('SELECT * FROM creator.posts WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',[w,Math.floor(limit),Math.floor(offset)])).rows}));
+  const params=new URL(request.url).searchParams,offset=Math.max(0,Math.min(100000,Number(params.get('offset'))||0)),limit=Math.max(1,Math.min(300,Number(params.get('limit'))||100)),bucket=params.get('bucket'),page=params.get('page');if(page&&!uuid(page))throw new AppError(400,'Invalid Page.');const filter=bucket==='trash'?'deleted_at IS NOT NULL':bucket==='archive'?'archived_at IS NOT NULL AND deleted_at IS NULL':'archived_at IS NULL AND deleted_at IS NULL';return transaction(w,async db=>({posts:(await db.query(`SELECT * FROM creator.posts WHERE workspace_id=$1 AND ${filter} AND ($4::uuid IS NULL OR page_id=$4) ORDER BY created_at DESC LIMIT $2 OFFSET $3`,[w,Math.floor(limit),Math.floor(offset),page])).rows}));
  }
  if(path==='/api/onboarding'&&method==='POST'){
   const data=validate('onboarding',body);return transaction(w,async db=>{await db.query('UPDATE creator.workspaces SET name=$2,niche=$3,language=$4,desired_pages=$5,onboarded=true WHERE id=$1',[w,data.name,data.niche,data.language,data.desired_pages]);await audit(db,w,actor,'workspace.onboarded','workspace',w);return {ok:true};});
  }
+ if(path==='/api/global-integrations/test'&&method==='POST')return transaction(w,async db=>{
+  const settings=(await db.query("SELECT value FROM creator.platform_settings WHERE key='globalConnections'")).rows[0]?.value||{};
+  if(actor.role!=='super_admin'&&(!settings.n8nVisibleToClients||!settings.n8nEnabled))throw new AppError(403,'The owner has not enabled the shared n8n service for clients.');
+  if(!process.env.N8N_BASE_URL||!process.env.N8N_API_KEY)throw new AppError(503,'The operator must configure the shared n8n server.');
+  let response;try{response=await fetch(new URL('/api/v1/workflows?limit=1',process.env.N8N_BASE_URL),{headers:{'X-N8N-API-KEY':process.env.N8N_API_KEY},signal:AbortSignal.timeout(15000)});}catch{throw new AppError(503,'The shared n8n server is offline.');}
+  if(!response.ok)throw new AppError(503,'The shared n8n server rejected its operator credentials.');return {ok:true,message:'Shared n8n server is connected. Workspace credentials remain private.'};
+ });
  if(path==='/api/brand-assets'&&method==='POST'){
   if(typeof body.dataURL!=='string'||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.dataURL))throw new AppError(400,'Upload a PNG, JPEG or WebP logo under 700 KB.');
   const bytes=Buffer.from(body.dataURL.split(',')[1],'base64');if(bytes.length>700000)throw new AppError(413,'Choose a logo under 700 KB.');if(!rasterImage(bytes))throw new AppError(400,'The uploaded logo is not a supported raster image.');let result;try{const image=await sharp(bytes,{limitInputPixels:10000000}).rotate().resize(500,500,{fit:'inside',withoutEnlargement:true}).png().toBuffer({resolveWithObject:true});result=await saveAsset(w,null,{bytes:image.data,width:image.info.width,height:image.info.height,mime:'image/png'});}catch{throw new AppError(400,'The logo could not be decoded. Choose a supported image file.');}
   await transaction(w,db=>db.query('INSERT INTO creator.assets(id,workspace_id,path,mime,width,height) VALUES($1,$2,$3,$4,$5,$6)',[result.id,w,result.path,result.mime,result.width,result.height]));return {id:result.id};
  }
  let match=path.match(/^\/api\/(pages|connections|websites|feeds|posts|campaigns)(?:\/([a-f0-9-]{36}))?$/);
+ if(match&&method==='GET'&&match[1]==='posts'&&match[2])return transaction(w,db=>row(db,'posts',w,match[2]));
  if(match&&['POST','PUT'].includes(method)){
   const [,table,id]=match;if(method==='PUT'&&!id||method==='POST'&&id)throw new AppError(405,'Unsupported operation.');const names={pages:'page',connections:'connection',websites:'website',feeds:'feed',posts:'post',campaigns:'campaign'},data=validate(names[table],body);
   return transaction(w,async db=>{
    await workspaceLock(db,w);
    if(id)await row(db,table,w,id);
-   let mirrorIds;
+   let mirrorIds,connectionPage,websitePage;if(table==='connections'&&body.page_id){connectionPage=await row(db,'pages',w,body.page_id);}if(table==='websites'&&body.page_id)websitePage=await row(db,'pages',w,body.page_id);
    if(table==='pages'){await workspaceLock(db,w);if(!id)await requirePageCapacity(db,w);if(id&&(await db.query("SELECT id FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status='publishing' LIMIT 1",[w,id])).rowCount)throw new AppError(409,'Wait for the current publication to finish before changing this Page.');await pageChecks(db,w,data,id);mirrorIds=data.mirror_connection_ids;delete data.mirror_connection_ids;for(const cid of mirrorIds){const c=await row(db,'connections',w,cid);if(!['airtable','google_sheets'].includes(c.provider))throw new AppError(400,'Choose a logging connection for mirroring.');}if(id){const old=await row(db,table,w,id);if(old.fb_page_id!==data.fb_page_id||old.facebook_connection_id!==data.facebook_connection_id)data.fb_verified=false;}}
    if(table==='connections'){
     if(id&&(await db.query("SELECT p.id FROM creator.posts p JOIN creator.pages g ON g.workspace_id=p.workspace_id AND g.id=p.page_id WHERE p.workspace_id=$1 AND p.status='publishing' AND g.facebook_connection_id=$2 LIMIT 1",[w,id])).rowCount)throw new AppError(409,'Wait for the current publication to finish before rotating its Page credentials.');
@@ -78,7 +92,7 @@ export async function api(request,path,body={},identityVerifier){
     data.status='saved';data.last_test_result=null;data.last_test_at=null;
     if(id)await db.query('UPDATE creator.pages SET fb_verified=false WHERE workspace_id=$1 AND facebook_connection_id=$2',[w,id]);
    }
-   if(table==='websites'){publicURL(data.url);if(data.config.catalogURL)publicURL(data.config.catalogURL);if(data.connection_id){const c=await row(db,'connections',w,data.connection_id);if(c.provider!==data.connector||!c.config.url||new URL(c.config.url).origin!==new URL(data.url).origin)throw new AppError(400,'Choose matching service credentials scoped to this website origin.');}}
+   if(table==='websites'){if(['nobleseek_db','fabrything_db'].includes(data.connector))requireOwner(actor);publicURL(data.url);if(data.config.catalogURL)publicURL(data.config.catalogURL);if(data.connection_id){const c=await row(db,'connections',w,data.connection_id);if(c.provider!==data.connector||!['nobleseek_db','fabrything_db'].includes(c.provider)&&(!c.config.url||new URL(c.config.url).origin!==new URL(data.url).origin))throw new AppError(400,'Choose matching service credentials scoped to this website origin.');}}
    if(table==='feeds'){const page=await row(db,'pages',w,data.page_id);if(page.kind!=='news')throw new AppError(400,'Only news Pages can have RSS feeds.');publicURL(data.url);if(data.fallback_url)publicURL(data.fallback_url);}
    if(table==='posts'){
     const page=await row(db,'pages',w,data.page_id);if(data.type==='news'&&page.kind!=='news')throw new AppError(400,'Use a news Page for news articles.');if(data.type==='product_sale'&&page.kind!=='ecommerce')throw new AppError(400,'Use an ecommerce Page for product campaigns.');
@@ -88,10 +102,12 @@ export async function api(request,path,body={},identityVerifier){
     if(['news','product_sale'].includes(data.type)){const product=data.product_id?await row(db,'products',w,data.product_id):null;data.seo={editorialWarnings:editorialWarnings(data.caption,product?{title:product.title,description:product.description,price:product.price,currency:product.currency}:{title:data.title,text:data.body},page.niche),title:data.title.slice(0,60),description:data.caption.slice(0,160)};}
     if(id){const old=await row(db,table,w,id);if(['published','publishing','unknown'].includes(old.status))throw new AppError(409,'Published or unresolved posts cannot be overwritten.');
      const changed=['ratio','style','headline','cta','sourceImage'].some(key=>Object.hasOwn(data.creative,key)&&data.creative[key]!==old.creative[key])||data.title!==old.title||data.product_id!==old.product_id;data.creative={...old.creative,...data.creative};if(changed)delete data.creative.assetId;
-     await workspaceLock(db,w);await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Post edited',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind='publish' AND status='queued'",[w,id]);data.version=old.version+1;data.status='draft';data.approved_version=null;data.scheduled_at=null;}
+     await workspaceLock(db,w);await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Post edited',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind='publish' AND status='queued'",[w,id]);data.version=old.version+1;data.status='draft';data.approved_version=null;data.scheduled_at=null;data.planned_at=null;}
    }
    const result=await save(db,table,w,data,id);if(!result)throw new AppError(404,'Item not found.');
-   if(table==='pages'){await db.query('UPDATE creator.page_mirrors SET enabled=false WHERE workspace_id=$1 AND page_id=$2',[w,result.id]);for(const cid of mirrorIds)await db.query('INSERT INTO creator.page_mirrors(workspace_id,page_id,connection_id,enabled) VALUES($1,$2,$3,true) ON CONFLICT(page_id,connection_id) DO UPDATE SET enabled=true',[w,result.id,cid]);}
+   if(table==='pages'){await db.query('UPDATE creator.page_mirrors SET enabled=false WHERE workspace_id=$1 AND page_id=$2',[w,result.id]);for(const cid of mirrorIds)await db.query('INSERT INTO creator.page_mirrors(workspace_id,page_id,connection_id,enabled) VALUES($1,$2,$3,true) ON CONFLICT(page_id,connection_id) DO UPDATE SET enabled=true',[w,result.id,cid]);for(const cid of [...new Set([result.facebook_connection_id,result.text_connection_id,result.image_connection_id,...mirrorIds].filter(Boolean))])await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,result.id,cid]);}
+   if(connectionPage)await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,connectionPage.id,result.id]);
+   if(websitePage){await db.query('UPDATE creator.pages SET website_id=$3 WHERE workspace_id=$1 AND id=$2',[w,websitePage.id,result.id]);if(result.connection_id)await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,websitePage.id,result.connection_id]);}
    await audit(db,w,actor,table+'.saved',table,result.id);if(table==='connections')return {id:result.id,ok:true};return result;
   });
  }
@@ -101,11 +117,25 @@ export async function api(request,path,body={},identityVerifier){
   return transaction(w,async db=>{
    await workspaceLock(db,w);const item=await row(db,table,w,id);
    if(table==='connections'&&action==='test')return enqueue(db,w,'test_connection',{input:{connectionId:id}});
+   if(table==='pages'&&action==='connect'){const c=await row(db,'connections',w,body.connection_id);await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,id,c.id]);return {ok:true};}
    if(table==='pages'&&action==='verify')return enqueue(db,w,'verify_page',{pageId:id});
+   if(table==='pages'&&action==='plan'){
+    const rule=(await db.query('SELECT * FROM creator.automation_rules WHERE workspace_id=$1 AND page_id=$2',[w,id])).rows[0],posts=(await db.query("SELECT * FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status IN ('draft','review','approved') AND caption<>'' AND archived_at IS NULL AND deleted_at IS NULL AND planned_at IS NULL ORDER BY created_at LIMIT $3",[w,id,Math.min(rule?.daily_target||item.daily_cap,50)])).rows;
+    let planned=0;const issues=[];for(const post of posts){await db.query('SAVEPOINT plan_post');try{await queuePublication(db,w,actor,item,post,{autoPick:true,planOnly:post.approved_version!==post.version||!env().publishing,spread:true,target:rule?.daily_target||item.daily_cap});planned++;}catch(e){await db.query('ROLLBACK TO SAVEPOINT plan_post');issues.push(e instanceof AppError?e.message:'Unable to plan this post.');}finally{await db.query('RELEASE SAVEPOINT plan_post');}}
+    return {ok:true,planned,message:planned?planned+' posts placed in the calendar. Unapproved content waits for review.':issues[0]||'No ready, unscheduled caption was found.'};
+   }
    if(table==='websites'&&action==='import')return enqueue(db,w,'import_products',{input:{websiteId:id}});
    if(table==='pages'&&action==='aggregate'){await entitlements(db,w);if(item.kind!=='news'||!item.aggregation_enabled)throw new AppError(400,'Aggregation is only enabled for configured news Pages.');return enqueue(db,w,'aggregate',{pageId:id});}
    if(table==='posts'){
     const post=item,page=await row(db,'pages',w,post.page_id);
+    if(['delete','archive','restore'].includes(action)){
+     if(['published','publishing','unknown'].includes(post.status))throw new AppError(409,'Published or unresolved posts stay in history. Reconcile an unknown delivery first.');
+     if((await db.query("SELECT id FROM creator.tasks WHERE workspace_id=$1 AND post_id=$2 AND status='running' LIMIT 1",[w,id])).rowCount)throw new AppError(409,'Wait for the running task to finish.');
+     await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Post removed from queue',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND status='queued'",[w,id]);
+     await db.query(`UPDATE creator.posts SET deleted_at=${action==='delete'?'now()':'NULL'},archived_at=${action==='archive'?'now()':'NULL'},planned_at=NULL,scheduled_at=NULL,status='draft',approved_version=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2`,[w,id]);await audit(db,w,actor,'post.'+action,'post',id);return {ok:true,message:action==='delete'?'Moved to Trash. Its duplicate fingerprint is retained.':action==='archive'?'Archived and removed from the queue.':'Restored as a draft.'};
+    }
+    if(post.deleted_at||post.archived_at)throw new AppError(409,'Restore this post before editing or publishing it.');
+    if(action==='slot'){const plan=await entitlements(db,w);const at=await nextSlot(db,w,page,{postId:id,until:new Date(plan.period_end)});return {at,timezone:page.timezone};}
     if(action==='reconcile'){
      if(post.status!=='unknown'||body.confirmed!==true||typeof body.note!=='string'||body.note.trim().length<10)throw new AppError(400,'Review both the Facebook Page and website, confirm your checks and provide a note.');
      if(body.remote_id){
@@ -120,15 +150,14 @@ export async function api(request,path,body={},identityVerifier){
     }
     if(['generate','creative'].includes(action)){await requireGenerationCapacity(db,w);return enqueue(db,w,action,{postId:id,pageId:page.id,input:{aiBackground:body.aiBackground===true}});}
     if(['publishing','published','unknown'].includes(post.status))throw new AppError(409,'Reconcile this publication before changing its state.');
-    if(action==='approve'){if(!post.caption.trim())throw new AppError(400,'Write or generate a caption first.');if((post.creative.sourceImage||['image','product_sale'].includes(post.type))&&!post.creative.assetId)throw new AppError(409,'Use Design image to prepare and review the photo creative before approval. For a text-only post, remove the source image first.');if(post.seo.editorialWarnings?.length&&body.confirmWarnings!==true)throw new AppError(409,'Review the editorial warnings and explicitly confirm before approving.');await db.query("UPDATE creator.posts SET status='approved',approved_version=version,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,id]);await audit(db,w,actor,'post.approved','post',id,{warningsAcknowledged:body.confirmWarnings===true});return {ok:true};}
-    if(action==='draft'){await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Returned to draft',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind='publish' AND status='queued'",[w,id]);await db.query("UPDATE creator.posts SET status='draft',approved_version=NULL,scheduled_at=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,id]);return {ok:true};}
+    if(action==='approve'){const approved=await approve(db,w,actor,post,{version:body.version,confirmWarnings:body.confirmWarnings===true});const rule=(await db.query('SELECT * FROM creator.automation_rules WHERE workspace_id=$1 AND page_id=$2 AND enabled AND auto_schedule',[w,page.id])).rows[0];if(post.planned_at&&env().publishing&&page.active&&page.fb_verified)return queuePublication(db,w,actor,page,approved,{at:new Date(post.planned_at),autoPick:new Date(post.planned_at)<=new Date(),spread:true,target:rule?.daily_target||page.daily_cap});return {ok:true,message:'Current caption and image approved.'};}
+    if(action==='draft'){await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Returned to draft',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind='publish' AND status='queued'",[w,id]);await db.query("UPDATE creator.posts SET status='draft',approved_version=NULL,scheduled_at=NULL,planned_at=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,id]);return {ok:true};}
     if(action==='dry-run')return {ok:true,mode:'dry-run',page:page.name,type:post.type,captionReady:!!post.caption,photoReady:!!post.creative.assetId,approvalReady:post.approved_version===post.version,websitePublishing:page.website_publishing,automaticLinkComments:false,checks:['No remote post was submitted.','No publishing allowance was consumed.','Generated captions require factual review.']};
     if(['publish','schedule'].includes(action)){
-     if(!env().publishing)throw new AppError(409,'Live publication is disabled by the operator. Dry-run remains available.');
-     if(post.approved_version!==post.version)throw new AppError(409,'Approve the current version first.');if(!page.active||!page.fb_verified)throw new AppError(409,'Enable and verify this Page first.');
-     const at=action==='schedule'?new Date(body.scheduled_at):new Date();if(!Number.isFinite(+at)||action==='schedule'&&+at<=Date.now())throw new AppError(400,'Choose a future date and time.');if(!inWindow(page,at))throw new AppError(400,'Choose a time within the Page posting window.');
-     const existing=(await db.query("SELECT id FROM creator.tasks WHERE workspace_id=$1 AND post_id=$2 AND kind='publish' AND status IN ('queued','running')",[w,id])).rows[0];if(existing)throw new AppError(409,'A publication is already queued. Return it to draft to change the schedule.');
-     await reservePublication(db,w,id,at);await db.query("UPDATE creator.posts SET status='scheduled',scheduled_at=$3,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,id,at]);const task=await enqueue(db,w,'publish',{postId:id,pageId:page.id,notBefore:at});await audit(db,w,actor,'post.'+action,'post',id,{at});return task;
+     if(!env().publishing&&body.planOnly!==true)throw new AppError(409,'Live publication is disabled by the operator.');
+     const at=body.local_time?wallTimeToInstant(body.local_time,page.timezone):body.scheduled_at?new Date(body.scheduled_at):action==='publish'?new Date():undefined;
+     if(action==='schedule'&&at&&+at<=Date.now())throw new AppError(400,'Choose a future time or use the next available slot.');
+     return queuePublication(db,w,actor,page,post,{at,autoPick:action==='schedule'&&body.autoPick===true,approveCurrent:body.approve===true,version:body.version,confirmWarnings:body.confirmWarnings===true,planOnly:body.planOnly===true,fallbackToSlot:action==='publish'});
     }
    }
    throw new AppError(404,'Unknown action.');
@@ -152,7 +181,8 @@ export async function api(request,path,body={},identityVerifier){
    if(data.enabled&&page.kind==='news'&&!page.aggregation_enabled)throw new AppError(400,'Enable news aggregation on this Page first.');
    if(data.enabled&&page.kind==='ecommerce'&&!page.website_id)throw new AppError(400,'Choose and import a store catalog first.');
    if(data.enabled&&!['news','ecommerce'].includes(page.kind)&&!data.topic.trim())throw new AppError(400,'Provide verified facts, ideas or a content brief for this automation.');
-   const result=(await db.query(`INSERT INTO creator.automation_rules(workspace_id,page_id,name,enabled,interval_minutes,topic,make_creative,auto_publish) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(page_id) DO UPDATE SET name=EXCLUDED.name,enabled=EXCLUDED.enabled,interval_minutes=EXCLUDED.interval_minutes,topic=EXCLUDED.topic,make_creative=EXCLUDED.make_creative,auto_publish=EXCLUDED.auto_publish,next_run_at=now() WHERE creator.automation_rules.workspace_id=$1 RETURNING *`,[w,data.page_id,data.name,data.enabled,data.interval_minutes,data.topic,data.make_creative,data.auto_publish])).rows[0];await audit(db,w,actor,'automation.configured','automation_rule',result.id);return result;
+   const fields=['name','enabled','interval_minutes','topic','make_creative','auto_publish','auto_schedule','daily_target','backlog_limit','batch_size'];const values=fields.map(f=>data[f]);
+   const result=(await db.query('INSERT INTO creator.automation_rules(workspace_id,page_id,'+fields.join(',')+') VALUES($1,$2,'+fields.map((_,i)=>'$'+(i+3)).join(',')+') ON CONFLICT(page_id) DO UPDATE SET '+fields.map(f=>f+'=EXCLUDED.'+f).join(',')+',next_run_at=now() WHERE creator.automation_rules.workspace_id=$1 RETURNING *',[w,data.page_id,...values])).rows[0];await audit(db,w,actor,'automation.configured','automation_rule',result.id);return result;
   });
  }
  if(path==='/api/ad-drafts'&&method==='POST'){
@@ -167,6 +197,10 @@ async function ownerAPI(actor,request,path,body){
    const result={};for(const table of ['accounts','workspaces','subscriptions','plans','payment_methods'])result[table]=(await db.query('SELECT * FROM creator.'+table)).rows;
    result.payments=(await db.query('SELECT * FROM creator.payments ORDER BY created_at DESC LIMIT 200')).rows;result.activity=(await db.query('SELECT * FROM creator.activity ORDER BY created_at DESC LIMIT 200')).rows;
    result.pages=(await db.query('SELECT id,workspace_id,name,kind,language,active,created_at FROM creator.pages ORDER BY created_at DESC LIMIT 300')).rows;return result;
+  }
+  if(path==='/api/owner/integrations'&&request.method==='PUT'){
+   if(typeof body.n8nEnabled!=='boolean'||typeof body.n8nVisibleToClients!=='boolean')throw new AppError(400,'Choose the shared service availability.');
+   await db.query("INSERT INTO creator.platform_settings(key,value) VALUES('globalConnections',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()",[JSON.stringify({n8nEnabled:body.n8nEnabled,n8nVisibleToClients:body.n8nVisibleToClients})]);await audit(db,null,actor,'integrations.updated','settings','globalConnections');return {ok:true};
   }
   let m=path.match(/^\/api\/owner\/(accounts|workspaces)\/([a-f0-9-]{36})$/);
   if(m&&request.method==='PUT'){
