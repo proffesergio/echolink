@@ -1,0 +1,13 @@
+.git
+.codex
+.superdesign
+.neon
+.env
+.env.*
+**/.env
+**/.env.*
+node_modules
+**/node_modules
+platform/.local
+platform/dist
+artifacts
