@@ -20,6 +20,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix platform
+      - run: npm run build --prefix platform
       - run: npm run build
       - run: npm test
   deploy:
@@ -38,6 +40,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix platform
+      - run: npm run build --prefix platform
       - run: npm run build
       - name: Validate deployment credentials
         run: |
@@ -49,13 +53,10 @@ jobs:
       - name: Verify deployment access
         run: node scripts/check-vercel-access.mjs
       - name: Pull production settings
-        working-directory: deploy/vercel
         run: vercel pull --yes --environment=production
       - name: Build production deployment
-        working-directory: deploy/vercel
         run: vercel build --prod
       - name: Publish dashboard
-        working-directory: deploy/vercel
         run: |
           vercel deploy --prebuilt --prod
           echo "Dashboard: https://echolinkbd.vercel.app" >> "$GITHUB_STEP_SUMMARY"

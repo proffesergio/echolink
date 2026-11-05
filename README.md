@@ -23,6 +23,8 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 > **Help build a better local newsroom.** If EchoLink is useful, [give it a star](https://github.com/proffesergio/echolink/stargazers), share a reproducible issue, improve a guide or contribute an adapter. Real-world reports help us make the project more reliable.
 
+> **v2 local preview:** multi-user workspaces, niche-specific Page routines, product creatives and owner billing controls are under development on the isolated platform branch. Start with the [v2 guide](platform/README.md) and [acceptance plan](docs/MULTI_TENANT_PLAN.md). Public migration is pending the owner’s Page and onboarding checks.
+
 ## A newsroom you can control
 
 The [operations dashboard](docs/DASHBOARD.md) brings 13 workspaces into a compact

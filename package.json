@@ -27,6 +27,8 @@
     "verify:newsroom": "node scripts/check-newsroom-ui.mjs",
     "public:check": "node scripts/check-local-services.mjs",
     "public:repair": "powershell -NoProfile -File scripts/repair-public-dashboard.ps1",
+    "platform:start": "powershell -NoProfile -File scripts/start-platform.ps1",
+    "platform:repair": "powershell -NoProfile -File scripts/start-platform.ps1",
     "verify:public": "node scripts/check-public-dashboard.mjs",
     "verify:cms": "node scripts/check-cms-ui.mjs",
     "verify:redesign": "node scripts/check-redesign-ui.mjs",

@@ -1,0 +1,10 @@
+BEGIN;
+INSERT INTO creator.plans(id,name,page_limit,post_limit,generation_limit,period_days,enabled) VALUES('owner','Owner workspace',1000,100000,100000,366,false) ON CONFLICT DO NOTHING;
+ALTER TABLE creator.websites DROP CONSTRAINT websites_connector_check;
+ALTER TABLE creator.websites ADD CONSTRAINT websites_connector_check CHECK(connector IN ('wordpress','shopify','woocommerce','json_catalog','public_product','webhook','nobleseek_db'));
+CREATE TABLE creator.legacy_imports(workspace_id uuid NOT NULL REFERENCES creator.workspaces(id),source text NOT NULL,kind text NOT NULL,source_id text NOT NULL,resource_id uuid NOT NULL,detail jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(workspace_id,source,kind,source_id));
+ALTER TABLE creator.legacy_imports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE creator.legacy_imports FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_rows ON creator.legacy_imports USING(workspace_id::text=current_setting('creator.workspace_id',true) OR current_setting('creator.super_admin',true)='true') WITH CHECK(workspace_id::text=current_setting('creator.workspace_id',true) OR current_setting('creator.super_admin',true)='true');
+INSERT INTO creator.migrations(name) VALUES('003-owner-migration.sql');
+COMMIT;

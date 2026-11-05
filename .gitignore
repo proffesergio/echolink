@@ -9,3 +9,8 @@ artifacts/
 .codex/
 .vercel/
 .superdesign/
+platform/.local/
+!platform/.env.test.example
+deploy/vercel/public/assets/
+deploy/vercel/public/index.html
+deploy/vercel/public/favicon.svg

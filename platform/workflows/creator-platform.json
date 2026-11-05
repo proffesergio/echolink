@@ -1,0 +1,136 @@
+{
+  "name": "EchoLink · Multi-tenant creator dispatcher (local)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "platform-timer",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "platform-manual",
+      "name": "Manual dispatch test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8790/internal/platform/tick",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "platform-dispatch",
+      "name": "Dispatch due workspace automations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>({json:{...item.json,checkedAt:new Date().toISOString(),note:'Due rules checked. Draft generation, approval, quotas and publishing run in the authenticated local worker.'}}));"
+      },
+      "id": "platform-result",
+      "name": "Dispatch result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "echolink-creator-dispatch",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "platform-webhook",
+      "name": "Protected dispatch check",
+      "webhookId": "3bb3f0c1-b1e9-4903-aa68-5a93ec45a47e",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due workspace automations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual dispatch test": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due workspace automations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch due workspace automations": {
+      "main": [
+        [
+          {
+            "node": "Dispatch result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Protected dispatch check": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due workspace automations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

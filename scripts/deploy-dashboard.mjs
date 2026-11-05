@@ -8,6 +8,6 @@ if(process.platform==='win32'){
   const manifest=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
   command=process.execPath;args.unshift(path.resolve(root,typeof manifest.bin==='string'?manifest.bin:manifest.bin.vercel));
 }
-const child=spawn(command,args,{cwd:'deploy/vercel',env:process.env,stdio:'inherit',windowsHide:true});
+const child=spawn(command,args,{cwd:process.cwd(),env:process.env,stdio:'inherit',windowsHide:true});
 child.on('error',()=>{console.error('Vercel CLI is unavailable; install vercel@65.4.0.');process.exitCode=1;});
 child.on('exit',code=>{process.exitCode=code??1;});

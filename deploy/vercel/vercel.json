@@ -3,19 +3,19 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "public",
-  "functions": { "api/proxy.mjs": { "maxDuration": 300 } },
-  "redirects": [ { "source": "/", "destination": "/admin", "permanent": false } ],
+  "functions": { "api/proxy.mjs": { "maxDuration": 300 }, "api/platform.mjs": { "maxDuration": 60 } },
+  "redirects": [ { "source": "/admin", "destination": "/", "permanent": false }, { "source": "/admin/", "destination": "/", "permanent": false } ],
   "rewrites": [
     { "source": "/admin/api/:path*", "destination": "/api/proxy?path=:path*" },
-    { "source": "/admin", "destination": "/admin/index.html" },
-    { "source": "/admin/", "destination": "/admin/index.html" }
+    { "source": "/api/:path*", "destination": "/api/platform?path=:path*" },
+    { "source": "/((?!api/|admin/|assets/|_vercel/).*)", "destination": "/index.html" }
   ],
   "headers": [
-    { "source": "/admin/:path*", "headers": [
+    { "source": "/:path*", "headers": [
       { "key": "Cache-Control", "value": "no-store" },
       { "key": "X-Content-Type-Options", "value": "nosniff" },
       { "key": "Referrer-Policy", "value": "no-referrer" },
-      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'none'" }
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://va.vercel-scripts.com; connect-src 'self' https://vitals.vercel-insights.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://checkout.stripe.com" }
     ] }
   ]
 }

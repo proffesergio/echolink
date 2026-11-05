@@ -1,0 +1,37 @@
+{
+  "name": "echolink-creator-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5180",
+    "start": "node server/index.mjs",
+    "build": "vite build",
+    "test": "node --env-file=.env.test.local --test test/*.test.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "verify": "node scripts/verify-platform.mjs",
+    "test:browser": "node --env-file=.env.test.local scripts/browser-verify.mjs",
+    "test:prepare": "node --env-file=.env.test.local scripts/migrate.mjs && node --env-file=.env.test.local scripts/setup-auth.mjs && node --env-file=.env.test.local scripts/grant-test-runtime.mjs"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "better-auth": "^1.7.17",
+    "cheerio": "^1.1.2",
+    "nodemailer": "^10.3.1",
+    "pg": "^8.16.3",
+    "react": "latest",
+    "react-dom": "latest",
+    "rss-parser": "^3.13.0",
+    "sharp": "latest",
+    "stripe": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "playwright": "^1.64.1",
+    "vite": "latest"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
