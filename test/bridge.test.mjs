@@ -22,6 +22,11 @@ test('public bridge requires its own key and excludes tickets and worker jobs',a
     assert.equal((await fetch(base+'/admin/api/auth',{headers,method:'DELETE'})).status,404);
     const response=await fetch(base+'/admin/api/auth',{headers});assert.equal(response.status,200);
     assert.deepEqual(await response.json(),{path:'/admin/api/auth',cookie:'session=test',origin:'https://dashboard.example'});
+    for(const name of ['n8n-key','test-n8n','facebook-connect','schedule-slot','test-website']){
+      const response=await fetch(base+'/admin/api/'+name,{headers,method:'POST',body:'{}'});assert.equal(response.status,200);
+      assert.equal((await response.json()).path,'/admin/api/'+name);
+    }
+    assert.equal((await fetch(base+'/admin/api/n8n-key/extra',{headers})).status,404);
   }finally{
     if(child.exitCode===null){const stopped=once(child,'exit');child.kill();await stopped;}
     await new Promise(resolve=>upstream.close(resolve));

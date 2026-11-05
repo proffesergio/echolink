@@ -8,7 +8,7 @@ const server=createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   const reject=(status,message)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:message}));};
   if(!authorized('Bearer '+(req.headers['x-echolink-bridge-key']||''),key))return reject(401,'Bridge authentication required');
-  if(!/^\/admin\/api\/[a-z-]+$/.test(req.url)||req.url==='/admin/api/ticket'||!['GET','POST'].includes(req.method))return reject(404,'Dashboard route not found');
+  if(!/^\/admin\/api\/[a-z][a-z0-9-]+$/.test(req.url)||req.url==='/admin/api/ticket'||!['GET','POST'].includes(req.method))return reject(404,'Dashboard route not found');
   try{
     let length=0;const chunks=[];
     for await(const c of req){length+=c.length;if(length>131072)return reject(413,'Request too large');chunks.push(c);}

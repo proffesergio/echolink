@@ -23,6 +23,11 @@ test('Vercel proxy forwards signed sessions and rejects foreign origins and work
     assert.equal((await request('ticket',{})).statusCode,404);
     assert.equal((await request('../../jobs/process',{})).statusCode,404);
     assert.equal((await request('login',{password:'x'.repeat(131073)})).statusCode,413);
+    globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});return Response.json({ok:true,path:new URL(url).pathname});};
+    for(const name of ['n8n-key','test-n8n','facebook-connect','test-website','schedule-slot','suggest-hashtags','resume-facebook']){
+      const response=await request(name,{},{cookie});assert.equal(response.statusCode,200);assert.equal(response.body.path,'/admin/api/'+name);
+      assert.equal(calls.at(-1).options.headers.Cookie,cookie);
+    }
     globalThis.fetch=async()=>{throw Object.assign(new Error('Private endpoint detail'),{cause:{code:'ENOTFOUND'}});};
     const offline=await request('auth');assert.equal(offline.statusCode,502);assert.match(offline.body.error,/public:repair/);assert.ok(!offline.body.error.includes('Private endpoint detail'));
     globalThis.fetch=async()=>{throw Object.assign(new Error('private'),{name:'TimeoutError'});};

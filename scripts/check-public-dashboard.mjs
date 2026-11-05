@@ -18,6 +18,8 @@ try{
   const state=await response.json();assert.ok(state.pages?.length);assert.ok(state.feeds?.length);
   const configResponse=await page.request.get(base+'/admin/api/configuration');assert.equal(configResponse.status(),200);
   const configuration=await configResponse.json();
+  const readOnlyChecks=[['test-n8n',{},200],['test-website',{},200],['schedule-slot',{pageId:'invalid'},400],['facebook-connect',{alias:'',pageId:'invalid'},400],['n8n-key',{n8nAPIKey:''},400],['resume-facebook',{pageId:'invalid'},400]];
+  for(const [path,data,status]of readOnlyChecks){const result=await page.request.post(base+'/admin/api/'+path,{headers:{Origin:base},data});assert.equal(result.status(),status,path+' must pass through the public proxy and reach worker validation');}
   const cookies=await page.context().cookies();
   assert.ok(cookies.some(cookie=>cookie.secure&&cookie.httpOnly),'Expected secure HttpOnly login cookie');
   for(const key of ['DASHBOARD_PASSWORD','WORKER_API_KEY','WORKER_BRIDGE_TOKEN','AIRTABLE_TOKEN','DATABASE_URL','NOBLESEEK_DATABASE_URL','N8N_API_KEY','META_APP_SECRET','META_USER_ACCESS_TOKEN'])if(process.env[key])assert.ok(!JSON.stringify({state,configuration}).includes(process.env[key]),`Leaked ${key}`);
