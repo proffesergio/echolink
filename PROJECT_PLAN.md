@@ -11,8 +11,10 @@ Current priority is the owner's three-part recovery and redesign request:
 
 1. Redesign the entire dashboard around the supplied Omniroute reference: compact
    charcoal/coral shell, connection categories/search, accurate provider states,
-   and the existing editorial, Page, scheduling and workflow controls. A concrete
-   Superdesign draft is being prepared for review; source integration is pending.
+   and the existing editorial, Page, scheduling and workflow controls. The owner
+   approved the concrete Superdesign draft; it is integrated across all 13 views,
+   with provider drawers, real status signals, keyboard/mobile navigation and
+   read-only connection tests. See [DASHBOARD.md](docs/DASHBOARD.md).
 2. Replace the expired Facebook credential with verified long-lived Page
    authorization and display its lifecycle. The November 5 real exchange passed
    for Noble Seek with publishing/comment scopes; Meta reports no scheduled token
@@ -66,9 +68,10 @@ handoff entries below are historical and do not override this current state.
 
 Editorial operations implemented: held Draft state, per-post
 Edit/Review/Approve/Schedule/Publish Now controls, navigation counts,
-per-task stage/feed percentages, heartbeat recovery and event logs. Next: the
-requested visual redesign, favicon and Page-specific image branding, plus live
-website delivery acceptance for https://www.fabrything.com/nobleseek. The website
+per-task stage/feed percentages, heartbeat recovery and event logs. Next:
+Page-specific image branding. The requested visual redesign and favicon are
+implemented; optional website delivery has now been verified live for
+https://www.fabrything.com/nobleseek. The website
 schema and logo assets have been located; branding controls and design choices
 remain open. Preserve
 posting gates, stale-edit detection and unknown-outcome protection. A selected

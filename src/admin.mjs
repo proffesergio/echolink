@@ -7,6 +7,7 @@ import { query,resetPools } from './db.mjs';
 import { jsonRequest, hostList } from './net.mjs';
 import { saveSettings } from './settings.mjs';
 import {validateN8nAPIKey,N8nCredentialError} from './n8n-credentials.mjs';
+import {connectorSettings,ConnectorSettingError} from './connector-settings.mjs';
 import {websiteConfiguration,testWebsiteConnection,WebsiteError} from './website.mjs';
 import {automaticLinksEnabled} from './link-policy.mjs';
 import { sync, mirror, approvals, jobs } from './jobs.mjs';
@@ -44,7 +45,7 @@ export async function admin(req) {
   if (!path.startsWith('/admin')) return null;
   prune();
   if(path==='/admin/api/auth'&&req.method==='GET')return reply({authenticated:validSession(readSession(req)),passwordConfigured:passwordConfigured()});
-  const assets = { '/admin': ['index.html','text/html'], '/admin/': ['index.html','text/html'], '/admin/app.js': ['app.js','text/javascript'], '/admin/cms.js':['cms.js','text/javascript'], '/admin/style.css': ['style.css','text/css'] };
+  const assets = { '/admin/favicon.svg':['favicon.svg','image/svg+xml'], '/admin': ['index.html','text/html'], '/admin/': ['index.html','text/html'], '/admin/app.js': ['app.js','text/javascript'], '/admin/connections.js':['connections.js','text/javascript'], '/admin/cms.js':['cms.js','text/javascript'], '/admin/style.css': ['style.css','text/css'] };
   if (req.method === 'GET' && assets[path]) {
     const [file, mime] = assets[path];
     return new Response(await readFile(new URL(`./ui/${file}`, import.meta.url)), { headers: { 'Content-Type': `${mime}; charset=utf-8`, 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'none'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
@@ -103,6 +104,10 @@ export async function admin(req) {
       return reply({ok:true,schema:result.rows[0]});
     }
     if(path==='/admin/api/test-airtable'&&req.method==='POST')return reply({ok:true,pages:(await allRecords(tables().pages)).length,feeds:(await allRecords(tables().feeds)).length});
+    if(path==='/admin/api/test-n8n'&&req.method==='POST'){
+      try{await validateN8nAPIKey(process.env.N8N_API_KEY);return reply({ok:true,workflow:workflowStatus()});}
+      catch(error){if(error instanceof N8nCredentialError)return reply({error:error.message},400);throw error;}
+    }
     if(path==='/admin/api/n8n-key'&&req.method==='POST'){
       const {n8nAPIKey}=await req.json();
       if(typeof n8nAPIKey==='string'&&await authenticatePassword(n8nAPIKey.trim()))return reply({error:'This is your dashboard password, likely from browser autofill. Paste the full n8n API key instead; the saved key was kept.'},400);
@@ -113,7 +118,7 @@ export async function admin(req) {
       }catch(error){if(error instanceof N8nCredentialError)return reply({error:error.message},400);throw error;}
     }
     if(path==='/admin/api/settings'&&req.method==='POST'){
-      const body=await req.json(),values={};
+      const body=await req.json(),values=connectorSettings(body);
       if(body.n8nAPIKey){
         return reply({error:'API keys are no longer saved by the general Settings form to prevent browser autofill replacing them. Refresh the dashboard and use Verify & save n8n key. Saved credentials were not changed.'},400);
       }
@@ -167,7 +172,7 @@ export async function admin(req) {
       }
       const counts=data(3)?.rows||[],count=status=>counts.find(c=>c.status===status)?.count||0;
       const navCounts={queue:count('Pending Approval'),drafts:counts.filter(c=>['Draft','Pending Approval','Dry Run','Queued'].includes(c.status)).reduce((sum,c)=>sum+c.caption_count,0),scheduled:count('Approved'),published:count('Posted'),inbox:count('Queued')-(counts.find(c=>c.status==='Queued')?.caption_count||0),total:counts.reduce((sum,c)=>sum+c.count,0)};
-      const configuration=publicConfiguration();
+      const configuration={...publicConfiguration(),website:websiteConfiguration(),automaticLinksEnabled:automaticLinksEnabled()};
       return reply({ pages: pages.map(p => ({ id: p.id, fields: pick(p.fields, pageFields) })), feeds, articles:(data(2)?.rows||[]).map(a=>({...a,panel:contentPanel(a)})), counts,navCounts,integrations:integrationCatalog(pages,configuration), audit:data(4)?.rows||[],scheduler:data(5),runs:data(6)?.rows||[],readiness:issues,serviceErrors:errors,configuration,workflow:workflowStatus(),
         calendar:data(7)?.rows||[],delivery:data(8)?.rows||[],dryRun: process.env.DRY_RUN !== 'false', facebookAliases: Object.keys(maps('FB_TOKENS_JSON')), aiAliases: Object.keys(maps('AI_TOKENS_JSON')),
         graphVersion: process.env.META_GRAPH_VERSION || '', sourceHosts: process.env.ALLOWED_SOURCE_HOSTS || '',
@@ -305,6 +310,7 @@ export async function admin(req) {
     }
     return reply({ error: 'Not found' }, 404);
   } catch (e) {
+    if(e instanceof ConnectorSettingError)return reply({error:e.message},400);
     if(e instanceof FacebookError)return reply({error:e.diagnostic,code:e.code,subcode:e.subcode},409);
     if(e instanceof ContentActionError)return reply({error:e.message},e.status);
     console.error('Admin operation failed:', e.status || e.code || 'configuration/upstream');

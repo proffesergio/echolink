@@ -25,6 +25,11 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 ## A newsroom you can control
 
+The [operations dashboard](docs/DASHBOARD.md) brings 13 workspaces into a compact
+charcoal/coral console: searchable provider cards, connection settings drawers,
+read-only tests, a publishing calendar and measured task progress. Saved settings,
+verified checks, failures and planned integrations have separate visible states.
+
 | Collect & understand | Review & publish | Observe & recover |
 | --- | --- | --- |
 | Catalog of 20 verified Bangla publishers | Review, edit, save Draft, approve, Publish Now | Per-task stage percentages and event logs |

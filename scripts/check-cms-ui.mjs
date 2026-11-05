@@ -78,11 +78,11 @@ try{
   await page.getByText('Failed · 66%',{exact:true}).waitFor();await page.locator('#work-progress').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'Operations center',exact:true}).click();await page.getByRole('heading',{name:'Editorial operations center'}).waitFor();
   await mkdir('.codex/logs',{recursive:true});await page.screenshot({path:'.codex/logs/cms-operations.png',fullPage:true});
-  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Connection center',exact:true}).waitFor();await page.getByRole('heading',{name:'Facebook Page token: start here'}).waitFor();
+  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Connection center',exact:true}).waitFor();await page.locator('[data-connection-open="facebook"]').click();await page.getByRole('heading',{name:'Facebook Page token',exact:true}).waitFor();await page.getByRole('button',{name:'Close connection settings',exact:true}).click();
   await page.getByLabel('Find a connection',{exact:true}).fill('Bright Data');assert.equal(await page.locator('[data-connection-name]:visible').count(),1);
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   const apiKey=page.locator('input[name="n8nAPIKey"]');assert.equal(await apiKey.getAttribute('autocomplete'),'new-password');assert.equal(await apiKey.inputValue(),'');
-  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Review queue',exact:true}).click();await card.waitFor();
+  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Open navigation',exact:true}).click();await page.getByRole('button',{name:'Review queue',exact:true}).click();await card.waitFor();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Mobile layout overflows');
   await page.screenshot({path:'.codex/logs/cms-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);

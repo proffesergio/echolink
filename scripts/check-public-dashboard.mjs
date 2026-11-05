@@ -26,7 +26,7 @@ try{
   await page.getByRole('heading',{name:'n8n API connection',exact:true}).waitFor();
   const keyField=page.getByLabel('n8nAPIKey',{exact:true});assert.ok(await keyField.isDisabled());assert.equal(await keyField.inputValue(),'');
   assert.equal(await page.locator('#settings-form [name="n8nAPIKey"]').count(),0);
-  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('heading',{name:'Long-lived Facebook connection',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.locator('[data-connection-open="facebook"]').click();await page.getByRole('heading',{name:'Long-lived Facebook connection',exact:true}).waitFor();await page.getByRole('button',{name:'Close connection settings',exact:true}).click();
   await page.getByRole('button',{name:'Workflow',exact:true}).click();await page.getByRole('button',{name:'Repair one-minute trigger',exact:true}).waitFor();
   await page.getByRole('button',{name:'Drafts',exact:true}).click();
   await page.getByRole('heading',{name:'Drafts',exact:true,level:2}).waitFor();
