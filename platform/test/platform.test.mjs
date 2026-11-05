@@ -10,7 +10,7 @@ import {requireOwner} from '../server/auth.mjs';
 import {tickAutomations} from '../server/jobs.mjs';
 if(process.env.PLATFORM_BRANCH!=='echolink-platform-local'||new URL(process.env.DATABASE_URL).pathname!=='/creator_test')throw new Error('Integration tests require the isolated development branch.');
 const original={port:process.env.PLATFORM_PORT,origin:process.env.PLATFORM_ORIGIN,owner:process.env.PLATFORM_OWNER_EMAIL};
-process.env.SMTP_HOST=''; // Fixtures never send external email.
+process.env.SMTP_HOST='';process.env.PLATFORM_ENV='development'; // Fixtures never use production cookies or send external email.
 process.env.PLATFORM_PORT='8792';process.env.PLATFORM_ORIGIN='http://localhost:8792';const origin=process.env.PLATFORM_ORIGIN;
 const suffix=randomUUID(),ownerEmail='owner-'+suffix+'@example.com';process.env.PLATFORM_OWNER_EMAIL=ownerEmail;
 const server=createApp(),accounts=[],mailFiles=[];
@@ -88,6 +88,9 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    const prior=process.env.PLATFORM_PUBLISHING_ENABLED;process.env.PLATFORM_PUBLISHING_ENABLED='true';
    try{
     const p=(await call('/api/state',{cookie:a.cookie})).data.posts.find(p=>p.id===postA.id);
+    const preparing=await call('/api/posts/'+p.id+'/creative',{method:'POST',cookie:a.cookie,body:{}});assert.equal(preparing.status,200);
+    assert.equal((await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,approve:true,version:p.version}})).status,409,'a queued image must finish before its version can be published');
+    await transaction(a.workspace.id,db=>db.query("UPDATE creator.tasks SET status='canceled' WHERE id=$1",[preparing.data.id]));
     assert.equal((await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,approve:true,version:p.version-1}})).status,409);
     const queued=await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true,approve:true,version:p.version}});assert.equal(queued.status,200,JSON.stringify(queued.data));
     const saved=(await call('/api/posts/'+p.id,{cookie:a.cookie})).data;assert.equal(saved.approved_version,saved.version);assert.equal(saved.status,'scheduled');

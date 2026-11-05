@@ -68,7 +68,7 @@ separate stages. Website publication remains optional; source-link comments stay
 
 ## Verification
 
-The implementation passes 30 platform tests and 61 existing tests. Real browser
+The implementation passes 31 platform tests and 61 existing tests. Real browser
 verification covers two Page workspaces, news/ecommerce navigation, creating a
 creative, combined approval/scheduling, combined approval/publish queueing, dialog
 closure, calendar details, Trash/Restore and mobile overflow. No real Facebook
@@ -80,3 +80,5 @@ documented by [Buffer](https://support.buffer.com/en-us/articles/how-to-use-the-
 and the calendar/review patterns described by [Metricool](https://help.metricool.com/how-to-manage-your-calendar-in-metricool-xhlbw).
 The existing approved visual style is retained; 12ui hosted design generation
 returned HTTP 403/missing_scope even after reauthentication.
+
+Live verification: 1,269 legacy drafts archived, 100 Fabrything products imported, and the actual local model produced a product caption and branded image with a proposed calendar time. Both Pages have stored logos and unrestricted posting windows. Fabrything still requires its own verified Facebook connection for delivery.

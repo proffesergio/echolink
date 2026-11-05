@@ -15,7 +15,7 @@ try{
  }
  await transaction(w,async db=>{
   await db.query("UPDATE creator.pages SET window_start='00:00',window_end='00:00' WHERE workspace_id=$1",[w]);
-  if(noble){await db.query('UPDATE creator.automation_rules SET daily_target=$3,backlog_limit=20,batch_size=2,interval_minutes=60,auto_schedule=true WHERE workspace_id=$1 AND page_id=$2',[w,noble.id,noble.daily_cap]);}
+  if(noble){await db.query("UPDATE creator.automation_rules SET daily_target=$3,backlog_limit=20,batch_size=2,interval_minutes=60,auto_schedule=true,next_run_at=LEAST(next_run_at,now()+interval '1 minute') WHERE workspace_id=$1 AND page_id=$2",[w,noble.id,noble.daily_cap]);}
   if(store){
    let site=(await db.query("SELECT * FROM creator.websites WHERE workspace_id=$1 AND lower(name)='fabrything' LIMIT 1",[w])).rows[0];
    const config={catalogURL:'https://www.fabrything.com/api/store/products/?pageSize=100'};

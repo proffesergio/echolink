@@ -7,7 +7,7 @@ import {transaction,closeDatabase} from '../server/db.mjs';
 import {runOne} from '../server/jobs.mjs';
 import {grantPlan} from '../server/billing.mjs';
 if(new URL(process.env.DATABASE_URL).pathname!=='/creator_test')throw new Error('Use the isolated test database.');
-process.env.SMTP_HOST='';process.env.PLATFORM_PORT='8793';process.env.PLATFORM_ORIGIN='http://localhost:8793';process.env.PLATFORM_PUBLISHING_ENABLED='true';
+process.env.SMTP_HOST='';process.env.PLATFORM_ENV='development';process.env.PLATFORM_PORT='8793';process.env.PLATFORM_ORIGIN='http://localhost:8793';process.env.PLATFORM_PUBLISHING_ENABLED='true';
 const origin=process.env.PLATFORM_ORIGIN,email='browser-'+randomUUID()+'@example.com',password='Browser-test-'+randomUUID();process.env.PLATFORM_OWNER_EMAIL=email;
 const server=createApp(),issues=[],browser=await chromium.launch({headless:true});let account,mailFile;
 try{

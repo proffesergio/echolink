@@ -12,3 +12,9 @@ test('creative exports preserve source pixels and selected aspect ratios',async(
   const dir=new URL('../.local/verification/',import.meta.url);await mkdir(dir,{recursive:true});await writeFile(new URL('creative-'+ratio.replace(':','x')+'.jpg',dir),image.bytes);
  }
 });
+test('transparent black logos stay visible on a white badge in a dark creative',async()=>{
+ const logo=await sharp({create:{width:100,height:100,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).composite([{input:await sharp({create:{width:30,height:30,channels:3,background:'#000000'}}).png().toBuffer(),left:35,top:35}]).png().toBuffer();
+ const image=await renderCreative({page:{name:'Brand',brand:{name:'Brand',color:'#000000'}},post:{title:'Product',creative:{ratio:'1:1',style:'editorial'}},brandLogo:logo});
+ const white=await sharp(image.bytes).extract({left:90,top:55,width:1,height:1}).raw().toBuffer(),black=await sharp(image.bytes).extract({left:110,top:80,width:1,height:1}).raw().toBuffer();
+ assert(white[0]>230&&white[1]>230&&white[2]>230,'transparent interior is flattened onto white');assert(black[0]<30,'the real black artwork remains black');
+});
