@@ -72,9 +72,9 @@ signup does not grant access to the owner's migrated NobleSeek Page or productio
   five concurrent publication reservations allow exactly three. Calendar booking,
   cancellation, trial expiry, account suspension and owner-only manual payment
   approval are exercised against real Postgres.
-- Owner migration imported one Page, 21 feeds, 1,273 article records, five encrypted
+- Owner migration initially imported one Page, 21 feeds, 1,273 article records, five encrypted
   connections and one optional NobleSeek website. Live source was read-only.
-  Imported Page stays paused; no old schedule was copied into the new queue.
+  Imported Page was initially paused; no old schedule was copied into the new queue.
   The owner workspace has a private owner package, not a client free trial.
 - Meta Page identity, NobleSeek schema, Airtable log access and Google spreadsheet
   read access passed. Ollama 4B connection and actual caption inference passed.
@@ -82,7 +82,7 @@ signup does not grant access to the owner's migrated NobleSeek Page or productio
 - Sixteen dashboard views passed browser navigation, onboarding, creation,
   editorial approval, creative rendering and dry-run checks at desktop/mobile.
 - Separate n8n v2 dispatcher completed a protected webhook → worker → result
-  round trip (HTTP 200), then was returned to inactive. Existing live workflow unchanged.
+  round trip (HTTP 200), then was returned to inactive. At release the legacy dispatcher was paused and its confirmed history reconciled.
 - A fresh RSS story was collected, rewritten by the owner's actual local model
   and composed with its real source photo. The model mixed a historical election
   result into a current story; the draft was corrected against its source and
@@ -122,3 +122,11 @@ favor original contributions and limit monetization of generic mass-produced
 content. A future YouTube phase should add original scripts, licensed media,
 local voice/subtitle/render jobs, human review and separately authorized channel
 upload; it is not implemented or advertised as working in this release.
+
+## Live rollout evidence
+
+- Main commits 9c0ccf6 and 9deabf1 were pushed; [GitHub Actions run 41995826614](https://github.com/proffesergio/echolink/actions/runs/41995826614) completed build, tests and production deployment successfully.
+- https://echolinkbd.vercel.app/ serves v2. /api/health returns HTTP 200, version 2 and publishing enabled; anonymous /api/state returns HTTP 401.
+- Public Google sign-in returns HTTP 200 with the correct Vercel callback. Browser rendering has zero JavaScript errors and successfully loads the Web Analytics script. Interactive Google consent remains in the user browser.
+- Noble Seek is verified and enabled; no automatic routine or real Facebook publication was launched by deployment.
+- Windows worker and bridge have a hidden supervisor and a per-user Startup shortcut. The PC must stay awake and online for local inference.

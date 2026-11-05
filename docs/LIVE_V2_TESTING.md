@@ -9,7 +9,7 @@ in their initial seven days. The owner has a separate private owner package.
 
 1. Open **Pages**. Noble Seek should be verified and enabled. Its posting window,
    daily frequency and gap remain editable. Automatic source-link comments are off.
-2. For fresh news, choose **Collect news** on a news Page. Follow **Activity** for
+2. For fresh news, choose **Find a story** on a news Page. Follow **Activity** for
    the collection task. Open the resulting draft, choose **Generate caption** and
    **Design image**, and wait for each task to finish. An Automation can connect
    these steps for subsequent runs.

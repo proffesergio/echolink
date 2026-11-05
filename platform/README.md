@@ -81,12 +81,12 @@ without it. Private logos/creatives live in `.local/assets/` and need backup too
    save the numeric Page ID on the Page, then choose Verify Page.
 6. Create a post or use Find a story / an imported product. Generate a caption,
    design an image, check facts/photo/brand, then approve the current version.
-7. Dry-run shows readiness without submitting a post. Live publishing stays
-   off in this preview until the reviewed migration test is authorized.
+7. Dry-run shows readiness without submitting a post. On the configured public
+   instance, approved posts can be published immediately or scheduled.
 
-For imported Noble Seek, the original active publisher still owns delivery.
-Do not enable a second publishing routine. A migration marker blocks enabling
-the imported Page until the controlled cutover is completed.
+Noble Seek's controlled cutover is complete: legacy delivery history was
+reconciled, its old dispatcher was paused and the verified v2 Page was enabled.
+The owner can submit the first reviewed publication from the live dashboard.
 
 The operator can inspect the proposed cutover without changing delivery:
 
@@ -175,8 +175,9 @@ administrative grants do not cancel an existing Stripe billing contract.
 ## n8n
 
 Open the prepared [v2 dispatcher](http://localhost:5678/workflow/4sR62MKzJyf3lINJ).
-It is inactive. The protected webhook round trip passed and it was stopped again;
-the old live workflow was untouched.
+It is inactive. The protected webhook round trip passed. The old live dispatcher
+was subsequently paused during cutover. The native v2 worker checks its durable
+queue and routines without requiring n8n; the dispatcher remains an optional trigger.
 
 The single canvas dispatches due routines to the authenticated local worker.
 Tenant secrets stay in the worker; quotas, review versions, schedules, media and
