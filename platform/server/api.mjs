@@ -18,6 +18,7 @@ import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {saveAsset,rasterImage} from './creative.mjs';
 import {canonicalArticleURL} from './catalog.mjs';
+import {resolveFacebookPage} from './facebook.mjs';
 const safeConnections=`id,workspace_id,provider,name,config,status,last_test_at,last_test_result,created_at,(secret_cipher IS NOT NULL) AS has_secret`;
 async function save(db,table,w,data,id){
  const names=Object.keys(data),values=Object.values(data).map(x=>x!==null&&typeof x==='object'?JSON.stringify(x):x);
@@ -42,10 +43,11 @@ export async function api(request,path,body={},identityVerifier){
   const data={actor:{id:actor.id,name:actor.name,email:actor.email,role:actor.role,email_verified:actor.email_verified},workspace:actor.workspace,workspaces:actor.workspaces,entitlements:await entitlements(db,w,{allowExpired:true}),providers:connectionTypes.filter(p=>!p.ownerOnly||actor.role==='super_admin'),publishingEnabled:env().publishing,environment:env().production?'production':'development'};
   for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules'])data[table]=(await db.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':'created_at'} DESC LIMIT 300`,[w])).rows;
   data.connections=(await db.query(`SELECT ${safeConnections} FROM creator.connections WHERE workspace_id=$1 ORDER BY created_at DESC`,[w])).rows;
-  data.activity=(await db.query('SELECT * FROM creator.activity WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 100',[w])).rows;
+  data.activity=(await db.query(`SELECT a.*,COALESCE(p.page_id,t.page_id,r.page_id,f.page_id) AS page_id FROM creator.activity a LEFT JOIN creator.posts p ON p.workspace_id=a.workspace_id AND p.id::text=a.resource_id LEFT JOIN creator.tasks t ON t.workspace_id=a.workspace_id AND t.id::text=a.resource_id LEFT JOIN creator.automation_rules r ON r.workspace_id=a.workspace_id AND r.id::text=a.resource_id LEFT JOIN creator.feeds f ON f.workspace_id=a.workspace_id AND f.id::text=a.resource_id WHERE a.workspace_id=$1 ORDER BY a.created_at DESC LIMIT 200`,[w])).rows;
   data.postCounts=Object.fromEntries((await db.query('SELECT status,count(*)::int AS count FROM creator.posts WHERE workspace_id=$1 AND archived_at IS NULL AND deleted_at IS NULL GROUP BY status',[w])).rows.map(r=>[r.status,r.count]));
   data.pagePostCounts=(await db.query('SELECT page_id,status,count(*)::int AS count FROM creator.posts WHERE workspace_id=$1 AND archived_at IS NULL AND deleted_at IS NULL GROUP BY page_id,status',[w])).rows;
   data.archiveCounts=(await db.query('SELECT count(*) FILTER(WHERE archived_at IS NOT NULL AND deleted_at IS NULL)::int AS archived,count(*) FILTER(WHERE deleted_at IS NOT NULL)::int AS trash FROM creator.posts WHERE workspace_id=$1',[w])).rows[0];
+  data.pageArchiveCounts=(await db.query('SELECT page_id,count(*) FILTER(WHERE archived_at IS NOT NULL AND deleted_at IS NULL)::int AS archived,count(*) FILTER(WHERE deleted_at IS NOT NULL)::int AS trash FROM creator.posts WHERE workspace_id=$1 GROUP BY page_id',[w])).rows;
   data.pageConnections=(await db.query('SELECT * FROM creator.page_connections WHERE workspace_id=$1',[w])).rows;
   data.calendar=(await db.query("SELECT id,page_id,type,title,status,version,approved_version,planned_at,scheduled_at,published_at,creative,caption,seo,last_error FROM creator.posts WHERE workspace_id=$1 AND deleted_at IS NULL AND archived_at IS NULL AND COALESCE(published_at,scheduled_at,planned_at) BETWEEN now()-interval '40 days' AND now()+interval '40 days' ORDER BY COALESCE(published_at,scheduled_at,planned_at)",[w])).rows;
   const integrations=(await db.query("SELECT value FROM creator.platform_settings WHERE key='globalConnections'")).rows[0]?.value||{};data.globalIntegrations={n8nVisible:actor.role==='super_admin'||integrations.n8nVisibleToClients===true,n8nEnabled:integrations.n8nEnabled===true,n8nClientsAllowed:integrations.n8nVisibleToClients===true,n8nConfigured:!!process.env.N8N_BASE_URL&&!!process.env.N8N_API_KEY};
@@ -116,12 +118,27 @@ export async function api(request,path,body={},identityVerifier){
   const [,table,id,action]=match;
   return transaction(w,async db=>{
    await workspaceLock(db,w);const item=await row(db,table,w,id);
+   if(table==='pages'&&action==='facebook'){
+    if((await db.query("SELECT id FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status='publishing' LIMIT 1",[w,id])).rowCount)throw new AppError(409,'Wait for the current publication to finish before changing its connection.');
+    const existing=body.connection_id?await row(db,'connections',w,body.connection_id):item.facebook_connection_id?await row(db,'connections',w,item.facebook_connection_id):null;
+    if(existing&&existing.provider!=='facebook')throw new AppError(400,'Select a Facebook connection.');
+    if(body.token!==undefined&&(typeof body.token!=='string'||body.token.length>8000))throw new AppError(400,'Enter a valid access token.');
+    const pageId=body.page_id||item.fb_page_id,version=body.version||existing?.config.version;
+    const resolved=await resolveFacebookPage({token:body.token?.trim()||decryptSecret(existing?.secret_cipher,w).token,pageId,version,tokenType:body.token_type||'auto'});
+    const shared=existing&&(await db.query('SELECT id FROM creator.pages WHERE workspace_id=$1 AND facebook_connection_id=$2 AND id<>$3 LIMIT 1',[w,existing.id,id])).rowCount;
+    const c=await save(db,'connections',w,{name:item.name+' · Facebook',provider:'facebook',config:{version},secret_cipher:encryptSecret({token:resolved.token},w),status:'connected',last_test_at:new Date(),last_test_result:resolved.result},shared?null:existing?.id);
+    await db.query('UPDATE creator.pages SET facebook_connection_id=$3,fb_page_id=$4,fb_verified=true,updated_at=now() WHERE workspace_id=$1 AND id=$2',[w,id,c.id,pageId]);
+    await db.query("DELETE FROM creator.page_connections pc USING creator.connections c WHERE pc.workspace_id=$1 AND pc.page_id=$2 AND pc.connection_id=c.id AND c.provider='facebook' AND pc.connection_id<>$3",[w,id,c.id]);
+    await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,id,c.id]);
+    await db.query('UPDATE creator.automation_rules SET next_run_at=now() WHERE workspace_id=$1 AND page_id=$2',[w,id]);
+    await audit(db,w,actor,'page.facebook_connected','page',id,{connectionId:c.id,tokenSource:resolved.result.tokenSource});return {...resolved.result,connectionId:c.id};
+   }
    if(table==='connections'&&action==='test')return enqueue(db,w,'test_connection',{input:{connectionId:id}});
    if(table==='pages'&&action==='connect'){const c=await row(db,'connections',w,body.connection_id);await db.query('INSERT INTO creator.page_connections(workspace_id,page_id,connection_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[w,id,c.id]);return {ok:true};}
    if(table==='pages'&&action==='verify')return enqueue(db,w,'verify_page',{pageId:id});
    if(table==='pages'&&action==='plan'){
     const rule=(await db.query('SELECT * FROM creator.automation_rules WHERE workspace_id=$1 AND page_id=$2',[w,id])).rows[0],posts=(await db.query("SELECT * FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status IN ('draft','review','approved') AND caption<>'' AND archived_at IS NULL AND deleted_at IS NULL AND planned_at IS NULL ORDER BY created_at LIMIT $3",[w,id,Math.min(rule?.daily_target||item.daily_cap,50)])).rows;
-    let planned=0;const issues=[];for(const post of posts){await db.query('SAVEPOINT plan_post');try{await queuePublication(db,w,actor,item,post,{autoPick:true,planOnly:post.approved_version!==post.version||!env().publishing,spread:true,target:rule?.daily_target||item.daily_cap});planned++;}catch(e){await db.query('ROLLBACK TO SAVEPOINT plan_post');issues.push(e instanceof AppError?e.message:'Unable to plan this post.');}finally{await db.query('RELEASE SAVEPOINT plan_post');}}
+    let planned=0;const issues=[];for(const post of posts){await db.query('SAVEPOINT plan_post');try{await queuePublication(db,w,actor,item,post,{autoPick:true,planOnly:(item.require_review&&post.approved_version!==post.version)||!env().publishing||!item.fb_verified||!item.active,spread:true,target:rule?.daily_target||item.daily_cap});planned++;}catch(e){await db.query('ROLLBACK TO SAVEPOINT plan_post');issues.push(e instanceof AppError?e.message:'Unable to plan this post.');}finally{await db.query('RELEASE SAVEPOINT plan_post');}}
     return {ok:true,planned,message:planned?planned+' posts placed in the calendar. Unapproved content waits for review.':issues[0]||'No ready, unscheduled caption was found.'};
    }
    if(table==='websites'&&action==='import')return enqueue(db,w,'import_products',{input:{websiteId:id}});

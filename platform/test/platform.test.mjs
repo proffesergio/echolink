@@ -7,7 +7,7 @@ import {createApp} from '../server/index.mjs';
 import {query,transaction,closeDatabase} from '../server/db.mjs';
 import {reservePublication} from '../server/quotas.mjs';
 import {requireOwner} from '../server/auth.mjs';
-import {tickAutomations} from '../server/jobs.mjs';
+import {tickAutomations,continuePipeline,resumePreparedPosts} from '../server/jobs.mjs';
 if(process.env.PLATFORM_BRANCH!=='echolink-platform-local'||new URL(process.env.DATABASE_URL).pathname!=='/creator_test')throw new Error('Integration tests require the isolated development branch.');
 const original={port:process.env.PLATFORM_PORT,origin:process.env.PLATFORM_ORIGIN,owner:process.env.PLATFORM_OWNER_EMAIL};
 process.env.SMTP_HOST='';process.env.PLATFORM_ENV='development'; // Fixtures never use production cookies or send external email.
@@ -105,6 +105,23 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
     assert.equal((await call('/api/posts/'+p.id+'/approve',{method:'POST',cookie:a.cookie,body:{version:restored.version}})).status,200);
     assert.equal((await call('/api/posts/'+p.id,{cookie:a.cookie})).data.status,'scheduled');await call('/api/posts/'+p.id+'/draft',{method:'POST',cookie:a.cookie,body:{}});
    }finally{process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
+  });
+  await t.test('automatic Pages schedule the final generated version and resume after connection; saved drafts stay paused',async()=>{
+   const prior=process.env.PLATFORM_PUBLISHING_ENABLED;process.env.PLATFORM_PUBLISHING_ENABLED='true';
+   try{
+    await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET require_review=false,active=true,fb_verified=false WHERE id=$1',[pageA.id]));
+    const post=(await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'Automatic content fixture',caption:'A prepared caption with supporting facts and relevant hashtags. #Learning'}})).data;
+    await transaction(a.workspace.id,db=>db.query("UPDATE creator.posts SET status='review',seo=$2 WHERE id=$1",[post.id,{editorialWarnings:['Fixture warning stays visible in automatic mode.']}]));
+    await continuePipeline({id:randomUUID(),workspace_id:a.workspace.id,page_id:pageA.id,post_id:post.id,kind:'generate',input:{}},{postId:post.id});
+    const planned=(await call('/api/posts/'+post.id,{cookie:a.cookie})).data;assert(planned.planned_at);assert.equal(planned.status,'review');
+    await resumePreparedPosts();assert.equal((await call('/api/posts/'+post.id,{cookie:a.cookie})).data.status,'review','unverified Page does not publish');
+    await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET fb_verified=true WHERE id=$1',[pageA.id]));
+    await resumePreparedPosts();const scheduled=(await call('/api/posts/'+post.id,{cookie:a.cookie})).data;assert.equal(scheduled.status,'scheduled');assert.equal(scheduled.approved_version,scheduled.version);assert.equal(scheduled.seo.editorialWarnings.length,1);
+    assert.equal((await call('/api/posts/'+post.id+'/draft',{method:'POST',cookie:a.cookie,body:{}})).status,200);await resumePreparedPosts();assert.equal((await call('/api/posts/'+post.id,{cookie:a.cookie})).data.status,'draft');
+    assert.equal((await call('/api/pages/'+pageA.id+'/facebook',{method:'POST',cookie:b.cookie,body:{}})).status,404);
+    assert.equal((await call('/api/pages/'+pageB.id+'/facebook',{method:'POST',cookie:b.cookie,body:{connection_id:connectionA.id}})).status,404);
+    assert.equal((await call('/api/pages/'+pageB.id+'/facebook',{method:'POST',cookie:b.cookie,body:{page_id:'not-numeric',version:'v26.0',token:'fake'}})).status,400);
+   }finally{await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET require_review=true WHERE id=$1',[pageA.id]));process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
   });
   await t.test('Page routine configuration and logging references are workspace protected',async()=>{
    assert.equal((await call('/api/automations',{method:'POST',cookie:b.cookie,body:{page_id:pageA.id,name:'Cross workspace',enabled:false}})).status,404);

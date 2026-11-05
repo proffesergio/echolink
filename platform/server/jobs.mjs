@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {transaction,audit,workspaceLock} from './db.mjs';
 import {AppError} from './errors.mjs';
-import {decryptSecret} from './vault.mjs';
+import {decryptSecret,encryptSecret} from './vault.mjs';
 import {testAI,textCompletion,imageGeneration} from './providers.mjs';
 import {fetchProducts,readFeed,articleDetails,canonicalArticleURL} from './catalog.mjs';
 import {renderCreative,saveAsset} from './creative.mjs';
@@ -15,13 +15,14 @@ import {testMirror,syncOneMirror} from './mirrors.mjs';
 import {editorialWarnings} from './editorial.mjs';
 import {queuePublication} from './planner.mjs';
 import {pageClock} from './scheduling.mjs';
+import {resolveFacebookPage} from './facebook.mjs';
 export async function row(client,table,workspaceId,id){
  if(!['connections','pages','posts','websites','products','campaigns','assets','tasks','feeds','automation_rules'].includes(table))throw new Error('Invalid internal table');
  const result=(await client.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 AND id=$2`,[workspaceId,id])).rows[0];
  if(!result)throw new AppError(404,'This item was not found in your workspace.');return result;
 }
 export async function enqueue(client,workspaceId,kind,{pageId=null,postId=null,input={},notBefore=null}={}){
- const count=(await client.query("SELECT count(*)::int AS count FROM creator.tasks WHERE workspace_id=$1 AND status IN ('queued','running')",[workspaceId])).rows[0].count;
+ const count=(await client.query("SELECT count(*)::int AS count FROM creator.tasks WHERE workspace_id=$1 AND kind<>'publish' AND status IN ('queued','running')",[workspaceId])).rows[0].count;
  if(count>=20)throw new AppError(429,'This workspace already has 20 pending tasks. Let them finish before adding more.');
  return(await client.query(`INSERT INTO creator.tasks(workspace_id,kind,page_id,post_id,input,not_before) VALUES($1,$2,$3,$4,$5,COALESCE($6,now())) RETURNING *`,[workspaceId,kind,pageId,postId,JSON.stringify(input),notBefore])).rows[0];
 }
@@ -145,8 +146,8 @@ async function publish(task){
 }
 async function verifyPage(task){
  const page=await transaction(task.workspace_id,db=>row(db,'pages',task.workspace_id,task.page_id));if(!page.facebook_connection_id||!page.fb_page_id)throw new AppError(400,'Save the Page ID and Facebook connection first.');
- const c=await connectionFor(task.workspace_id,page.facebook_connection_id),result=await facebookIdentity(c);if(result.id!==page.fb_page_id)throw new AppError(400,'The Page token does not belong to this numeric Page ID.');
- await transaction(task.workspace_id,db=>db.query('UPDATE creator.pages SET fb_verified=true WHERE workspace_id=$1 AND id=$2 AND facebook_connection_id=$3 AND fb_page_id=$4',[task.workspace_id,page.id,c.id,result.id]));return result;
+ const c=await connectionFor(task.workspace_id,page.facebook_connection_id),resolved=await resolveFacebookPage({token:c.secret.token,pageId:page.fb_page_id,version:c.config.version});
+ await transaction(task.workspace_id,async db=>{await workspaceLock(db,task.workspace_id);const current=await row(db,'pages',task.workspace_id,page.id),credential=await row(db,'connections',task.workspace_id,c.id);if(current.facebook_connection_id!==c.id||current.fb_page_id!==page.fb_page_id||credential.secret_cipher!==c.secret_cipher)throw new AppError(409,'The Page connection changed while verification ran. Verify the current settings again.');await db.query("UPDATE creator.connections SET secret_cipher=$3,status='connected',last_test_at=now(),last_test_result=$4 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,c.id,encryptSecret({token:resolved.token},task.workspace_id),resolved.result]);await db.query('UPDATE creator.pages SET fb_verified=true WHERE workspace_id=$1 AND id=$2',[task.workspace_id,page.id]);});return resolved.result;
 }
 const handlers={test_connection:testConnection,verify_page:verifyPage,generate,creative,import_products:importProducts,aggregate,publish};
 export async function runOne({publishOnly=false,excludePublish=false}={}){
@@ -168,20 +169,33 @@ export async function recoverExpiredTasks(){return transaction(null,async client
  for(const task of stale){await client.query("UPDATE creator.tasks SET status='unknown',phase='Worker interrupted; review before retry',finished_at=now() WHERE id=$1",[task.id]);if(task.kind==='publish'){await client.query("UPDATE creator.posts SET status='unknown',last_error='Worker interrupted; reconcile Facebook and website before retrying.' WHERE workspace_id=$1 AND id=$2 AND status='publishing'",[task.workspace_id,task.post_id]);await client.query("UPDATE creator.publish_attempts SET outcome='unknown' WHERE workspace_id=$1 AND task_id=$2 AND outcome='started'",[task.workspace_id,task.id]);await client.query("UPDATE creator.usage_reservations SET status='unknown' WHERE workspace_id=$1 AND post_id=$2 AND status='reserved'",[task.workspace_id,task.post_id]);}}
  return stale.length;
 },{owner:true});}
-async function continuePipeline(task,result){
- if(!task.input.pipeline)return;
+export async function continuePipeline(task,result){
+ if(!['aggregate','generate','creative'].includes(task.kind))return;
  const w=task.workspace_id,pipeline=task.input.pipeline,postId=task.post_id||result.postId;if(!postId)return;
  await transaction(w,async db=>{
-  await workspaceLock(db,w);const rule=await row(db,'automation_rules',w,pipeline.ruleId);if(!rule.enabled)return;
-  if(task.kind==='aggregate'){await requireGenerationCapacity(db,w);await enqueue(db,w,'generate',{pageId:task.page_id,postId,input:{pipeline}});}
-  else if(task.kind==='generate'&&pipeline.makeCreative){await requireGenerationCapacity(db,w);await enqueue(db,w,'creative',{pageId:task.page_id,postId,input:{pipeline}});}
-  else if(['generate','creative'].includes(task.kind)&&rule.auto_schedule){
-   const page=await row(db,'pages',w,task.page_id),post=await row(db,'posts',w,postId);if(post.deleted_at||post.archived_at)return;
-   const automatic=rule.auto_publish&&page.active&&!page.require_review&&!post.seo.editorialWarnings?.length&&env().publishing&&page.fb_verified;
-   await queuePublication(db,w,null,page,post,{autoPick:true,approveCurrent:automatic,planOnly:!automatic,spread:true,target:Math.min(rule.daily_target,page.daily_cap),ignoreTaskId:task.id});
-   await db.query('UPDATE creator.automation_rules SET last_message=$3 WHERE workspace_id=$1 AND id=$2',[w,rule.id,automatic?'Caption and creative scheduled for automatic publication.':'Calendar slot prepared; waiting for editorial approval.']);
+  await workspaceLock(db,w);const rule=pipeline?await row(db,'automation_rules',w,pipeline.ruleId):null;
+  if(rule&&!rule.enabled)return;const page=await row(db,'pages',w,task.page_id),post=await row(db,'posts',w,postId);if(post.deleted_at||post.archived_at)return;
+  if(!pipeline&&page.require_review)return;
+  const input=pipeline?{pipeline}:{};
+  if(task.kind==='aggregate'){await requireGenerationCapacity(db,w);await enqueue(db,w,'generate',{pageId:page.id,postId,input});}
+  else if(task.kind==='generate'&&(pipeline?.makeCreative||post.creative.sourceImage||['image','product_sale'].includes(post.type))){await requireGenerationCapacity(db,w);await enqueue(db,w,'creative',{pageId:page.id,postId,input});}
+  else if(['generate','creative'].includes(task.kind)&&(rule?.auto_schedule??true)){
+   const automatic=(rule?.auto_publish??true)&&page.active&&!page.require_review&&env().publishing&&page.fb_verified;
+   await queuePublication(db,w,null,page,post,{autoPick:true,approveCurrent:automatic,planOnly:!automatic,spread:true,target:Math.min(rule?.daily_target||page.daily_cap,page.daily_cap),ignoreTaskId:task.id});
+   if(rule)await db.query('UPDATE creator.automation_rules SET last_message=$3 WHERE workspace_id=$1 AND id=$2',[w,rule.id,automatic?'Caption and creative scheduled for automatic publication.':page.require_review?'Calendar slot prepared; waiting for editorial approval.':'Calendar slot prepared; enable and connect this Page to resume publication.']);
   }
  });
+}
+// Resume only prepared content, never drafts explicitly saved by a user, deleted
+// stories, ambiguous deliveries or a post already rejected by Meta.
+export async function resumePreparedPosts(){
+ if(!env().publishing)return {scheduled:0};
+ return transaction(null,async db=>{
+  const pages=(await db.query("SELECT p.*,r.auto_publish,r.auto_schedule,r.daily_target FROM creator.pages p LEFT JOIN creator.automation_rules r ON r.workspace_id=p.workspace_id AND r.page_id=p.id JOIN creator.workspaces w ON w.id=p.workspace_id JOIN creator.accounts a ON a.id=w.owner_id WHERE p.active AND p.fb_verified AND NOT p.require_review AND w.status='active' AND a.status='active' AND (r.id IS NULL OR (r.enabled AND r.auto_publish AND r.auto_schedule)) ORDER BY p.id")).rows;
+  let scheduled=0;for(const page of pages){await workspaceLock(db,page.workspace_id);const posts=(await db.query("SELECT p.* FROM creator.posts p WHERE p.workspace_id=$1 AND p.page_id=$2 AND p.status IN ('review','approved') AND p.planned_at IS NOT NULL AND p.deleted_at IS NULL AND p.archived_at IS NULL AND p.last_error IS NULL AND NOT EXISTS(SELECT 1 FROM creator.tasks t WHERE t.workspace_id=p.workspace_id AND t.post_id=p.id AND t.status IN ('queued','running')) ORDER BY p.planned_at LIMIT 20",[page.workspace_id,page.id])).rows;
+   for(const post of posts){await db.query('SAVEPOINT resume_post');try{await queuePublication(db,page.workspace_id,null,page,post,{autoPick:true,at:new Date(Math.max(Date.now()+60000,+new Date(post.planned_at))),target:Math.min(page.daily_target||page.daily_cap,page.daily_cap)});scheduled++;}catch(error){await db.query('ROLLBACK TO SAVEPOINT resume_post');await db.query('UPDATE creator.posts SET last_error=$3 WHERE workspace_id=$1 AND id=$2',[page.workspace_id,post.id,error instanceof AppError?error.message:'Automatic scheduling could not complete.']);}finally{await db.query('RELEASE SAVEPOINT resume_post');}}
+  }return {scheduled};
+ },{owner:true});
 }
 export async function tickAutomations(){
  return transaction(null,async db=>{
@@ -212,7 +226,7 @@ export async function tickAutomations(){
 }
 let timer,publishTimer,busy=false,publishBusy=false,lastTick=0;
 export function startWorker(){
- timer=setInterval(async()=>{if(busy)return;busy=true;try{if(Date.now()-lastTick>60000){await recoverExpiredTasks();await tickAutomations();lastTick=Date.now();}if(!await runOne({excludePublish:true}))await syncOneMirror();}catch{console.error('Platform worker could not process the queue.');}finally{busy=false;}},1500);
+ timer=setInterval(async()=>{if(busy)return;busy=true;try{if(Date.now()-lastTick>60000){await recoverExpiredTasks();await resumePreparedPosts();await tickAutomations();lastTick=Date.now();}if(!await runOne({excludePublish:true}))await syncOneMirror();}catch{console.error('Platform worker could not process the queue.');}finally{busy=false;}},1500);
  publishTimer=setInterval(async()=>{if(publishBusy)return;publishBusy=true;try{await runOne({publishOnly:true});}catch{console.error('Publication queue check failed.');}finally{publishBusy=false;}},1500);
  return ()=>{clearInterval(timer);clearInterval(publishTimer);};
 }
