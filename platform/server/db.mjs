@@ -1,10 +1,10 @@
 import './env.mjs';
-import pg from 'pg';
+import {databaseDriver} from './database-driver.mjs';
 import {AppError} from './errors.mjs';
 let pool;
 export function database(){
   if(!process.env.DATABASE_URL)throw new AppError(503,'The local platform database is not configured.');
-  if(!pool){pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:6,connectionTimeoutMillis:15000,idleTimeoutMillis:15000,statement_timeout:30000,keepAlive:true});pool.on('error',()=>console.error('Platform database idle connection interrupted. The next request will reconnect.'));}return pool;
+  if(!pool){const driver=databaseDriver();pool=new driver.Pool({connectionString:process.env.DATABASE_URL,max:6,connectionTimeoutMillis:15000,idleTimeoutMillis:15000,statement_timeout:30000,keepAlive:true});pool.on('error',()=>console.error('Platform database idle connection interrupted. The next request will reconnect.'));}return pool;
 }
 export const query=(sql,args=[])=>database().query(sql,args);
 export async function transaction(workspaceId,fn,{owner=false}={}){

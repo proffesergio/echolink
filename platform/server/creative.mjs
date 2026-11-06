@@ -24,7 +24,7 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
  // chosen from the artwork; no forced recolouring or oversized white sticker.
  let brandX=pad;
  if(brandLogo){
-  const cropped=await sharp(brandLogo,{limitInputPixels:10000000}).trim().png().toBuffer(),stats=await sharp(cropped).stats(),bright=stats.channels.slice(0,3).reduce((sum,c)=>sum+c.mean,0)/3>170,opaque=stats.channels.length<4||stats.channels[3].min===255,corner=await sharp(cropped).extract({left:0,top:0,width:1,height:1}).removeAlpha().raw().toBuffer(),plate=opaque&&corner[0]+corner[1]+corner[2]<100?'#111111':bright?'#17313a':'#ffffff';
+  const originalStats=await sharp(brandLogo,{limitInputPixels:10000000}).stats(),cropped=await sharp(brandLogo,{limitInputPixels:10000000}).trim().png().toBuffer(),stats=await sharp(cropped).stats(),bright=stats.channels.slice(0,3).reduce((sum,c)=>sum+c.mean,0)/3>170,opaque=originalStats.channels.length<4||originalStats.channels[3].min===255,corner=await sharp(cropped).extract({left:0,top:0,width:1,height:1}).removeAlpha().raw().toBuffer(),plate=opaque&&corner[0]+corner[1]+corner[2]<100?'#111111':bright?'#17313a':'#ffffff';
   const logo=await sharp(cropped).resize(104,48,{fit:'inside',withoutEnlargement:false}).png().toBuffer(),m=await sharp(logo).metadata();
   layers.push({input:Buffer.from(`<svg width="128" height="68"><rect width="128" height="68" rx="12" fill="${plate}"/></svg>`),left:pad,top:30});
   layers.push({input:logo,left:pad+Math.round((128-m.width)/2),top:30+Math.round((68-m.height)/2)});brandX=pad+148;

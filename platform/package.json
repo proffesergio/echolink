@@ -14,6 +14,7 @@
     "test:prepare": "node --env-file=.env.test.local scripts/migrate.mjs && node --env-file=.env.test.local scripts/setup-auth.mjs && node --env-file=.env.test.local scripts/grant-test-runtime.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@vercel/analytics": "^2.0.1",
     "better-auth": "^1.7.17",
     "cheerio": "^1.1.2",

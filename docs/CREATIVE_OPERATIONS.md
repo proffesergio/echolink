@@ -26,6 +26,13 @@ Recovery is automatic, with a short reconnect interval rather than a promise of
 zero downtime. A stable named tunnel remains an option when an owned hostname is
 configured.
 
+This Windows worker uses `PLATFORM_DATABASE_TRANSPORT=websocket` in its private
+platform environment because direct PostgreSQL connections proved intermittent
+while secure WebSocket transactions succeeded. Other installations retain TCP
+by default. Both transports retain interactive transactions, tenant row security
+and the existing database role; credentials stay on the worker. See the
+[Neon transport documentation](https://neon.com/docs/serverless/serverless-driver).
+
 The dashboard uses one status region. It shows connection recovery, action
 errors, measured task progress, or the next scheduled-post countdown. Model
 inference can stay at a stage while it works; the percentage is not increased
@@ -143,6 +150,10 @@ the owner’s Pages. Source-link comments remain disabled.
 Prompts avoid unrelated hashtags, engagement bait, fabricated urgency and
 unsupported product claims. This follows Meta’s emphasis on relevant captions and
 original content in its [spam update](https://about.fb.com/news/2025/04/cracking-down-spammy-content-facebook/).
+Chat-style model introductions are removed. If the product caption adds an
+unsupported sanitizer, disinfectant or cure claim, a caption based on the catalog
+title and price replaces it and the generation metadata records why. This targeted
+check does not establish that every generated statement is factually correct.
 No posting frequency is guaranteed safe, and the app cannot guarantee reach,
 monetization or a restriction-free account.
 

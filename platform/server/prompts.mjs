@@ -10,3 +10,23 @@ export function captionPrompt(page,post,product,insights){
 export function backgroundPrompt(page,post,product){
  return `Premium commercial art direction for ${page.niche}: an elegant studio backdrop, soft directional light, natural cast-shadow area, restrained ${page.brand?.color||'warm coral'} accents, tactile matte surfaces, quiet depth and generous negative space. Keep the main product placement area empty. No products, text, lettering, logos, price labels, badges, people, anatomy or watermarks. The real catalog product will be composited separately without changing its appearance. Campaign goal: ${page.creative_policy?.goal||'messages'}. Additional art direction: ${String(page.creative_policy?.imageInstructions||'').slice(0,2000)}`;
 }
+
+// Small local models sometimes return chat framing or change the product's
+// category. This is a targeted safeguard, not a general factual verifier.
+export function prepareCaption(raw,page,product){
+ let caption=String(raw||'').trim().replace(/^(?:এখানে[^\n]{0,90}ক্যাপশন[^\n]*[:：]|(?:here(?:'s| is)|sure[,!]?).{0,70}(?:caption|post)[^\n]*[:：])\s*/iu,'').trim();
+ caption=caption.replace(/^["“]([\s\S]*?)["”](?=\s*(?:#|$))/u,'$1').trim();
+ const notes=[];
+ if(product){
+  const source=JSON.stringify({title:product.title,description:product.description||''});
+  const claims=[/saniti[sz]er|স্যানিটাইজার/iu,/disinfectant|জীবাণুনাশক/iu,/cures?\b|রোগ সারায়/iu,/kills?\s+(?:all\s+)?germs|জীবাণু ধ্বংস/iu];
+  if(claims.some(pattern=>pattern.test(caption)&&!pattern.test(source))){
+   const bangla=['Bangla','Bilingual-Mix'].includes(page.language),price=product.price!==null&&product.price!==undefined?`${product.currency||''} ${new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(product.price))}`.trim():null;
+   caption=[product.title,price?(bangla?'মূল্য: ':'Price: ')+price:null,bangla?'পণ্যটির বিস্তারিত জানতে ইনবক্সে যোগাযোগ করুন।':'Message us for product details.'].filter(Boolean).join('\n\n');
+   notes.push('Model added an unsupported product-category or health claim; a caption using catalog title and price replaced it.');
+  }
+  if(page.language==='Bilingual-Mix'&&!/(?:^|\n|[.!?]\s+)[A-Za-z][A-Za-z ,’'–-]{15,}[.!?](?:\s|$)/u.test(caption))caption+='\n\nMessage us for product details.';
+  if(notes.length){const brand=String(page.name||'').replace(/[^\p{L}\p{M}\p{N}_]/gu,'');caption+='\n\n'+(brand?'#'+brand+' ':'')+'#ProductDetails';}
+ }
+ return {caption,notes};
+}

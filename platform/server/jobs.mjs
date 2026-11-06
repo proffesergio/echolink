@@ -16,7 +16,7 @@ import {editorialWarnings} from './editorial.mjs';
 import {queuePublication} from './planner.mjs';
 import {pageClock} from './scheduling.mjs';
 import {resolveFacebookPage,pauseFacebookPage} from './facebook.mjs';
-import {captionPrompt,backgroundPrompt} from './prompts.mjs';
+import {captionPrompt,backgroundPrompt,prepareCaption} from './prompts.mjs';
 import {removeProductBackground} from './cutout.mjs';
 import {summarizeInsights} from './insights.mjs';
 export async function row(client,table,workspaceId,id){
@@ -61,11 +61,12 @@ async function generate(task){
  const guidance=snapshot?summarizeInsights(snapshot.records,page.timezone):null;
  const {facts,system,prompt}=captionPrompt(page,post,product,guidance?.sampleSize>=5?guidance.recommendation:null);
  await updateTask(task,35,'Model generating caption; waiting for inference');
- const caption=await textCompletion(c,c.secret,prompt,{systemPrompt:system});
+ const rawCaption=await textCompletion(c,c.secret,prompt,{systemPrompt:system});
+ const {caption,notes}=prepareCaption(rawCaption,page,product);
  if(caption.length<60)throw new AppError(422,'The model returned too little content. Choose a more capable model or edit the draft manually.');
  await updateTask(task,85,'Saving a reviewable draft');
  await transaction(task.workspace_id,async client=>{
- const seo={title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:editorialWarnings(caption,facts,page.niche)};
+ const seo={title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:editorialWarnings(caption,facts,page.niche),generationNotes:notes};
   const updated=await client.query("UPDATE creator.posts SET caption=$3,status='review',approved_version=NULL,version=version+1,updated_at=now(),seo=$5 WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,caption,post.version,seo]);
   if(!updated.rowCount)throw new AppError(409,'The draft changed while the model worked. Generate again from the current version.');
   await audit(client,task.workspace_id,null,'post.generated','post',post.id);
