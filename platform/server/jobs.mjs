@@ -1,3 +1,4 @@
+import {logoAssetFor} from './brand.mjs';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {transaction,audit,workspaceLock} from './db.mjs';
@@ -66,9 +67,18 @@ async function generate(task){
  const rawCaption=await textCompletion(c,c.secret,prompt,{systemPrompt:system});
  const {caption,notes}=prepareCaption(rawCaption,page,product);
  if(caption.length<60)throw new AppError(422,'The model returned too little content. Choose a more capable model or edit the draft manually.');
- await updateTask(task,85,'Saving a reviewable draft');
+ let instagramCaption;
+ const instagramEnabled=await transaction(task.workspace_id,async db=>(await db.query("SELECT id FROM creator.social_destinations WHERE workspace_id=$1 AND page_id=$2 AND enabled AND platform='instagram'",[task.workspace_id,page.id])).rowCount>0);
+ if(instagramEnabled){
+  await updateTask(task,60,'Adapting the same source facts to the Instagram caption style');
+  const variant=captionPrompt(page,post,product,null,'instagram');
+  const result=prepareCaption(await textCompletion(c,c.secret,variant.prompt,{systemPrompt:variant.system}),page,product);
+  if(result.caption.length<60||result.caption.length>2200)throw new AppError(422,'The Instagram caption needs editing: use 60–2200 characters.');
+  instagramCaption=result.caption;notes.push(...result.notes);
+ }
+ await updateTask(task,85,'Saving channel captions together for the same calendar slot');
  await transaction(task.workspace_id,async client=>{
- const seo={...post.seo,title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:editorialWarnings(caption,facts,page.niche),generationNotes:notes};
+ const seo={...post.seo,channelCaptions:instagramCaption?{instagram:instagramCaption}:{},title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:[...editorialWarnings(caption,facts,page.niche),...(instagramCaption?editorialWarnings(instagramCaption,facts,page.niche).map(w=>'Instagram: '+w):[])],generationNotes:notes};
   const updated=await client.query("UPDATE creator.posts SET caption=$3,status='review',approved_version=NULL,version=version+1,updated_at=now(),seo=$5 WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,caption,post.version,seo]);
   if(!updated.rowCount)throw new AppError(409,'The draft changed while the model worked. Generate again from the current version.');
   await audit(client,task.workspace_id,null,'post.generated','post',post.id);
@@ -82,7 +92,7 @@ async function creative(task){
   if(!page.image_connection_id){if(task.input.aiBackground)throw new AppError(400,'Choose an image tool on this Page.');warnings.push('Connect an image model for AI-generated backdrops. Designed studio background used.');}
   else{const c=await connectionFor(task.workspace_id,page.image_connection_id);await updateTask(task,45,'Generating an empty studio background with the image model');try{background=await imageGeneration(c,c.secret,backgroundPrompt(page,post,product));backgroundMethod='ai-generated';}catch(error){warnings.push('The image provider was unavailable. Designed studio background used.');}}
  }
- let brandLogo;if(page.brand.logoAssetId){const logo=await transaction(task.workspace_id,db=>row(db,'assets',task.workspace_id,page.brand.logoAssetId));brandLogo=await readFile(logo.path);}
+ let brandLogo;const logoId=logoAssetFor(page,product);if(logoId){const logo=await transaction(task.workspace_id,db=>row(db,'assets',task.workspace_id,logoId));brandLogo=await readFile(logo.path);}
  await updateTask(task,65,'Composing real photo, shaped typography and original brand logo');const site=page.website_id?await transaction(task.workspace_id,db=>row(db,'websites',task.workspace_id,page.website_id)):null;const image=await renderCreative({post,page,product,background,sourcePhoto,brandLogo,website:site}),asset=await saveAsset(task.workspace_id,post.id,image);
  await transaction(task.workspace_id,async client=>{
   const result=await client.query("UPDATE creator.posts SET creative=creative||$3::jsonb,status='review',approved_version=NULL,version=version+1,updated_at=now() WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,JSON.stringify({assetId:asset.id,designVersion:image.designVersion,backgroundMethod,cutout,warnings}),post.version]);if(!result.rowCount)throw new AppError(409,'The post changed while the creative was being prepared.');

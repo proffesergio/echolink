@@ -1,3 +1,5 @@
+import {logoAssetFor} from './brand.mjs';
+import {instagramCaption} from './channel-captions.mjs';
 import {transaction,audit} from './db.mjs';
 import {decryptSecret} from './vault.mjs';
 import {remoteJSON} from './net.mjs';
@@ -56,13 +58,13 @@ export async function publishInstagram(task,{updateTask}){
  const limit=await remoteJSON(base+'/'+linked.id+'/content_publishing_limit?fields=config,quota_usage',{headers});
  if(limit.data?.some(l=>Number.isFinite(l.config?.quota_total)&&l.quota_usage>=l.config.quota_total))throw new AppError(429,'Instagram reports its current publishing allowance is exhausted. Try after its rolling window resets.');
  try{
-  let assetId=task.input.imageAssetId||post.creative.assetId,caption=task.input.captionSnapshot||prepareCaption(post.caption,page,product).caption;
+  let assetId=task.input.imageAssetId||post.creative.assetId,caption=task.input.captionSnapshot||prepareCaption(instagramCaption(post),page,product).caption;
   // A newly shared older Facebook product can receive today's price-free
   // Instagram design without overwriting its historical Facebook creative.
-  if(product&&post.creative.designVersion!=='studio-v3'&&!task.input.imageAssetId){
+  if(product&&post.creative.designVersion!=='studio-v4'&&!task.input.imageAssetId){
    await updateTask(task,25,'Preparing a price-free Instagram variant from the real catalog photo');
    let photo;if(product.image_url){const source=await outbound(product.image_url,{maxBytes:12000000});if(!source.ok)throw new AppError(502,'The product photo could not be read.');photo=source.bytes;if(page.creative_policy?.removeBackground!==false){try{photo=(await removeProductBackground(photo)).bytes;}catch{}}}
-   const assets=await transaction(w,async db=>({logo:page.brand.logoAssetId?(await db.query('SELECT path FROM creator.assets WHERE workspace_id=$1 AND id=$2',[w,page.brand.logoAssetId])).rows[0]:null,website:page.website_id?(await db.query('SELECT * FROM creator.websites WHERE workspace_id=$1 AND id=$2',[w,page.website_id])).rows[0]:null}));
+   const assets=await transaction(w,async db=>({logo:logoAssetFor(page,product)?(await db.query('SELECT path FROM creator.assets WHERE workspace_id=$1 AND id=$2',[w,logoAssetFor(page,product)])).rows[0]:null,website:page.website_id?(await db.query('SELECT * FROM creator.websites WHERE workspace_id=$1 AND id=$2',[w,page.website_id])).rows[0]:null}));
    const image=await renderCreative({post,page,product,sourcePhoto:photo,brandLogo:assets.logo?await readFile(assets.logo.path):null,website:assets.website}),asset=await saveAsset(w,post.id,image);assetId=asset.id;
    await transaction(w,db=>db.query('INSERT INTO creator.assets(id,workspace_id,post_id,path,mime,width,height) VALUES($1,$2,$3,$4,$5,$6,$7)',[asset.id,w,post.id,asset.path,asset.mime,asset.width,asset.height]));
   }

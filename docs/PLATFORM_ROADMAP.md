@@ -253,3 +253,12 @@ format checks. Website posting remains optional for every Page, and RSS stays
 exclusive to news Pages. Instagram photo sharing now uses the professional account
 linked through the existing Facebook Page authorization. Reels and personal
 profile API posting are not enabled by that photo adapter.
+
+
+## November channel and hosting update
+
+Implemented: linked professional Instagram image delivery after Facebook, a shared intended calendar slot, independently generated/editable channel captions and Page styles, adaptive transparent product logos with optional contrast variants, per-variant widths, concise product headlines and corner handles around a website badge. Source-link comments remain opt-in and currently disabled.
+
+Next: choose destinations per content item (including Instagram-only workflows), optional channel-specific image crops/carousels, Reels rendering with licensed audio and measured upload status, mixed-format Page routines, content experiments based on measured insights, and YouTube video pipelines after local hardware/runtime benchmarks. Simultaneous publication to two external APIs is not a guarantee.
+
+Infrastructure: [Oracle assessment](ORACLE_HOSTING.md) verifies the current 2-OCPU/12-GB Always Free A1 allocation. A tested Linux worker package, portable asset storage/path migration, private model networking and restore verification precede any Windows-to-Oracle cutover. n8n hosting alone does not remove the worker’s PC dependency.

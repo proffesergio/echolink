@@ -32,7 +32,9 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 - **Catalogue to creative:** category/search/stock filters, category rotation and priority post preparation.
 - **Brand-led layouts:** price-free product posters, verified fabric/color annotations, website and social footers, and category-labelled news images.
 - **Watch the work:** timestamped task console, measured stage progress and the next-post countdown.
-- **Facebook + Instagram:** linked professional accounts share finished image posts with independent delivery records; Instagram retries never repeat Facebook.
+- **Facebook + Instagram:** one calendar slot and finished image, independently editable channel captions and styles, plus separate delivery records. Instagram retries never repeat Facebook.
+- **Adaptive branding:** transparent light/dark logo choices, shorter product headlines and a centered website badge with corner social handles.
+- **Cloud planning:** see the [Oracle Free Tier assessment](docs/ORACLE_HOSTING.md) for current limits and the separate n8n/worker migration requirements.
 - **Per-type prompts:** separate caption and image direction for each Page’s news, product, quote and original content.
 
 Follow [Creative operations](docs/CREATIVE_OPERATIONS.md). Planned Text/Image/Reels mixes and YouTube tooling are tracked in the [release roadmap](docs/PLATFORM_ROADMAP.md).

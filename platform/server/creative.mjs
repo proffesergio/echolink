@@ -58,7 +58,7 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
  if(news)layers.push({input:Buffer.from(`<svg width="${width}" height="8"><rect width="${width}" height="8" fill="${accent}"/></svg>`),left:0,top:height-8});
  const output=sharp({create:{width,height,channels:4,background:'#ffffff'}}).composite(layers).jpeg({quality:93,mozjpeg:true});
  if(background&&!news)output.withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>');
- return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!image,designVersion:'studio-v3'};
+ return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!image,designVersion:'studio-v4'};
 }
 export async function saveAsset(workspaceId,postId,creative){
  const id=randomUUID(),mime=creative.mime||'image/jpeg',dir=new URL('../.local/assets/'+workspaceId+'/',import.meta.url);await mkdir(dir,{recursive:true});const path=new URL(id+(mime==='image/png'?'.png':'.jpg'),dir);await writeFile(path,creative.bytes);return {id,path:fileURLToPath(path),mime,width:creative.width,height:creative.height};

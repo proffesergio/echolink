@@ -60,12 +60,13 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    assert.equal((await call('/api/pages/'+pageA.id+'/aggregate',{method:'POST',cookie:a.cookie,body:{}})).status,400);
   });
   await t.test('post edit/review/dry-run preserves isolation and does not consume publishing usage',async()=>{
-   postA=(await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'A verified draft',caption:'A factual caption with a clear message. #Education #Learning #Ideas'}})).data;
+   postA=(await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'A verified draft',instagram_caption:'A separate concise Instagram caption. #Learning',caption:'A factual caption with a clear message. #Education #Learning #Ideas'}})).data;
+   assert.equal(postA.seo.channelCaptions.instagram,'A separate concise Instagram caption. #Learning');
    assert.equal((await call('/api/posts/'+postA.id+'/approve',{method:'POST',cookie:b.cookie,body:{}})).status,404);
    assert.equal((await call('/api/posts/'+postA.id+'/approve',{method:'POST',cookie:a.cookie,body:{}})).status,200);
    const dry=await call('/api/posts/'+postA.id+'/dry-run',{method:'POST',cookie:a.cookie,body:{}});assert.equal(dry.data.approvalReady,true);assert.equal(dry.data.automaticLinkComments,false);
    assert.equal((await call('/api/state',{cookie:a.cookie})).data.entitlements.posts_used,0);
-   const edit=await call('/api/posts/'+postA.id,{method:'PUT',cookie:a.cookie,body:{...postA,caption:'Changed after approval'}});assert.equal(edit.data.status,'draft');assert.equal(edit.data.approved_version,null);
+   const edit=await call('/api/posts/'+postA.id,{method:'PUT',cookie:a.cookie,body:{...postA,instagram_caption:'Instagram edited after approval'}});assert.equal(edit.data.seo.channelCaptions.instagram,'Instagram edited after approval');assert.equal(edit.data.caption,postA.caption);assert.equal(edit.data.status,'draft');assert.equal(edit.data.approved_version,null);
   });
   await t.test('five concurrent reservations yield exactly three slots and cannot exceed trial',async()=>{
    const posts=[];for(let i=0;i<5;i++)posts.push((await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'Quota '+i,caption:'Test draft'}})).data);

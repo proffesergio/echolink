@@ -225,3 +225,14 @@ when needed rather than cropped. Normal asset URLs remain authenticated; signed
 links are bound to one tenant/asset and expire after two hours. The PC, bridge and
 public dashboard must remain reachable while Meta fetches media. See
 [Meta’s Instagram API reference](https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api).
+
+
+## Channel consistency and product branding (studio-v4)
+
+In **Page settings → One calendar · two caption styles**, choose a style and optional instructions for each channel. Facebook and Instagram are generated from identical source facts and language rules, then saved together. The post editor exposes both captions; editing either invalidates the current approval/schedule so it can be prepared again. An empty Instagram caption falls back to Facebook copy. Content cards, schedule/publish confirmations and the calendar inspector preview the Instagram variant. The calendar labels linked delivery **FB + IG**. Enable or pause linked sharing in **Page connections → Instagram**. Instagram follows confirmed Facebook delivery; this is one intended calendar slot, not a guarantee of simultaneous network publication.
+
+New product creatives omit brand-name duplication and PRODUCT EDIT text, shorten the headline, place Facebook at the bottom left and Instagram at the bottom right, and show a centered www-domain badge with a cursor illustration. The badge is artwork, not a clickable image link. Product prices remain excluded from the caption and creative.
+
+**Page settings → Logo contrast variants** accepts optional light/dark uploads and independent widths. Adaptive monochrome mode recolors the original transparent mark for the canvas while keeping its shape and alpha. Custom variants retain their supplied colors. Upload transparent PNGs; opaque logo backgrounds are not silently removed. Fabrything’s existing mark has transparency and uses adaptive contrast without a plate. Saved settings affect newly made images; use Creative Studio → Refresh queued designs for prepared content. Already published posts are preserved.
+
+Each enabled Instagram destination requires an additional caption inference during preparation. Publication uses the saved captions and does not wait for a model to run. Channel-specific generation failures leave a visible failed preparation task rather than publishing a partly updated item.
