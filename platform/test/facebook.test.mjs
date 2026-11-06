@@ -21,3 +21,12 @@ test('missing permissions, wrong Page and expired credentials fail before connec
  await assert.rejects(resolveFacebookPage({token:'x',pageId:'123',version:'v26.0'},async()=>{throw new Error('Meta code 190/463');}),/190\/463/);
  await assert.rejects(resolveFacebookPage({token:'x',pageId:'123',version:'v26.0'},async url=>url.includes('permissions')?{data:required.map(permission=>({permission,status:'granted'}))}:url.includes('accounts')?{data:[{id:'999',access_token:'other'}]}:{id:'user'}),/cannot manage the selected Page/);
 });
+test('long-lived exchange validates the app and publishing scopes, then stores only the Page credential',async()=>{
+ const r=await resolveFacebookPage({token:'short-user',pageId:'123',version:'v26.0',appId:'app',appSecret:'secret'},async(url,options)=>{
+  if(url.includes('/debug_token'))return {data:url.includes('short-user')?{is_valid:true,type:'USER',app_id:'app'}:{is_valid:true,type:'PAGE',app_id:'app',scopes:required,expires_at:0}};
+  if(url.includes('/oauth/access_token'))return {access_token:'long-user'};
+  if(url.includes('/permissions'))return {data:required.map(permission=>({permission,status:'granted'}))};
+  if(url.includes('/accounts')){assert.equal(options.headers.authorization,'Bearer long-user');return {data:[{id:'123',access_token:'durable-page',tasks:['CREATE_CONTENT']}]};}
+  return options.headers.authorization==='Bearer durable-page'?{id:'123',name:'Shop',category:'Shopping'}:{id:'user'};
+ });assert.equal(r.token,'durable-page');assert.equal(r.result.longLived,true);assert.equal(r.result.noScheduledExpiry,true);assert(!JSON.stringify(r.result).includes('long-user'));
+});

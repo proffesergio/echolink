@@ -1,5 +1,6 @@
 // Only the authenticated bridge is public. Database and provider secrets stay
 // with the Windows worker; cookies and OAuth redirects retain the site origin.
+import {workerOrigin} from '../lib/worker-route.mjs';
 export const config={api:{bodyParser:false}};
 const fail=(res,status,error)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error}));};
 export default async function platform(req,res){
@@ -8,7 +9,7 @@ export default async function platform(req,res){
   const incoming=new URL(req.url,'https://proxy.invalid'),path=req.query?.path||incoming.searchParams.get('path')||'';
   if(typeof path!=='string'||!/^\/?[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)*\/?$/.test(path)||path.includes('..'))return fail(res,404,'Unknown application endpoint.');
   if(!['GET','HEAD','POST','PUT','DELETE','PATCH'].includes(req.method))return fail(res,405,'Method not allowed.');
-  const origin=process.env.DASHBOARD_PUBLIC_ORIGIN,worker=process.env.WORKER_ORIGIN,key=process.env.WORKER_BRIDGE_TOKEN;
+  const origin=process.env.DASHBOARD_PUBLIC_ORIGIN,worker=await workerOrigin(process.env.WORKER_ORIGIN),key=process.env.WORKER_BRIDGE_TOKEN;
   if(!origin||!worker||!key||key.length<32)return fail(res,503,'The owner must configure the protected worker connection.');
   const publicURL=new URL(origin),target=new URL(worker);
   if(publicURL.protocol!=='https:'||publicURL.origin!==origin||target.protocol!=='https:'||target.origin!==worker||target.username||target.password)return fail(res,503,'The protected worker connection settings are invalid.');

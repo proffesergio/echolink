@@ -1,10 +1,10 @@
 import {transaction,workspaceLock} from './db.mjs';
 import {AppError} from './errors.mjs';
-export async function entitlements(client,workspaceId,{at=new Date(),allowExpired=false}={}){
-  const row=(await client.query(`SELECT s.*,p.name AS plan_name,p.page_limit,p.post_limit,p.generation_limit,p.period_days,w.status AS workspace_status,w.trial_ends_at
+export async function entitlements(client,workspaceId,{at,allowExpired=false}={}){
+  const row=(await client.query(`SELECT s.*,now() AS database_now,p.name AS plan_name,p.page_limit,p.post_limit,p.generation_limit,p.period_days,w.status AS workspace_status,w.trial_ends_at
     FROM creator.subscriptions s JOIN creator.plans p ON p.id=s.plan_id JOIN creator.workspaces w ON w.id=s.workspace_id WHERE s.workspace_id=$1`,[workspaceId])).rows[0];
   if(!row)throw new AppError(409,'Choose a plan before continuing.');
-  row.expired=!['active','trialing'].includes(row.status)||new Date(row.period_end)<=at;
+  row.expired=!['active','trialing'].includes(row.status)||new Date(row.period_end)<=new Date(at||row.database_now);
   if(!allowExpired&&(row.expired||row.workspace_status!=='active'))throw new AppError(402,row.workspace_status!=='active'?'This workspace is suspended.':'Your plan or seven-day trial has ended. Choose a package to continue.','plan_inactive');
   const used=(await client.query("SELECT count(*)::int AS used FROM creator.usage_reservations WHERE workspace_id=$1 AND period_start=$2 AND status IN ('reserved','consumed','unknown')",[workspaceId,row.period_start])).rows[0].used;
   const pages=(await client.query('SELECT count(*)::int AS count FROM creator.pages WHERE workspace_id=$1',[workspaceId])).rows[0].count;

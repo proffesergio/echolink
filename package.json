@@ -35,7 +35,8 @@
     "verify:website": "node scripts/check-website-connection.mjs",
     "semantic:calibrate": "node scripts/check-semantic-quality.mjs",
     "semantic:corpus": "node scripts/check-semantic-corpus.mjs",
-    "caption:diagnose": "node scripts/check-caption-quality.mjs"
+    "caption:diagnose": "node scripts/check-caption-quality.mjs",
+    "creative:setup": "powershell -NoProfile -File scripts/setup-creative-tools.ps1"
   },
   "keywords": [],
   "author": "",
@@ -43,6 +44,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",
     "@neon/config": "latest",
+    "@neondatabase/serverless": "^1.2.0",
     "cheerio": "^1.1.2",
     "pg": "^8.16.3",
     "rss-parser": "^3.13.0"

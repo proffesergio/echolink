@@ -25,6 +25,8 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 > **v2 is available for public testing:** [Open EchoLink](https://echolinkbd.vercel.app/) for private creator workspaces, multiple Pages, niche-specific routines, product creatives and owner controls. Start with [Page workspaces and the calendar](docs/PAGE_WORKSPACES.md), then follow the [live testing guide](docs/LIVE_V2_TESTING.md) or [platform setup guide](platform/README.md). The protected Windows worker runs local inference and publication jobs.
 
+> **Worker setup:** `n8n start` starts n8n, not the creator worker. Run `npm run platform:start` from the EchoLink folder to start the supervised worker, protected tunnel and Ollama. See [Creative operations](docs/CREATIVE_OPERATIONS.md) for the generation studio, premium product/news layouts, per-Page Meta apps, personal-profile handoffs and measured insights.
+
 ## A newsroom you can control
 
 The [operations dashboard](docs/DASHBOARD.md) brings 13 workspaces into a compact
@@ -44,10 +46,11 @@ verified checks, failures and planned integrations have separate visible states.
 
 ## How it fits together
 
-The next platform phases add multiple niches, content/language profiles, optional
-per-Page websites, branded image/quote formats and future YouTube video workflows.
-The current working module remains the news newsroom; planned adapters are
-tracked separately in the [creator platform roadmap](docs/PLATFORM_ROADMAP.md).
+The creator platform supports multiple niches and languages, independent Page
+websites, product catalogs, branded creatives, automatic scheduling and measured
+insights. Personal profiles use scheduled manual sharing. Future YouTube video
+workflows and remaining adapters are tracked in the
+[creator platform roadmap](docs/PLATFORM_ROADMAP.md).
 The [NobleSeek connector guide](docs/WEBSITE_PUBLISHING.md) covers local database
 settings and the owner's automatic-link opt-out.
 

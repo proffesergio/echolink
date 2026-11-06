@@ -16,7 +16,7 @@ export function wallTimeToInstant(value,timezone){
  for(let i=0;i<3;i++){const local=pageClock({timezone},new Date(at));at+=desired-Date.parse(local.date+'T'+local.time+':00Z');}
  const check=pageClock({timezone},new Date(at));if(check.date+'T'+check.time!==value)throw new AppError(400,'That local time does not exist in this timezone. Choose another time.');return new Date(at);
 }
-export async function bookings(db,w,pageId,exclude=null){return(await db.query(`SELECT id,status,COALESCE(published_at,scheduled_at,planned_at) AS at FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND ($3::uuid IS NULL OR id<>$3) AND deleted_at IS NULL AND archived_at IS NULL AND (status IN ('published','publishing','unknown','scheduled') OR planned_at IS NOT NULL) AND (COALESCE(published_at,scheduled_at,planned_at)>now()-interval '8 days' OR status IN ('publishing','unknown'))`,[w,pageId,exclude])).rows;}
+export async function bookings(db,w,pageId,exclude=null){return(await db.query(`SELECT id,status,COALESCE(published_at,scheduled_at,planned_at) AS at FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND ($3::uuid IS NULL OR id<>$3) AND deleted_at IS NULL AND archived_at IS NULL AND (status IN ('published','publishing','unknown','scheduled','ready_manual') OR planned_at IS NOT NULL) AND (COALESCE(published_at,scheduled_at,planned_at)>now()-interval '8 days' OR status IN ('publishing','unknown'))`,[w,pageId,exclude])).rows;}
 export function slotProblem(page,reservations,at){
  if(!inWindow(page,at))return 'outside_window';if(page.daily_cap<1)return 'daily_cap';
  const date=pageClock(page,at).date,timed=reservations.filter(x=>x.at),today=timed.filter(x=>pageClock(page,new Date(x.at)).date===date);

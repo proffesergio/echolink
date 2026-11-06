@@ -5,6 +5,7 @@ export function scopeState(value,pageId){
  const resourceIds=new Set([page.id,page.website_id,...ids,...out.posts.map(p=>p.id),...out.tasks.map(t=>t.id),...out.feeds.map(f=>f.id),...out.automation_rules.map(r=>r.id),...out.campaigns.map(c=>c.id)].filter(Boolean));
  out.activity=(value.activity||[]).filter(a=>a.page_id?a.page_id===page.id:resourceIds.has(a.resource_id));
  const postIds=new Set(out.posts.map(p=>p.id));out.mirrorStatus=(value.mirrorStatus||[]).filter(m=>postIds.has(m.post_id));
+ out.insights=(value.insights||[]).filter(s=>s.page_id===page.id);
  out.pageMirrors=(value.pageMirrors||[]).filter(m=>m.page_id===page.id);
  out.archiveCounts=(value.pageArchiveCounts||[]).find(c=>c.page_id===page.id)||{archived:0,trash:0};
  out.postCounts=Object.fromEntries((value.pagePostCounts||[]).filter(x=>x.page_id===page.id).map(x=>[x.status,x.count]));return out;

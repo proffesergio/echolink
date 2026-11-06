@@ -7,7 +7,9 @@ import {createApp} from '../server/index.mjs';
 import {query,transaction,closeDatabase} from '../server/db.mjs';
 import {reservePublication} from '../server/quotas.mjs';
 import {requireOwner} from '../server/auth.mjs';
-import {tickAutomations,continuePipeline,resumePreparedPosts} from '../server/jobs.mjs';
+import {tickAutomations,continuePipeline,resumePreparedPosts,runOne} from '../server/jobs.mjs';
+import {pauseFacebookPage} from '../server/facebook.mjs';
+import {encryptSecret} from '../server/vault.mjs';
 if(process.env.PLATFORM_BRANCH!=='echolink-platform-local'||new URL(process.env.DATABASE_URL).pathname!=='/creator_test')throw new Error('Integration tests require the isolated development branch.');
 const original={port:process.env.PLATFORM_PORT,origin:process.env.PLATFORM_ORIGIN,owner:process.env.PLATFORM_OWNER_EMAIL};
 process.env.SMTP_HOST='';process.env.PLATFORM_ENV='development'; // Fixtures never use production cookies or send external email.
@@ -118,10 +120,36 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
     await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET fb_verified=true WHERE id=$1',[pageA.id]));
     await resumePreparedPosts();const scheduled=(await call('/api/posts/'+post.id,{cookie:a.cookie})).data;assert.equal(scheduled.status,'scheduled');assert.equal(scheduled.approved_version,scheduled.version);assert.equal(scheduled.seo.editorialWarnings.length,1);
     assert.equal((await call('/api/posts/'+post.id+'/draft',{method:'POST',cookie:a.cookie,body:{}})).status,200);await resumePreparedPosts();assert.equal((await call('/api/posts/'+post.id,{cookie:a.cookie})).data.status,'draft');
+    const fb=await transaction(a.workspace.id,async db=>(await db.query("INSERT INTO creator.connections(workspace_id,name,provider,config,secret_cipher) VALUES($1,'Auth pause fixture','facebook','{\"version\":\"v26.0\"}',$2) RETURNING id",[a.workspace.id,encryptSecret({token:'never-used-fixture'},a.workspace.id)])).rows[0]);
+    await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET facebook_connection_id=$2 WHERE id=$1',[pageA.id,fb.id]));
+    const queued=await call('/api/posts/'+post.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true}});assert.equal(queued.status,200);
+    await transaction(a.workspace.id,db=>pauseFacebookPage(db,a.workspace.id,pageA.id,fb.id,'Facebook token expired (190/463).'));
+    const paused=(await call('/api/state',{cookie:a.cookie})).data;assert.equal(paused.pages.find(p=>p.id===pageA.id).fb_verified,false);assert.equal(paused.tasks.find(t=>t.id===queued.data.id).status,'blocked');assert.equal(paused.posts.find(p=>p.id===post.id).seo.deliveryBlock,'facebook_auth');
+    assert.equal((await call('/api/posts/'+post.id+'/schedule',{method:'POST',cookie:a.cookie,body:{autoPick:true}})).status,409);
+    await transaction(a.workspace.id,async db=>{await db.query('UPDATE creator.pages SET fb_verified=true WHERE id=$1',[pageA.id]);await db.query("UPDATE creator.posts SET last_error=NULL,seo=seo-'deliveryBlock' WHERE id=$1",[post.id]);});await resumePreparedPosts();assert.equal((await call('/api/posts/'+post.id,{cookie:a.cookie})).data.status,'scheduled');
+    await call('/api/posts/'+post.id+'/draft',{method:'POST',cookie:a.cookie,body:{}});
     assert.equal((await call('/api/pages/'+pageA.id+'/facebook',{method:'POST',cookie:b.cookie,body:{}})).status,404);
     assert.equal((await call('/api/pages/'+pageB.id+'/facebook',{method:'POST',cookie:b.cookie,body:{connection_id:connectionA.id}})).status,404);
     assert.equal((await call('/api/pages/'+pageB.id+'/facebook',{method:'POST',cookie:b.cookie,body:{page_id:'not-numeric',version:'v26.0',token:'fake'}})).status,400);
    }finally{await transaction(a.workspace.id,db=>db.query('UPDATE creator.pages SET require_review=true WHERE id=$1',[pageA.id]));process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
+  });
+  await t.test('profile scheduling is a manual handoff, metrics imports are isolated and manual confirmation is explicit',async()=>{
+   const prior=process.env.PLATFORM_PUBLISHING_ENABLED;process.env.PLATFORM_PUBLISHING_ENABLED='true';
+   try{
+    const profile=(await call('/api/pages',{method:'POST',cookie:o.cookie,body:{name:'Owner profile fixture',niche:'Education',kind:'creator',language:'English',destination_type:'facebook_profile',profile_url:'https://www.facebook.com/profile.fixture',active:true,require_review:false,timezone:'UTC'}})).data;assert(profile.id);
+    assert.equal((await call('/api/pages/'+profile.id+'/facebook',{method:'POST',cookie:o.cookie,body:{token:'not-real'}})).status,400);
+    const p=(await call('/api/posts',{method:'POST',cookie:o.cookie,body:{page_id:profile.id,type:'original',title:'Manual profile fixture',caption:'An original, useful caption with verified facts.'}})).data;
+    const schedule=await call('/api/posts/'+p.id+'/schedule',{method:'POST',cookie:o.cookie,body:{autoPick:true}});assert.equal(schedule.status,200,JSON.stringify(schedule.data));assert.equal(schedule.data.kind,'manual_handoff');
+    await transaction(o.workspace.id,db=>db.query("UPDATE creator.tasks SET not_before=now()-interval '1 second' WHERE id=$1",[schedule.data.id]));await runOne({publishOnly:true});
+    const ready=(await call('/api/posts/'+p.id,{cookie:o.cookie})).data;assert.equal(ready.status,'ready_manual');assert.equal(ready.fb_post_id,null);
+    assert.equal((await call('/api/posts/'+p.id+'/confirm-manual',{method:'POST',cookie:o.cookie,body:{confirmed:true,url:'https://evil.example/post/1'}})).status,400);
+    const done=await call('/api/posts/'+p.id+'/confirm-manual',{method:'POST',cookie:o.cookie,body:{confirmed:true,url:'https://www.facebook.com/profile.fixture/posts/123'}});assert.equal(done.status,200);assert.equal((await call('/api/posts/'+p.id,{cookie:o.cookie})).data.status,'published');
+    const records=Array.from({length:5},(_,i)=>({type:'photo',publishedAt:new Date(Date.now()-i*86400000).toISOString(),reactions:10,comments:2,shares:1}));
+    assert.equal((await call('/api/pages/'+profile.id+'/insights',{method:'POST',cookie:b.cookie,body:{records}})).status,404);
+    assert.equal((await call('/api/pages/'+profile.id+'/insights',{method:'POST',cookie:o.cookie,body:{}})).status,400);
+    assert.equal((await call('/api/pages/'+profile.id+'/insights',{method:'POST',cookie:o.cookie,body:{records}})).status,200);
+    const snapshot=(await call('/api/state',{cookie:o.cookie})).data.insights.find(s=>s.page_id===profile.id);assert.equal(snapshot.summary.sampleSize,5);assert.equal(snapshot.summary.types[0].type,'photo');
+   }finally{process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
   });
   await t.test('Page routine configuration and logging references are workspace protected',async()=>{
    assert.equal((await call('/api/automations',{method:'POST',cookie:b.cookie,body:{page_id:pageA.id,name:'Cross workspace',enabled:false}})).status,404);
@@ -172,7 +200,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
  }finally{
   try{await transaction(null,async db=>{
    await db.query('DELETE FROM creator.activity WHERE actor_id=ANY($1::uuid[])',[accounts.map(a=>a.id)]);
-   for(const account of accounts){const w=account.w;for(const table of ['checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
+   for(const account of accounts){const w=account.w;for(const table of ['insight_snapshots','checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
    for(const account of accounts)await db.query('DELETE FROM public.auth_user WHERE id=$1',[account.subject]);
   },{owner:true});}finally{
   await Promise.all(mailFiles.map(f=>unlink(f).catch(()=>{})));server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await closeDatabase();process.env.PLATFORM_PORT=original.port;process.env.PLATFORM_ORIGIN=original.origin;process.env.PLATFORM_OWNER_EMAIL=original.owner;

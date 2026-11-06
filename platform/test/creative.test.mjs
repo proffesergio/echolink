@@ -18,3 +18,7 @@ test('transparent black logos stay visible on a white badge in a dark creative',
  const white=await sharp(image.bytes).extract({left:90,top:55,width:1,height:1}).raw().toBuffer(),black=await sharp(image.bytes).extract({left:110,top:80,width:1,height:1}).raw().toBuffer();
  assert(white[0]>230&&white[1]>230&&white[2]>230,'transparent interior is flattened onto white');assert(black[0]<30,'the real black artwork remains black');
 });
+test('AI-backed product composites retain provenance metadata',async()=>{
+ const background=await sharp({create:{width:300,height:300,channels:3,background:'#6e4233'}}).png().toBuffer();const image=await renderCreative({page:{name:'Shop',brand:{}},post:{title:'Catalog product',creative:{ratio:'1:1'}},product:{price:240,currency:'BDT'},background});
+ const metadata=await sharp(image.bytes).metadata();assert.match(metadata.xmp.toString(),/compositeWithTrainedAlgorithmicMedia/);
+});
