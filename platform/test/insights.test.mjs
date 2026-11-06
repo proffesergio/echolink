@@ -8,6 +8,6 @@ test('measured content guidance never fabricates reach or conversion counts',()=
 });
 test('product and editorial prompts separate facts, bilingual goals and backdrop-only art direction',()=>{
  const page={name:'Shop',niche:'Fashion',language:'Bilingual-Mix',brand:{color:'#112233'},creative_policy:{goal:'messages'}};
- const result=captionPrompt(page,{type:'product_sale'},{title:'Socks',description:'Cotton',price:240,currency:'BDT',available:true});assert.match(result.prompt,/Bangla and English/);assert.match(result.prompt,/inbox/);assert.match(result.system,/Never invent/);assert.equal(result.facts.price,240);assert.match(backgroundPrompt(page,{},{}),/No products, text/);
+ const result=captionPrompt(page,{type:'product_sale'},{title:'Socks',description:'Cotton',price:240,currency:'BDT',available:true});assert.match(result.prompt,/Bangla and English/);assert.match(result.prompt,/inbox/);assert.match(result.system,/Never invent/);assert.equal(result.facts.price,undefined);assert.match(backgroundPrompt(page,{},{}),/No products, text/);
  const news=captionPrompt({...page,language:'Bangla'},{type:'news',title:'Facts',body:'Verified reporting'},null);assert.match(news.prompt,/Preserve attribution/);assert.match(news.prompt,/news summary/);
 });

@@ -16,7 +16,9 @@ npm run platform:start
 This starts the hidden worker supervisor, protected bridge and Ollama when
 installed. The existing Windows Startup shortcut starts the same supervisor at
 sign-in. Keep the PC online; an awake PC alone cannot replace a stopped service.
-For repair, use `npm run platform:repair`.
+For repair, use `npm run platform:repair`. For a planned update while work is
+running, use `npm run platform:restart`; it holds pending work and lets current
+tasks finish before restarting.
 
 The public proxy discovers the current tunnel through a dedicated Neon routing
 record. The registry credential can only read that route and cannot read tenant
@@ -53,7 +55,7 @@ Open **Page settings → Creative direction & prompts**:
 News designs use the actual source photo, shaped Bengali typography, a restrained
 editorial palette and the original brand logo. Product designs preserve the
 catalog item, remove its background locally when possible, and compose it with
-studio lighting, price, typography, an original logo and one CTA. The real product
+studio lighting, a compact top-centered title, verified detail callouts, an original logo and one CTA. The real product
 is not redrawn by an image model. Low-confidence cutouts retain the original
 photo and record a warning.
 
@@ -152,7 +154,7 @@ unsupported product claims. This follows Meta’s emphasis on relevant captions 
 original content in its [spam update](https://about.fb.com/news/2025/04/cracking-down-spammy-content-facebook/).
 Chat-style model introductions are removed. If the product caption adds an
 unsupported sanitizer, disinfectant or cure claim, a caption based on the catalog
-title and price replaces it and the generation metadata records why. This targeted
+title and a product-details CTA replaces it and the generation metadata records why. This targeted
 check does not establish that every generated statement is factually correct.
 No posting frequency is guaranteed safe, and the app cannot guarantee reach,
 monetization or a restriction-free account.
@@ -161,3 +163,65 @@ Website SEO metadata uses descriptive titles, summaries and image alt text.
 Google emphasizes useful original value and accuracy, and recommends reviewing
 AI output; keyword stuffing or large volumes of lightly rewritten articles do
 not establish quality. See [Google’s AI-content guidance](https://developers.google.com/search/docs/fundamentals/using-gen-ai-content).
+
+
+## Catalogue and live worker console
+
+Select the ecommerce Page, open **Product catalog**, then filter by category,
+search name/brand/SKU or show only available items. **Prepare urgent post** queues
+caption and creative preparation at priority; it preserves posting gaps, plan
+allowances and duplicate checks. Existing pending posts for that product are
+reused rather than duplicated. Routine generation chooses a random eligible
+category and random unused product, avoiding the immediately previous category
+when alternatives exist. Refresh the catalogue to keep stock and facts current.
+
+Generated commerce captions and image overlays omit prices. Catalogue cards keep
+prices as an internal reference. Fabrilife layouts retain the actual product
+photo and use verified material/color callouts, compact centered titles and the
+Page’s own website and social handles. No fabric specification is invented.
+Page settings contain independent caption/image system instructions per post
+type. The backdrop model follows the image instructions; the branded renderer
+keeps readable typography, source/product pixels and logo placement.
+
+**Creative studio** and **Activity** include a terminal-style view of recorded
+backend task events. Task filters, pause/follow scrolling and measured progress
+make long CPU inference visible. They do not expose raw process output or secrets
+and do not fabricate intermediate model tokens or success messages.
+
+News selection balances the recent category mix instead of always choosing the
+latest story in the same section. RSS/section metadata and source URL/headline
+classification populate the category; edit it in the post editor if needed.
+BBC বাংলা and DW বাংলা feeds were verified and added to NobleSeek. RSS media and
+OpenGraph/Twitter images are read from the actual article. NobleSeek website
+publication resolves the category against existing active website categories.
+
+## n8n cadence and historical failures
+
+The old Complete pipeline’s recent failures were connection refusals to its
+retired worker. All legacy workflows remain inactive. The optional creator
+dispatcher now checks every 15 minutes; its authenticated worker endpoint has a
+five-minute dispatch safeguard. The creator worker handles due publication and
+per-Page generation intervals independently. Do not enable both generations of
+workflow. Historical execution counts remain visible for their original dates;
+this update does not erase failed executions to change the reported percentage.
+
+## Instagram photo sharing
+
+In **Page connections**, verify Facebook, then choose **Discover / verify linked
+account** under Instagram. Enable automatic sharing and save. Meta must expose a
+Business/Creator account linked to that Page, and the Page authorization needs
+instagram_basic and instagram_content_publish. Each Page controls its own toggle.
+Fabrything’s linked @fabrything account and required scopes were confirmed.
+
+Future finished image posts are shared after Facebook succeeds. Instagram
+containers, processing, remote IDs, errors and links are recorded separately;
+an Instagram failure does not repeat Facebook publication. Definite failures can
+be retried with **Retry Instagram only**. Uncertain publishing outcomes require
+reconciliation. Text-only Facebook posts are skipped for Instagram with an
+explanation. Reels are a future release.
+
+Meta fetches an expiring signed HTTPS JPEG URL. The full design is square-padded
+when needed rather than cropped. Normal asset URLs remain authenticated; signed
+links are bound to one tenant/asset and expire after two hours. The PC, bridge and
+public dashboard must remain reachable while Meta fetches media. See
+[Meta’s Instagram API reference](https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api).

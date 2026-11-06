@@ -14,7 +14,7 @@
       "parameters": {
         "width": 720,
         "height": 150,
-        "content": "## Delayed source comments\nRun once per minute alongside the Complete pipeline (or the individual job schedules). Only comments whose due time has passed are eligible, and page quiet hours still apply. Dry-run mode never sends comments. Ambiguous API outcomes require manual reconciliation."
+        "content": "## Delayed source comments\nRun once per five minutes alongside the Complete pipeline (or the individual job schedules). Only comments whose due time has passed are eligible, and page quiet hours still apply. Dry-run mode never sends comments. Ambiguous API outcomes require manual reconciliation."
       }
     },
     {
@@ -42,7 +42,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 5
             }
           ]
         }

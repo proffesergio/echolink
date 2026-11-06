@@ -9,9 +9,10 @@ export function database(){
 export const query=(sql,args=[])=>database().query(sql,args);
 export async function transaction(workspaceId,fn,{owner=false}={}){
   const client=await database().connect();
+  const connectionError=()=>console.error('Active database connection interrupted; this operation will report its outcome.');client.on('error',connectionError);
   try{await client.query('BEGIN');await client.query("SELECT set_config('creator.workspace_id',$1,true),set_config('creator.super_admin',$2,true)",[workspaceId||'',owner?'true':'false']);
     const result=await fn(client);await client.query('COMMIT');return result;
-  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+  }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();client.removeListener('error',connectionError);}
 }
 export const tenantQuery=(workspaceId,sql,args=[])=>transaction(workspaceId,client=>client.query(sql,args));
 export const workspaceLock=(client,id)=>client.query("SELECT pg_advisory_xact_lock(hashtextextended('creator:'||$1,0))",[id]);

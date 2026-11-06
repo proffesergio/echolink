@@ -14,7 +14,7 @@
       "parameters": {
         "width": 720,
         "height": 150,
-        "content": "## EchoLink: approvals\nRuns every 1 minutes. Select an HTTP Header Auth credential on Run job: name Authorization; value Bearer <WORKER_API_KEY>.\nWindows npm n8n and worker use 127.0.0.1:8787. For Docker n8n rebuild with ECHOLINK_WORKER_URL set to a reachable worker address. Import inactive, test manually, then activate."
+        "content": "## EchoLink: approvals\nRuns every 5 minutes. Select an HTTP Header Auth credential on Run job: name Authorization; value Bearer <WORKER_API_KEY>.\nWindows npm n8n and worker use 127.0.0.1:8787. For Docker n8n rebuild with ECHOLINK_WORKER_URL set to a reachable worker address. Import inactive, test manually, then activate."
       }
     },
     {
@@ -42,7 +42,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 5
             }
           ]
         }

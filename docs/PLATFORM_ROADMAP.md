@@ -1,6 +1,6 @@
 # EchoLink: multi-niche creator operations platform
 
-Updated 2026-11-04. This is the product direction and phased implementation plan,
+Updated 2026-11-06. This is the product direction and phased implementation plan,
 not a claim that the planned adapters or revenue streams already work.
 
 ## Product direction
@@ -232,3 +232,24 @@ presenting it as a plug-and-play connection. Website/YouTube authorization,
 commercial accounts, content rights, additional hardware and final creative
 choices remain the owner's parts. The agent handles code, migration validation,
 connection probes, workflow wiring, documentation and test evidence.
+
+
+## Next releases: format-aware multi-channel scheduling
+
+| Release | Deliverable | Acceptance before enabling |
+| --- | --- | --- |
+| Current update | Price-free product creatives, verified fabric callouts, category-based catalogue search, randomized category rotation, priority preparation, category-balanced news, real task console, separate Instagram photo deliveries | Tenant isolation, current-version scheduling, signed JPEG expiry and duplicate-publication protection; per-Page opt-in |
+| Next: Text and Image mixes | Separate post format from editorial type; weighted or rotating Text/Image slots, per-format prompts and daily goals, reusable layout presets and template previews | Text posts need no image task; every image slot waits for its own completed asset; editing a mix leaves already-published deliveries untouched |
+| Next: Reels preparation | Verified script, scene list, local narration/subtitles, licensed music, product/photo motion templates and CPU FFmpeg rendering; optional capable local/cloud video adapters | Render queue has independent resource limits; real MP4 codec/duration/aspect checks; progress from the renderer; usable preview before scheduling |
+| Next: Reels delivery | Instagram/Facebook container upload, processing checks and durable delivery records, platform-specific captions and covers | Permission checks against the actual account, resumable upload, lost-response reconciliation, no fake success or duplicate publication |
+| Later: YouTube channels | Original long/short scripts, thumbnail and chapter variants, local media assembly, channel-specific OAuth, upload and analytics | Real OAuth consent, upload quota checks, ownership/licensing records and separate per-channel scheduling; reused news text alone is not treated as original video value |
+| Later: Performance-guided mixes | Compare actual measured retention, messages, leads and purchases; propose a different mix by niche | Minimum samples and explicit opt-in; record costs and results; no guarantees of virality, revenue or reach |
+
+Post-format choices will be separate from content types such as news, product
+sale, quote and tutorial. A Page may select a mix such as Text 20%, Image 60%,
+Reels 20%; these are user preferences, not a recommendation or a claim that Reel
+publishing is implemented today. Each channel gets its own delivery state and
+format checks. Website posting remains optional for every Page, and RSS stays
+exclusive to news Pages. Instagram photo sharing now uses the professional account
+linked through the existing Facebook Page authorization. Reels and personal
+profile API posting are not enabled by that photo adapter.

@@ -21,6 +21,8 @@ import {canonicalArticleURL} from './catalog.mjs';
 import {resolveFacebookPage} from './facebook.mjs';
 import {insightRecords,summarizeInsights} from './insights.mjs';
 import {cutoutAvailable} from './cutout.mjs';
+import {categoryFor} from './content-policy.mjs';
+import {discoverInstagram,queueInstagramDelivery} from './instagram.mjs';
 import {metaAppProfiles,metaAppCredentials} from './meta-apps.mjs';
 const safeConnections=`id,workspace_id,provider,name,config,status,last_test_at,last_test_result,created_at,(secret_cipher IS NOT NULL) AS has_secret`;
 async function save(db,table,w,data,id){
@@ -49,7 +51,7 @@ export async function api(request,path,body={},identityVerifier){
  if(method!=='GET')requireVerified(actor);
  if(path==='/api/state'&&method==='GET')return transaction(w,async db=>{
   const data={actor:{id:actor.id,name:actor.name,email:actor.email,role:actor.role,email_verified:actor.email_verified},workspace:actor.workspace,workspaces:actor.workspaces,entitlements:await entitlements(db,w,{allowExpired:true}),providers:connectionTypes.filter(p=>!p.ownerOnly||actor.role==='super_admin'),publishingEnabled:env().publishing,environment:env().production?'production':'development'};
-  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules'])data[table]=(await db.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':'created_at'} DESC LIMIT 300`,[w])).rows;
+  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules','social_destinations','social_deliveries'])data[table]=(await db.query(`SELECT * FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':table==='social_destinations'?'verified_at':'created_at'} DESC LIMIT 300`,[w])).rows;
   data.connections=(await db.query(`SELECT ${safeConnections} FROM creator.connections WHERE workspace_id=$1 ORDER BY created_at DESC`,[w])).rows;
   data.creativeTools={localCutout:cutoutAvailable()};
   data.metaApps=actor.role==='super_admin'?await metaAppProfiles():[];
@@ -112,7 +114,8 @@ export async function api(request,path,body={},identityVerifier){
     if(data.creative.sourceImage)publicURL(data.creative.sourceImage);
     if(data.product_id){const p=await row(db,'products',w,data.product_id);if(data.type!=='product_sale'||p.website_id!==page.website_id)throw new AppError(400,'Choose a product from this Page’s connected store.');if(!p.available)throw new AppError(409,'This product is out of stock.');}
     if(data.source_url){data.source_url=canonicalArticleURL(data.source_url);if(['news','blog'].includes(data.type)){const prior=id?await row(db,table,w,id):null;data.source_hash=prior?.source_url===data.source_url?prior.source_hash:createHash('sha256').update(data.source_url).digest('hex');}}
-    if(['news','product_sale'].includes(data.type)){const product=data.product_id?await row(db,'products',w,data.product_id):null;data.seo={editorialWarnings:editorialWarnings(data.caption,product?{title:product.title,description:product.description,price:product.price,currency:product.currency}:{title:data.title,text:data.body},page.niche),title:data.title.slice(0,60),description:data.caption.slice(0,160)};}
+    if(['news','product_sale'].includes(data.type)){const product=data.product_id?await row(db,'products',w,data.product_id):null;data.seo={...(id?(await row(db,'posts',w,id)).seo:{}),...(data.type==='news'?{category:data.category||(id?(await row(db,'posts',w,id)).seo.category:null)||categoryFor(data)}:{}),editorialWarnings:editorialWarnings(data.caption,product?{title:product.title,description:product.description,price:product.price,currency:product.currency}:{title:data.title,text:data.body},page.niche),title:data.title.slice(0,60),description:data.caption.slice(0,160)};}
+    delete data.category;
     if(id){const old=await row(db,table,w,id);if(['published','publishing','unknown'].includes(old.status))throw new AppError(409,'Published or unresolved posts cannot be overwritten.');
      const changed=['ratio','style','headline','cta','sourceImage'].some(key=>Object.hasOwn(data.creative,key)&&data.creative[key]!==old.creative[key])||data.title!==old.title||data.product_id!==old.product_id;data.creative={...old.creative,...data.creative};if(changed)delete data.creative.assetId;
      await workspaceLock(db,w);await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Post edited',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind IN ('publish','manual_handoff') AND status='queued'",[w,id]);data.version=old.version+1;data.status='draft';data.approved_version=null;data.scheduled_at=null;data.planned_at=null;}
@@ -124,18 +127,43 @@ export async function api(request,path,body={},identityVerifier){
    await audit(db,w,actor,table+'.saved',table,result.id);if(table==='connections')return {id:result.id,ok:true};return result;
   });
  }
+ match=path.match(/^\/api\/products\/([a-f0-9-]{36})\/prepare$/);
+ if(match&&method==='POST')return transaction(w,async db=>{
+  if(!uuid(body.page_id))throw new AppError(400,'Select the ecommerce Page for this product.');
+  await workspaceLock(db,w);const product=await row(db,'products',w,match[1]),page=await row(db,'pages',w,body.page_id);
+  if(page.kind!=='ecommerce'||page.website_id!==product.website_id)throw new AppError(400,'Choose a product from this ecommerce Page’s connected catalog.');
+  if(!product.available)throw new AppError(409,'This product is out of stock. Refresh the catalog or choose an available item.');
+  if(Date.now()-new Date(product.fetched_at)>86400000)throw new AppError(409,'Refresh this catalog before preparing a product post.');
+  if(!page.text_connection_id)throw new AppError(400,'Connect a caption model for this Page first.');
+  const existing=(await db.query("SELECT id,status FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND product_id=$3 AND deleted_at IS NULL AND archived_at IS NULL AND status IN ('draft','review','approved','scheduled') ORDER BY created_at DESC LIMIT 1",[w,page.id,product.id])).rows[0];
+  if(existing)return {ok:true,postId:existing.id,message:'This product already has a '+existing.status+' post. Open Content to manage it.'};
+  await requireGenerationCapacity(db,w);const ratio=['1:1','4:5','9:16','16:9'].includes(body.ratio)?body.ratio:'1:1';
+  const post=await save(db,'posts',w,{page_id:page.id,type:'product_sale',title:product.title,body:product.description,product_id:product.id,creative:{ratio,style:'editorial'}});
+  const task=await enqueue(db,w,'generate',{pageId:page.id,postId:post.id,input:{urgent:body.urgent===true}});
+  await audit(db,w,actor,'product.preparation_requested','post',post.id,{productId:product.id,urgent:body.urgent===true});
+  return {...task,postId:post.id,message:body.urgent===true?'Priority preparation queued. Caption and design will use the next available posting slot; publishing gaps still apply.':'Product preparation queued. Follow the real stages in Creative studio.'};
+ });
  match=path.match(/^\/api\/(pages|connections|websites|posts)\/([a-f0-9-]{36})\/([a-z-]+)$/);
  if(match&&method==='POST'){
   const [,table,id,action]=match;
   return transaction(w,async db=>{
    await workspaceLock(db,w);const item=await row(db,table,w,id);
    if(table==='pages'&&action==='redesign'){
-    const posts=(await db.query("SELECT * FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status IN ('review','approved','scheduled') AND caption<>'' AND archived_at IS NULL AND deleted_at IS NULL AND creative->>'designVersion' IS DISTINCT FROM 'studio-v2' ORDER BY COALESCE(scheduled_at,planned_at,created_at) LIMIT 10",[w,id])).rows;
+    const posts=(await db.query("SELECT * FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status IN ('review','approved','scheduled') AND caption<>'' AND archived_at IS NULL AND deleted_at IS NULL AND creative->>'designVersion' IS DISTINCT FROM 'studio-v3' ORDER BY COALESCE(scheduled_at,planned_at,created_at) LIMIT 10",[w,id])).rows;
     let queued=0;for(const post of posts){const tasks=(await db.query("SELECT id,kind,status FROM creator.tasks WHERE workspace_id=$1 AND post_id=$2 AND status IN ('queued','running') FOR UPDATE",[w,post.id])).rows;if(tasks.some(t=>t.status==='running'||!['publish','manual_handoff'].includes(t.kind)))continue;await requireGenerationCapacity(db,w);await db.query("UPDATE creator.tasks SET status='canceled',phase='Preparing the updated design',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND status='queued'",[w,post.id]);await releasePublication(db,w,post.id);await db.query("UPDATE creator.posts SET status='draft',scheduled_at=NULL,approved_version=NULL WHERE workspace_id=$1 AND id=$2",[w,post.id]);await enqueue(db,w,'creative',{postId:post.id,pageId:id});queued++;}
     return {ok:true,message:queued+' existing posts queued for the updated design. Running and completed deliveries were left alone.'};
    }
    if(table==='pages'&&action==='run'){
     const changed=await db.query('UPDATE creator.automation_rules SET next_run_at=now() WHERE workspace_id=$1 AND page_id=$2 AND enabled RETURNING id',[w,id]);if(!changed.rowCount)throw new AppError(409,'Configure and start this Page’s workflow first.');return {ok:true,message:'Generation check requested. The worker will check this Page within one minute; follow its stages in Creative studio.'};
+   }
+   if(table==='pages'&&action==='instagram'){
+    if(item.destination_type==='facebook_profile'||!item.fb_verified||!item.facebook_connection_id)throw new AppError(409,'Verify this Facebook Page first. Instagram uses its linked professional account.');
+    if(body.enabled===false){await db.query("UPDATE creator.social_destinations SET enabled=false WHERE workspace_id=$1 AND page_id=$2 AND platform='instagram'",[w,id]);return {ok:true,message:'Automatic Instagram sharing paused for this Page.'};}
+    const c=await row(db,'connections',w,item.facebook_connection_id),account=await discoverInstagram(item,c,decryptSecret(c.secret_cipher,w));
+    const existing=(await db.query("SELECT * FROM creator.social_destinations WHERE workspace_id=$1 AND page_id=$2 AND platform='instagram'",[w,id])).rows[0];
+    if(existing?.remote_id!==account.id&&(await db.query("SELECT id FROM creator.social_deliveries WHERE workspace_id=$1 AND page_id=$2 AND status IN ('preparing','publishing','unknown') LIMIT 1",[w,id])).rowCount)throw new AppError(409,'Resolve the existing Instagram delivery before replacing its account.');
+    await db.query("INSERT INTO creator.social_destinations(workspace_id,page_id,platform,remote_id,username,enabled) VALUES($1,$2,'instagram',$3,$4,$5) ON CONFLICT(workspace_id,page_id,platform) DO UPDATE SET remote_id=EXCLUDED.remote_id,username=EXCLUDED.username,enabled=EXCLUDED.enabled,verified_at=now()",[w,id,account.id,account.username,body.enabled===true||existing?.enabled===true]);
+    await audit(db,w,actor,'page.instagram_connected','page',id,{username:account.username,enabled:body.enabled===true||existing?.enabled===true});return {ok:true,username:account.username,message:'Connected Instagram @'+account.username+'. '+(body.enabled===true?'Future finished image posts will be shared after Facebook delivery.':'Enable automatic sharing when ready.')};
    }
    if(table==='pages'&&action==='insights'){
     if(body.records){const records=insightRecords(body.records);await db.query("INSERT INTO creator.insight_snapshots(workspace_id,page_id,source,records) VALUES($1,$2,'import',$3)",[w,id,JSON.stringify(records)]);await audit(db,w,actor,'page.insights_imported','page',id,{records:records.length});return {ok:true,message:'Imported metrics saved. Recommendations use only this Page/profile’s data.'};}
@@ -202,6 +230,16 @@ export async function api(request,path,body={},identityVerifier){
      await audit(db,w,actor,'post.reconciled','post',id,{remoteId:body.remote_id||null,note:body.note.slice(0,1000)});return {ok:true};
     }
     if(['generate','creative'].includes(action)){await requireGenerationCapacity(db,w);return enqueue(db,w,action,{postId:id,pageId:page.id,input:{aiBackground:body.aiBackground===true}});}
+    if(action==='instagram'){
+     if(!(await db.query("SELECT id FROM creator.social_destinations WHERE workspace_id=$1 AND page_id=$2 AND enabled AND platform='instagram'",[w,page.id])).rowCount)throw new AppError(409,'Enable this Page’s Instagram destination first.');
+     if(post.status!=='published'||!post.creative.assetId)throw new AppError(409,'Instagram sharing requires the completed image and a recorded Facebook publication.');
+     const delivery=(await db.query("SELECT * FROM creator.social_deliveries WHERE workspace_id=$1 AND post_id=$2 AND platform='instagram' FOR UPDATE",[w,id])).rows[0];
+     if(delivery?.status==='published')return {ok:true,message:'Already published on Instagram.'};
+     if(delivery&&['publishing','unknown','preparing'].includes(delivery.status))throw new AppError(409,'Check Instagram before retrying this in-progress or uncertain delivery.');
+     if((await db.query("SELECT id FROM creator.tasks WHERE workspace_id=$1 AND post_id=$2 AND kind='publish_instagram' AND status IN ('queued','running')",[w,id])).rowCount)return {ok:true,message:'Instagram delivery is already queued.'};
+     if(delivery){await db.query("UPDATE creator.social_deliveries SET status='queued',container_id=NULL,last_error=NULL WHERE workspace_id=$1 AND id=$2",[w,delivery.id]);await db.query("INSERT INTO creator.tasks(workspace_id,page_id,post_id,kind) VALUES($1,$2,$3,'publish_instagram')",[w,page.id,id]);}else await queueInstagramDelivery(db,w,page,post);
+     return {ok:true,message:'Instagram delivery queued independently. Facebook will not be resubmitted.'};
+    }
     if(['publishing','published','unknown'].includes(post.status))throw new AppError(409,'Reconcile this publication before changing its state.');
     if(action==='approve'){const approved=await approve(db,w,actor,post,{version:body.version,confirmWarnings:body.confirmWarnings===true});const rule=(await db.query('SELECT * FROM creator.automation_rules WHERE workspace_id=$1 AND page_id=$2 AND enabled AND auto_schedule',[w,page.id])).rows[0];if(post.planned_at&&env().publishing&&page.active&&(page.fb_verified||page.destination_type==='facebook_profile'))return queuePublication(db,w,actor,page,approved,{at:new Date(post.planned_at),autoPick:new Date(post.planned_at)<=new Date(),spread:true,target:rule?.daily_target||page.daily_cap});return {ok:true,message:'Current caption and image approved.'};}
     if(action==='draft'){await releasePublication(db,w,id);await db.query("UPDATE creator.tasks SET status='canceled',phase='Returned to draft',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind IN ('publish','manual_handoff') AND status='queued'",[w,id]);await db.query("UPDATE creator.posts SET status='draft',approved_version=NULL,scheduled_at=NULL,planned_at=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,id]);return {ok:true};}

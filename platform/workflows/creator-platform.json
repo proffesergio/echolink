@@ -7,13 +7,13 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 15
             }
           ]
         }
       },
       "id": "platform-timer",
-      "name": "Every minute",
+      "name": "Every 15 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -84,17 +84,6 @@
     }
   ],
   "connections": {
-    "Every minute": {
-      "main": [
-        [
-          {
-            "node": "Dispatch due workspace automations",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Manual dispatch test": {
       "main": [
         [
@@ -118,6 +107,17 @@
       ]
     },
     "Protected dispatch check": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due workspace automations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 15 minutes": {
       "main": [
         [
           {

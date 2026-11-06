@@ -11,7 +11,8 @@
     "migrate": "node scripts/migrate.mjs",
     "verify": "node scripts/verify-platform.mjs",
     "test:browser": "node --env-file=.env.test.local scripts/browser-verify.mjs",
-    "test:prepare": "node --env-file=.env.test.local scripts/migrate.mjs && node --env-file=.env.test.local scripts/setup-auth.mjs && node --env-file=.env.test.local scripts/grant-test-runtime.mjs"
+    "test:prepare": "node --env-file=.env.test.local scripts/migrate.mjs && node --env-file=.env.test.local scripts/setup-auth.mjs && node --env-file=.env.test.local scripts/grant-test-runtime.mjs",
+    "test:unit": "node scripts/unit-tests.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -25,6 +26,7 @@
     "rss-parser": "^3.13.0",
     "sharp": "latest",
     "stripe": "latest",
+    "ws": "^8.22.1",
     "zod": "latest"
   },
   "devDependencies": {

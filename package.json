@@ -36,7 +36,8 @@
     "semantic:calibrate": "node scripts/check-semantic-quality.mjs",
     "semantic:corpus": "node scripts/check-semantic-corpus.mjs",
     "caption:diagnose": "node scripts/check-caption-quality.mjs",
-    "creative:setup": "powershell -NoProfile -File scripts/setup-creative-tools.ps1"
+    "creative:setup": "powershell -NoProfile -File scripts/setup-creative-tools.ps1",
+    "platform:restart": "node scripts/restart-platform-gracefully.mjs"
   },
   "keywords": [],
   "author": "",

@@ -27,6 +27,16 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 > **Worker setup:** `n8n start` starts n8n, not the creator worker. Run `npm run platform:start` from the EchoLink folder to start the supervised worker, protected tunnel and Ollama. See [Creative operations](docs/CREATIVE_OPERATIONS.md) for the generation studio, premium product/news layouts, per-Page Meta apps, personal-profile handoffs and measured insights.
 
+## Creator operations update
+
+- **Catalogue to creative:** category/search/stock filters, category rotation and priority post preparation.
+- **Brand-led layouts:** price-free product posters, verified fabric/color annotations, website and social footers, and category-labelled news images.
+- **Watch the work:** timestamped task console, measured stage progress and the next-post countdown.
+- **Facebook + Instagram:** linked professional accounts share finished image posts with independent delivery records; Instagram retries never repeat Facebook.
+- **Per-type prompts:** separate caption and image direction for each Page’s news, product, quote and original content.
+
+Follow [Creative operations](docs/CREATIVE_OPERATIONS.md). Planned Text/Image/Reels mixes and YouTube tooling are tracked in the [release roadmap](docs/PLATFORM_ROADMAP.md).
+
 ## A newsroom you can control
 
 The [operations dashboard](docs/DASHBOARD.md) brings 13 workspaces into a compact

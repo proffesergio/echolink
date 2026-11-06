@@ -5,6 +5,7 @@ export function scopeState(value,pageId){
  const resourceIds=new Set([page.id,page.website_id,...ids,...out.posts.map(p=>p.id),...out.tasks.map(t=>t.id),...out.feeds.map(f=>f.id),...out.automation_rules.map(r=>r.id),...out.campaigns.map(c=>c.id)].filter(Boolean));
  out.activity=(value.activity||[]).filter(a=>a.page_id?a.page_id===page.id:resourceIds.has(a.resource_id));
  const postIds=new Set(out.posts.map(p=>p.id));out.mirrorStatus=(value.mirrorStatus||[]).filter(m=>postIds.has(m.post_id));
+ out.social_destinations=(value.social_destinations||[]).filter(s=>s.page_id===page.id);out.social_deliveries=(value.social_deliveries||[]).filter(s=>s.page_id===page.id);
  out.insights=(value.insights||[]).filter(s=>s.page_id===page.id);
  out.pageMirrors=(value.pageMirrors||[]).filter(m=>m.page_id===page.id);
  out.archiveCounts=(value.pageArchiveCounts||[]).find(c=>c.page_id===page.id)||{archived:0,trash:0};

@@ -15,7 +15,7 @@
       "parameters": {
         "width": 1000,
         "height": 175,
-        "content": "## EchoLink: one connected workflow\nOne-minute tick checks independent job intervals configured in the dashboard. Source comments run before ingestion and AI to avoid waiting behind slow inference. Due calendar posts take priority; Page windows, daily caps, spacing, approval and Meta cooldowns apply. No automatic HTTP retry on publishing nodes. Includes RSS fallback, deduplication, approvals, AI generation, photo/text publishing, durable delayed source comments, Airtable logs and engagement analytics.\nEach HTTP stage calls the local EchoLink worker. Manual runs force every stage; scheduled runs execute only due jobs. A failed stage logs via Airtable and stops the run. Start/stop from the dashboard Workflow tab; older schedules must remain stopped. Keep dry run enabled until real model quality and Facebook credentials are verified."
+        "content": "## EchoLink: one connected workflow\nFifteen-minute standby tick checks independent job intervals configured in the dashboard. Source comments run before ingestion and AI to avoid waiting behind slow inference. Due calendar posts take priority; Page windows, daily caps, spacing, approval and Meta cooldowns apply. No automatic HTTP retry on publishing nodes. Includes RSS fallback, deduplication, approvals, AI generation, photo/text publishing, durable delayed source comments, Airtable logs and engagement analytics.\nEach HTTP stage calls the local EchoLink worker. Manual runs force every stage; scheduled runs execute only due jobs. A failed stage logs via Airtable and stops the run. Start/stop from the dashboard Workflow tab; older schedules must remain stopped. Keep dry run enabled until real model quality and Facebook credentials are verified."
       }
     },
     {
@@ -30,8 +30,8 @@
       "parameters": {}
     },
     {
-      "id": "244ee3b2-5357-43b9-ad55-03609b8c2f79",
-      "name": "Every minute",
+      "id": "d819331a-dcdf-4cb4-bc41-71fbfaa3bd48",
+      "name": "Every 15 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -43,7 +43,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 15
             }
           ]
         }
@@ -248,7 +248,7 @@
         80
       ],
       "parameters": {
-        "jsCode": "return [{json:{scheduled:$('Every minute').isExecuted}}];"
+        "jsCode": "return [{json:{scheduled:$('Every 15 minutes').isExecuted}}];"
       }
     },
     {
@@ -560,7 +560,7 @@
         ]
       ]
     },
-    "Every minute": {
+    "Every 15 minutes": {
       "main": [
         [
           {
