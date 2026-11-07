@@ -4,7 +4,7 @@ EchoLink connects to the Django/PostgreSQL news module in
 `H:\Desktop\Music Projects\fabrythingweb`. Its source is now under
 `backend/nobleseek/`; the production article table is `public.nobleseek_article`.
 Article states are `DRAFT`, `REVIEW`, `PUBLISHED` and `ARCHIVED`. Public routes are
-`https://www.fabrything.com/nobleseek/<slug>`.
+`https://nobleseek.fabrything.com/nobleseek/<slug>`.
 
 ## Local settings
 

@@ -29,7 +29,7 @@ export async function reservePublication(client,workspaceId,postId,scheduledAt){
 export const releasePublication=(client,workspaceId,postId)=>client.query("UPDATE creator.usage_reservations SET status='released',updated_at=now() WHERE workspace_id=$1 AND post_id=$2 AND status='reserved'",[workspaceId,postId]);
 export async function requireGenerationCapacity(client,workspaceId){
   await workspaceLock(client,workspaceId);const plan=await entitlements(client,workspaceId);
-  const {count}=(await client.query("SELECT count(*)::int AS count FROM creator.tasks WHERE workspace_id=$1 AND kind IN ('generate','creative') AND created_at>=$2 AND status<>'canceled'",[workspaceId,plan.period_start])).rows[0];
+  const {count}=(await client.query("SELECT count(*)::int AS count FROM creator.tasks WHERE workspace_id=$1 AND kind IN ('generate','creative','design_page_brand') AND created_at>=$2 AND status<>'canceled'",[workspaceId,plan.period_start])).rows[0];
   if(count>=plan.generation_limit)throw new AppError(402,`This package allows ${plan.generation_limit} generation tasks per period. Upgrade or contact the owner.`,'generation_limit');return plan;
 }
 export const workspaceEntitlements=workspaceId=>transaction(workspaceId,client=>entitlements(client,workspaceId,{allowExpired:true}));

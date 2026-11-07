@@ -71,7 +71,7 @@ Edit/Review/Approve/Schedule/Publish Now controls, navigation counts,
 per-task stage/feed percentages, heartbeat recovery and event logs. Next:
 Page-specific image branding. The requested visual redesign and favicon are
 implemented; optional website delivery has now been verified live for
-https://www.fabrything.com/nobleseek. The website
+https://nobleseek.fabrything.com/nobleseek. The website
 schema and logo assets have been located; branding controls and design choices
 remain open. Preserve
 posting gates, stale-edit detection and unknown-outcome protection. A selected

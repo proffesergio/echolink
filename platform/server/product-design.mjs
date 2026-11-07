@@ -1,24 +1,23 @@
+import {analyzeProduct} from './product-analysis.mjs';
 import {productLogo} from './brand.mjs';
 import sharp from 'sharp';
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
-export function productCallouts(product){
- const a=product.attributes||{},material=a.material||product.description?.match(/\b(?:combed cotton|cotton|polyester|elastane|spandex|viscose|mesh)\b/i)?.[0],color=a.color||product.title?.match(/\(([^)]+)\)\s*$/)?.[1];
- return [material?{label:'FABRIC',value:material}:null,color?{label:'COLOUR',value:color}:null,a.category&&a.category!=='Uncategorized'?{label:'COLLECTION',value:a.category}:null].filter(Boolean).slice(0,2);
-}
+export const productCallouts=product=>analyzeProduct(product).callouts;
 export function shortProductTitle(value){
  const title=String(value||'').replace(/\bFabrilife\b/gi,'').replace(/\([^)]*\)/g,'').replace(/\b(?:premium quality|premium|for men|for women|mens|womens)\b/gi,'').replace(/\s+/g,' ').trim().replace(/^[-–:| ]+|[-–:| ]+$/g,'');
  const words=title.split(' ');let result='';for(const word of words.slice(0,7)){if((result+' '+word).trim().length>58)break;result+=(result?' ':'')+word;}return result||title.slice(0,58);
 }
 export async function renderProductCreative({post,page,product,background,sourcePhoto,brandLogo,website,width,height}){
- const fashion=/fabrilife/i.test(product.attributes?.brand||''),ink=fashion?'#f6f4ec':'#213439',muted=fashion?'#b5c1c2':'#6a797a',policy=page.creative_policy||{},accent=page.brand?.color||'#b5704e',pad=Math.round(width*.06),landscape=width>height,layers=[],visibleText=[];
+ const analysis=analyzeProduct(product),fashion=analysis.type==='apparel',technical=analysis.style==='technical',ink=fashion?'#f6f4ec':'#213439',muted=fashion?'#b5c1c2':'#6a797a',policy=page.creative_policy||{},accent=page.brand?.color||'#b5704e',pad=Math.round(width*.06),landscape=width>height,layers=[],visibleText=[];
  const svg=(body,x=0,y=0,w=width,h=height)=>layers.push({input:Buffer.from(`<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`),left:Math.round(x),top:Math.round(y)});
  const text=async(value,x,y,w,h,size=32,align='left',color=ink,font='Segoe UI',weight='normal')=>{if(!value)return;visibleText.push(String(value));const bytes=await sharp({text:{text:`<span foreground="${color}" weight="${weight}">${escape(value)}</span>`,font:font+' '+size,width:Math.round(w),align,wrap:'word-char',rgba:true,spacing:6}}).resize({width:Math.round(w),height:Math.round(h),fit:'inside',withoutEnlargement:true}).png().toBuffer(),m=await sharp(bytes).metadata();layers.push({input:bytes,left:Math.round(x+(align==='center'?(w-m.width)/2:align==='right'?w-m.width:0)),top:Math.round(y)});};
  svg(`<defs><radialGradient id="studio" cx="50%" cy="40%" r="80%"><stop stop-color="${fashion?'#29444a':'#fffef8'}"/><stop offset=".7" stop-color="${fashion?'#14292f':'#f0eee6'}"/><stop offset="1" stop-color="${fashion?'#101c24':'#dce5df'}"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#studio)"/><circle cx="${width*.67}" cy="${height*.52}" r="${width*.39}" fill="${accent}" opacity=".05"/>`);
 
+ if(technical)svg(`<path d="M${pad} ${height*.27}H${width-pad}M${pad} ${height*.78}H${width-pad}" stroke="#577c8a" stroke-width="1" opacity=".18"/><circle cx="${width*.5}" cy="${height*.53}" r="${width*.31}" stroke="#577c8a" fill="none" opacity=".12"/>`);
  if(background){layers.push({input:await sharp(background,{limitInputPixels:40000000}).resize(width,height,{fit:'cover'}).png().toBuffer(),left:0,top:0});svg(`<rect width="100%" height="100%" fill="${fashion?'#14292f':'#f6f3e9'}" opacity="${fashion?'.82':'.68'}"/>`);}
  if(brandLogo){const logo=await productLogo(brandLogo,{dark:fashion,mode:(fashion?page.brand?.logoLightAssetId:page.brand?.logoDarkAssetId)?'original':page.brand?.logoMode||'original',width:fashion?page.brand?.logoLightWidth||104:page.brand?.logoDarkWidth||104}),m=await sharp(logo).metadata();layers.push({input:logo,left:Math.round((width-m.width)/2),top:30});}
  const titleY=landscape?112:142,title=shortProductTitle(post.creative.headline||post.title);
- await text(title,pad,titleY,width-pad*2,height*.10,landscape?27:33,'center',undefined,fashion&&!/[\u0980-\u09ff]/u.test(title)?(post.creative.style==='bold'?'Bahnschrift':post.creative.style==='minimal'?'Segoe UI':'Georgia'):'Nirmala UI');
+ await text(title,pad,titleY,width-pad*2,height*.10,landscape?27:33,'center',undefined,fashion&&!/[\u0980-\u09ff]/u.test(title)?(post.creative.style==='bold'?'Bahnschrift':post.creative.style==='minimal'?'Segoe UI':analysis.font):/[\u0980-\u09ff]/u.test(title)?'Nirmala UI':analysis.font);
  const box={x:width*.23,y:height*(landscape?.34:.33),w:width*.54,h:height*(landscape?.39:.43)};
  svg(`<defs><radialGradient id="shadow"><stop stop-color="#23343a" stop-opacity=".18"/><stop offset="1" stop-color="#23343a" stop-opacity="0"/></radialGradient></defs><ellipse cx="${width*.5}" cy="${height*.79}" rx="${width*.28}" ry="${height*.035}" fill="url(#shadow)"/>`);
  if(sourcePhoto){const hero=await sharp(sourcePhoto,{limitInputPixels:40000000}).trim().resize(Math.round(box.w),Math.round(box.h),{fit:'inside'}).png().toBuffer(),m=await sharp(hero).metadata();layers.push({input:hero,left:Math.round(box.x+(box.w-m.width)/2),top:Math.round(box.y+(box.h-m.height)/2)});}
@@ -33,5 +32,5 @@ export async function renderProductCreative({post,page,product,background,source
  for(const h of handles){const groupW=Math.min(handleW,h.handle.length*11+40),x=h.type==='fb'?pad:width-pad-groupW,y=height-44;svg((h.type==='fb'?'<rect width="24" height="24" rx="6" fill="#20363b"/><path d="M14 23V13h3l.5-4H14V7c0-1 .5-2 2-2h2V1h-3c-4 0-5 2-5 6v2H7v4h3v10" fill="#fff"/>':'<rect x="2" y="2" width="20" height="20" rx="6" fill="none" stroke="#20363b" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#20363b" stroke-width="2"/><circle cx="18" cy="6" r="1.5" fill="#20363b"/>').replaceAll('#20363b',fashion?'#c7d0cf':'#20363b').replaceAll('fill="#fff"',fashion?'fill="#172d33"':'fill="#fff"'),x,y,24,24);await text('@'+h.handle.replace(/^@/,''),x+32,y+1,groupW-32,26,18,'left',muted);}
  const output=sharp({create:{width,height,channels:4,background:'#fff'}}).composite(layers).jpeg({quality:93,mozjpeg:true});
  if(background)output.withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>');
- return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!sourcePhoto,designVersion:'studio-v4',visibleText};
+ return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!sourcePhoto,designVersion:'studio-v5',analysis,visibleText};
 }

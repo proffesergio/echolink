@@ -61,7 +61,7 @@ export async function publishInstagram(task,{updateTask}){
   let assetId=task.input.imageAssetId||post.creative.assetId,caption=task.input.captionSnapshot||prepareCaption(instagramCaption(post),page,product).caption;
   // A newly shared older Facebook product can receive today's price-free
   // Instagram design without overwriting its historical Facebook creative.
-  if(product&&post.creative.designVersion!=='studio-v4'&&!task.input.imageAssetId){
+  if(product&&post.creative.designVersion!=='studio-v5'&&!task.input.imageAssetId){
    await updateTask(task,25,'Preparing a price-free Instagram variant from the real catalog photo');
    let photo;if(product.image_url){const source=await outbound(product.image_url,{maxBytes:12000000});if(!source.ok)throw new AppError(502,'The product photo could not be read.');photo=source.bytes;if(page.creative_policy?.removeBackground!==false){try{photo=(await removeProductBackground(photo)).bytes;}catch{}}}
    const assets=await transaction(w,async db=>({logo:logoAssetFor(page,product)?(await db.query('SELECT path FROM creator.assets WHERE workspace_id=$1 AND id=$2',[w,logoAssetFor(page,product)])).rows[0]:null,website:page.website_id?(await db.query('SELECT * FROM creator.websites WHERE workspace_id=$1 AND id=$2',[w,page.website_id])).rows[0]:null}));

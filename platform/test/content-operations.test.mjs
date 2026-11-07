@@ -7,7 +7,7 @@ import {captionPrompt,prepareCaption,backgroundPrompt} from '../server/prompts.m
 test('catalog categories and factual fabric details survive normalization and rotation',()=>{
  const attributes=productDetails({brand:'Fabrilife',category_name:'T-shirts',material:'Combed cotton',color:'Black'});assert.equal(attributes.category,'T-shirts');assert.equal(attributes.brand,'Fabrilife');
  const a={id:'a',attributes:{category:'T-shirts'}},b={id:'b',attributes:{category:'Socks'}};assert.equal(pickCatalogProduct([a,b],['T-shirts'],()=>0).id,'b');assert.equal(pickCatalogProduct([],[],()=>0),null);
- assert.equal(productCallouts({title:'Shirt',attributes:{category:'T-shirts'}}).some(c=>c.label==='FABRIC'),false);assert.equal(productCallouts({title:'Shirt',attributes}).find(c=>c.label==='FABRIC').value,'Combed cotton');
+ assert.equal(productCallouts({title:'Shirt',attributes:{category:'T-shirts'}}).some(c=>c.label==='MATERIAL'),false);assert.equal(productCallouts({title:'Shirt',attributes}).find(c=>c.label==='MATERIAL').value,'Combed cotton');
 });
 test('news rotation prefers underrepresented sections and preserves actual source classification',()=>{
  assert.equal(categoryFor({category:'Sports',title:'Latest result'}),'sports');assert.equal(categoryFor({title:'এইচএসসি পরীক্ষার ফল প্রকাশ'}),'education');assert.equal(categoryFor({source_url:'https://www.prothomalo.com/sports/cricket/story',title:'পাঁচ দেশের বিপক্ষে পাঁচ উইকেট'}),'sports');

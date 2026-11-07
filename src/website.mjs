@@ -112,7 +112,7 @@ export async function testWebsiteConnection({env=process.env,probeDraft=false}={
     if(probeDraft){
       stage='draft probe';
       const {randomUUID}=await import('node:crypto');
-      const article={id:randomUUID(),title:'EchoLink connection test — unpublished',caption:'Connection test only. This article must never be published.',source_url:'https://www.fabrything.com/nobleseek'};
+      const article={id:randomUUID(),title:'EchoLink connection test — unpublished',caption:'Connection test only. This article must never be published.',source_url:'https://nobleseek.fabrything.com/nobleseek'};
       await client.query('BEGIN');
       try{
         const first=await writeWebsiteArticle(client,article,{env,status:'DRAFT'}),second=await writeWebsiteArticle(client,article,{env,status:'DRAFT'});

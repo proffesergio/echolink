@@ -27,6 +27,12 @@ Collect Bangla news, prepare source-supported drafts, review photos, schedule po
 
 > **Worker setup:** `n8n start` starts n8n, not the creator worker. Run `npm run platform:start` from the EchoLink folder to start the supervised worker, protected tunnel and Ollama. See [Creative operations](docs/CREATIVE_OPERATIONS.md) for the generation studio, premium product/news layouts, per-Page Meta apps, personal-profile handoffs and measured insights.
 
+## November Page operations
+
+Product-aware creatives use only verified specifications. Configure five-minute website-link comments per Page, inspect Facebook/Instagram measurements, or draft a new Page profile/cover with a custom prompt. **Page branding** previews designs before an explicit Facebook update. NobleSeek now uses [nobleseek.fabrything.com](https://nobleseek.fabrything.com). See [Creative operations](docs/CREATIVE_OPERATIONS.md) for behavior, permissions and current limits.
+
+Airtable is optional: Neon stores the primary records and the dashboard manages them. Google Sheets can serve as an additional reporting copy.
+
 ## Creator operations update
 
 - **Catalogue to creative:** category/search/stock filters, category rotation and priority post preparation.

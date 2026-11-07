@@ -32,5 +32,6 @@ export function productDetails(raw,clean=s=>String(s||'').trim()){
  const value=x=>typeof x==='object'&&x!==null?x.name||x.title||x.label||'':x;
  const category=clean(value(raw.category_name||raw.category||raw.productType||raw.product_type||raw.categories?.[0])||'Uncategorized').slice(0,120);
  const brand=clean(value(raw.brand||raw.vendor||raw.brands?.[0])).slice(0,100),material=clean(value(raw.material)).slice(0,150);
- return {sku:raw.sku||null,category,brand,material,color:clean(value(raw.color)).slice(0,100)};
+ const specifications={};for(const [key,v]of Object.entries(raw.specifications||raw.specs||{}).slice(0,30)){if(typeof v==='string'||typeof v==='number')specifications[clean(key).slice(0,50)]=clean(String(v)).slice(0,150);}for(const a of Array.isArray(raw.attributes)?raw.attributes:[]){if(a?.name&&Array.isArray(a.options))specifications[clean(a.name).toLowerCase()]=a.options.map(clean).join(', ').slice(0,150);}
+ return {sku:raw.sku||null,category,brand,material,specifications,color:clean(value(raw.color)).slice(0,100)};
 }

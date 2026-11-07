@@ -1,3 +1,4 @@
+import {verifyExpandedOperations} from './operations-db-check.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -193,6 +194,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    const tampered=new URL(signed);tampered.searchParams.set('workspace',a.workspace.id);assert.equal((await fetch(tampered)).status,404);
    await transaction(b.workspace.id,db=>db.query('UPDATE creator.products SET available=false WHERE workspace_id=$1 AND id=$2',[b.workspace.id,product.id]));assert.equal((await call('/api/products/'+product.id+'/prepare',{method:'POST',cookie:b.cookie,body:{page_id:pageB.id}})).status,409);
   });
+  await t.test('delayed comments and branding respect timing, ownership and uncertain-write protection',()=>verifyExpandedOperations({a,b,pageA,pageB,call}));
   await t.test('only owner may set pricing and approve manually verified payments, exactly once',async()=>{
    assert.equal((await call('/api/owner/state',{cookie:a.cookie})).status,403);assert.throws(()=>requireOwner({role:'super_admin',email_verified:false}));
    const ownerState=(await call('/api/owner/state',{cookie:o.cookie})).data,plan=ownerState.plans.find(p=>p.id==='starter');
@@ -216,7 +218,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
  }finally{
   try{await transaction(null,async db=>{
    await db.query('DELETE FROM creator.activity WHERE actor_id=ANY($1::uuid[])',[accounts.map(a=>a.id)]);
-   for(const account of accounts){const w=account.w;for(const table of ['social_deliveries','social_destinations','insight_snapshots','checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
+   for(const account of accounts){const w=account.w;for(const table of ['link_comments','analytics_reports','page_branding','social_deliveries','social_destinations','insight_snapshots','checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
    for(const account of accounts)await db.query('DELETE FROM public.auth_user WHERE id=$1',[account.subject]);
   },{owner:true});}finally{
   await Promise.all(mailFiles.map(f=>unlink(f).catch(()=>{})));server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await closeDatabase();process.env.PLATFORM_PORT=original.port;process.env.PLATFORM_ORIGIN=original.origin;process.env.PLATFORM_OWNER_EMAIL=original.owner;

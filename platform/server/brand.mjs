@@ -1,6 +1,7 @@
+import {analyzeProduct} from './product-analysis.mjs';
 import sharp from 'sharp';
 export function logoAssetFor(page,product){
- const dark=product?/fabrilife/i.test(product.attributes?.brand||''):['news','blog'].includes(page.kind);
+ const dark=product?analyzeProduct(product).type==='apparel':['news','blog'].includes(page.kind);
  return (dark?page.brand?.logoLightAssetId:page.brand?.logoDarkAssetId)||page.brand?.logoAssetId;
 }
 export async function productLogo(bytes,{dark=false,mode='original',width=104}){

@@ -262,3 +262,10 @@ Implemented: linked professional Instagram image delivery after Facebook, a shar
 Next: choose destinations per content item (including Instagram-only workflows), optional channel-specific image crops/carousels, Reels rendering with licensed audio and measured upload status, mixed-format Page routines, content experiments based on measured insights, and YouTube video pipelines after local hardware/runtime benchmarks. Simultaneous publication to two external APIs is not a guarantee.
 
 Infrastructure: [Oracle assessment](ORACLE_HOSTING.md) verifies the current 2-OCPU/12-GB Always Free A1 allocation. A tested Linux worker package, portable asset storage/path migration, private model networking and restore verification precede any Windows-to-Oracle cutover. n8n hosting alone does not remove the worker’s PC dependency.
+
+
+## 7 November operational update
+
+Implemented: source-grounded product profiles and specification callouts, technical/fashion typography, durable five-minute Facebook link comments per Page, NobleSeek subdomain migration, Facebook/Instagram account reports with availability labels and CSV export, and Page profile/cover drafting with explicit Facebook application. Airtable remains an optional mirror; Neon and the dashboard provide primary management.
+
+Next: exact news-reference matching after receiving usable pixels; broader structured catalog adapters; measured product-spec coverage; reporting pagination and controlled scheduled snapshots; richer media-level Instagram analytics; shared/object-storage asset portability; Instagram-only delivery choices; carousel/Reels variants and YouTube rendering benchmarks.

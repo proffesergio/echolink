@@ -14,7 +14,7 @@ try{
   state.pages[0].fields['Active Status']=true; // Intercepted browser fixture only.
   const id='11111111-1111-4111-8111-111111111111';let version=Date.now();
   const article={id,page_id:pageId,title:'CMS interface test — never persisted',caption:'A synthetic editorial draft for interface verification only.',status:'Pending Approval',source_url:'https://example.com/test',image_url:'https://example.com/test.jpg',analysis:'Synthetic review data',image_prompt:'Symbolic illustration suggestion',updated_at:new Date(version).toISOString()};
-  article.website_status='Published';article.website_url='https://www.fabrything.com/nobleseek/ui-fixture-not-created';
+  article.website_status='Published';article.website_url='https://nobleseek.fabrything.com/nobleseek/ui-fixture-not-created';
   const writes=[];
   const snapshot=()=>({...state,calendar:article.scheduled_at?[{...article}]:[],articles:[{...article,panel:article.status==='Posted'?'Published':article.status==='Approved'?'Scheduled':'Drafts'}],navCounts:{queue:article.status==='Pending Approval'?1:0,drafts:['Draft','Pending Approval'].includes(article.status)?1:0,scheduled:article.status==='Approved'?1:0,published:article.status==='Posted'?1:0,inbox:0,total:1}});
   // Browser fixtures do not mutate the user's actual articles, approve anything
