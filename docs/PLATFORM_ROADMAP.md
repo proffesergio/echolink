@@ -268,4 +268,6 @@ Infrastructure: [Oracle assessment](ORACLE_HOSTING.md) verifies the current 2-OC
 
 Implemented: source-grounded product profiles and specification callouts, technical/fashion typography, durable five-minute Facebook link comments per Page, NobleSeek subdomain migration, Facebook/Instagram account reports with availability labels and CSV export, and Page profile/cover drafting with explicit Facebook application. Airtable remains an optional mirror; Neon and the dashboard provide primary management.
 
-Next: exact news-reference matching after receiving usable pixels; broader structured catalog adapters; measured product-spec coverage; reporting pagination and controlled scheduled snapshots; richer media-level Instagram analytics; shared/object-storage asset portability; Instagram-only delivery choices; carousel/Reels variants and YouTube rendering benchmarks.
+Implemented on 7 November: reference-based dark news layout with configurable headline highlights, website-first public API verification, independent destination receipts, visible failed-delivery queue and interval-mode scheduling.
+
+Next: broader structured catalog adapters; measured product-spec coverage; reporting pagination and controlled scheduled snapshots; richer media-level Instagram analytics; shared/object-storage asset portability; Instagram-only delivery choices; carousel/Reels variants and YouTube rendering benchmarks.

@@ -1,0 +1,11 @@
+import React,{useEffect,useState} from 'react';
+const elapsed=(from,to=Date.now())=>Math.max(0,Math.floor((to-new Date(from))/1000)),duration=n=>n<60?n+'s':Math.floor(n/60)+'m '+n%60+'s';
+export function TaskTelemetry({task,telemetry}){
+ const [now,setNow]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id);},[]);
+ const offset=telemetry?.serverTime?new Date(telemetry.serverTime)-new Date(telemetry.receivedAt||telemetry.serverTime):0,clock=now+offset,events=task.events||[],last=events.at(-1),since=last?.at||task.started_at||task.created_at,heartbeat=task.heartbeat_at?elapsed(task.heartbeat_at,clock):null,running=task.status==='running';
+ return <div className="task-telemetry"><span>{running?'Current stage':'Last stage'} · {duration(elapsed(since,task.finished_at?+new Date(task.finished_at):clock))}</span><span>{running?heartbeat===null?'Waiting for heartbeat':heartbeat<=35?'Worker responding · '+heartbeat+'s ago':'Waiting for worker · '+heartbeat+'s since heartbeat':task.status}</span>{telemetry?.roundTripMs!=null&&<span>Dashboard response {telemetry.roundTripMs} ms · server {telemetry.stateReadMs} ms</span>}<details><summary>{events.length} recorded stage updates</summary><ol>{events.map((e,i)=><li key={i}><span>{e.phase}</span><small>{duration(elapsed(e.at,+(new Date(events[i+1]?.at||task.finished_at||clock))))} · {e.progress}%</small></li>)}</ol></details></div>;
+}
+export function DestinationReceipt({post,deliveries=[]}){
+ const rows=deliveries.filter(d=>d.post_id===post.id);if(!rows.length)return null;
+ return <div className="destination-receipts" aria-label="Publication destinations">{['website','facebook'].map(destination=>{const d=rows.find(r=>r.destination===destination);return d&&<section key={destination} className={'destination-receipt '+d.status}><span className="receipt-mark">{d.status==='confirmed'?'✓':d.status==='failed'?'!':d.status==='unknown'?'?':'○'}</span><div><strong>{destination==='website'?'Website':'Facebook'} · {d.status}</strong><p>{d.phase}</p>{d.url&&<a href={d.url} target="_blank" rel="noopener noreferrer">{destination==='website'?'Open live article':'View Facebook post'} ↗</a>}{d.started_at&&d.confirmed_at&&<small>Confirmed in {duration(elapsed(d.started_at,+new Date(d.confirmed_at)))}</small>}</div></section>;})}</div>;
+}

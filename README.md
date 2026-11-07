@@ -33,6 +33,8 @@ Product-aware creatives use only verified specifications. Configure five-minute 
 
 Airtable is optional: Neon stores the primary records and the dashboard manages them. Google Sheets can serve as an additional reporting copy.
 
+**Publishing recovery update:** website-enabled news is verified on the live domain before Facebook submission. Separate destination receipts, a Needs attention queue, measured task timings and configurable colored news headlines are available in the creator dashboard. See the [delivery and design guide](docs/CREATIVE_OPERATIONS.md#website-first-delivery-and-visible-recovery).
+
 ## Creator operations update
 
 - **Catalogue to creative:** category/search/stock filters, category rotation and priority post preparation.

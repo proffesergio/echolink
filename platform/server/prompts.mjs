@@ -20,6 +20,10 @@ export function prepareCaption(raw,page,product){
  let caption=String(raw||'').trim().replace(/^(?:এখানে[^\n]{0,90}ক্যাপশন[^\n]*[:：]|(?:here(?:'s| is)|sure[,!]?).{0,70}(?:caption|post)[^\n]*[:：])\s*/iu,'').trim();
  caption=caption.replace(/^["“]([\s\S]*?)["”](?=\s*(?:#|$))/u,'$1').trim();
  const notes=[];
+ const editorial=String(page.creative_policy?.captionInstructions||'');
+ const instructionSentences=editorial.split(/(?<=[।.!?])\s+|\n+/u).map(s=>s.trim()).filter(s=>s.length>35);
+ for(const instruction of instructionSentences){if(caption.includes(instruction)){caption=caption.replaceAll(instruction,'').trim();notes.push('Echoed editorial instructions were removed from the public caption.');}}
+ caption=caption.replace(/\n[ \t]*\n(?:[ \t]*\n)+/g,'\n\n').trim();
  if(product){
   if(['Bangla','Bilingual-Mix','English'].includes(page.language)){
    const lines=caption.split('\n'),kept=lines.filter(line=>(line.match(/[\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)||[]).length<3);

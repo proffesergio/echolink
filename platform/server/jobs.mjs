@@ -1,3 +1,4 @@
+import {deliveryState,publicationFailure} from './publication-state.mjs';
 import {analyzeProduct} from './product-analysis.mjs';
 import {designPageBrand,applyPageBrand} from './page-branding.mjs';
 import {collectSocialReports} from './social-reporting.mjs';
@@ -15,7 +16,7 @@ import {remoteJSON,publicURL,outbound} from './net.mjs';
 import {entitlements,reservePublication,releasePublication,requireGenerationCapacity} from './quotas.mjs';
 import {publishGate} from './scheduling.mjs';
 import {env} from './env.mjs';
-import {testNoble,writeNoble} from './nobleseek.mjs';
+import {testNoble,writeNoble,verifyNoblePublic} from './nobleseek.mjs';
 import {testMirror,syncOneMirror} from './mirrors.mjs';
 import {editorialWarnings} from './editorial.mjs';
 import {queuePublication} from './planner.mjs';
@@ -99,7 +100,7 @@ async function creative(task){
  let brandLogo;const logoId=logoAssetFor(page,product);if(logoId){const logo=await transaction(task.workspace_id,db=>row(db,'assets',task.workspace_id,logoId));brandLogo=await readFile(logo.path);}
  await updateTask(task,65,'Composing real photo, shaped typography and original brand logo');const site=page.website_id?await transaction(task.workspace_id,db=>row(db,'websites',task.workspace_id,page.website_id)):null;const image=await renderCreative({post,page,product,background,sourcePhoto,brandLogo,website:site}),asset=await saveAsset(task.workspace_id,post.id,image);
  await transaction(task.workspace_id,async client=>{
-  const result=await client.query("UPDATE creator.posts SET creative=creative||$3::jsonb,status='review',approved_version=NULL,version=version+1,updated_at=now() WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,JSON.stringify({assetId:asset.id,designVersion:image.designVersion,productAnalysis:image.analysis,backgroundMethod,cutout,warnings}),post.version]);if(!result.rowCount)throw new AppError(409,'The post changed while the creative was being prepared.');
+  const result=await client.query("UPDATE creator.posts SET creative=creative||$3::jsonb,status='review',approved_version=NULL,version=version+1,updated_at=now() WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,JSON.stringify({assetId:asset.id,designVersion:image.designVersion,headlineHighlight:image.headlineHighlight,highlightColor:image.highlightColor,productAnalysis:image.analysis,backgroundMethod,cutout,warnings}),post.version]);if(!result.rowCount)throw new AppError(409,'The post changed while the creative was being prepared.');
   await client.query('INSERT INTO creator.assets(id,workspace_id,post_id,path,mime,width,height) VALUES($1,$2,$3,$4,$5,$6,$7)',[asset.id,task.workspace_id,post.id,asset.path,asset.mime,asset.width,asset.height]);
  });return {assetId:asset.id,width:asset.width,height:asset.height,backgroundMethod,cutout,warnings};
 }
@@ -123,7 +124,7 @@ async function aggregate(task){
  for(const candidate of candidates){
   const hash=createHash('sha256').update(canonicalArticleURL(candidate.url)).digest('hex');const seen=await transaction(task.workspace_id,client=>client.query('SELECT id FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND source_hash=$3',[task.workspace_id,page.id,hash]));if(seen.rowCount)continue;
   await updateTask(task,70,'Reading a recent, unseen article');let article=candidate;try{article=await articleDetails(candidate);}catch{}
-  const inserted=await transaction(task.workspace_id,client=>client.query(`INSERT INTO creator.posts(workspace_id,page_id,type,title,body,source_url,source_hash,creative,seo) VALUES($1,$2,'news',$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id`,[task.workspace_id,page.id,article.title,article.body,article.url,hash,{sourceImage:article.image,ratio:'1:1',style:'editorial'},{category:categoryFor(article)}]));postId=inserted.rows[0]?.id;if(postId)created++;break;
+  const inserted=await transaction(task.workspace_id,client=>client.query(`INSERT INTO creator.posts(workspace_id,page_id,type,title,body,source_url,source_hash,creative,seo) VALUES($1,$2,'news',$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id`,[task.workspace_id,page.id,article.title,article.body,article.url,hash,{sourceImage:article.image,ratio:'4:5',style:'editorial'},{category:categoryFor(article)}]));postId=inserted.rows[0]?.id;if(postId)created++;break;
  }
  if(!created&&failed===feeds.length&&feeds.length)throw new AppError(502,'All active feeds failed, including their configured fallbacks.');
  return {postId,draftsCreated:created,feedsFailed:failed,message:created?'A recent unseen story is ready to edit and generate.':'No new story in the last 24 hours. This is a recency selection, not a verified popularity ranking.'};
@@ -135,40 +136,51 @@ async function publish(task){
   await workspaceLock(client,w);const account=(await client.query('SELECT a.status FROM creator.workspaces w JOIN creator.accounts a ON a.id=w.owner_id WHERE w.id=$1',[w])).rows[0];if(account.status!=='active')throw new AppError(403,'Workspace owner account is suspended.');
   const post=await row(client,'posts',w,task.post_id),page=await row(client,'pages',w,post.page_id);
   if(!['approved','scheduled'].includes(post.status))throw new AppError(409,'The post must be approved or scheduled.');
-  await publishGate(client,w,page,post);await reservePublication(client,w,post.id);
+  await publishGate(client,w,page,post,{execution:true});await reservePublication(client,w,post.id);
   if(!page.fb_verified||!page.facebook_connection_id||!page.fb_page_id)throw new AppError(409,'Verify this Page connection before publishing.');
   await client.query("INSERT INTO creator.publish_attempts(workspace_id,post_id,task_id) VALUES($1,$2,$3)",[w,post.id,task.id]);
   await client.query("UPDATE creator.posts SET status='publishing',updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,post.id]);state={post,page};
  });
- // From this point a lost response is ambiguous. Never auto-retry a remote
- // write; an owner must reconcile the remote Page before a retry is offered.
- let remoteWriteStarted=false;
+ // Track submissions independently: a definite website rejection has no Facebook side effect.
+ // Lost submitted responses are held; confirmed destination receipts remain intact.
+ let websiteSubmitted=false,websiteConfirmed=false,facebookSubmitted=false,facebookConfirmed=false;const stage=state.page.website_publishing&&['news','blog'].includes(state.post.type)?'website':'facebook';
  try{
-  const {post,page}=state,c=await connectionFor(w,page.facebook_connection_id),identity=await facebookIdentity(c);if(identity.id!==page.fb_page_id)throw new AppError(400,'The token belongs to another Page.');
-  if(page.website_publishing&&['news','blog'].includes(post.type)&&!post.website_url){
-   await updateTask(task,30,'Publishing the article to the connected website');
+  const {post,page}=state;await deliveryState(task,'facebook','pending',{phase:'Waiting for website stage'});
+  if(page.website_publishing&&['news','blog'].includes(post.type)){
+   await updateTask(task,15,'Website · validating the article schema and destination');await deliveryState(task,'website','running',{phase:'Validating and publishing article'});
    const site=await transaction(w,client=>row(client,'websites',w,page.website_id));if(!['wordpress','nobleseek_db'].includes(site.connector))throw new AppError(400,'This website connector does not support publication.');
    const sc=await connectionFor(w,site.connection_id);let wp;
-   if(site.connector==='nobleseek_db')wp=await writeNoble(sc,sc.secret,site,post,{onWrite:()=>{remoteWriteStarted=true;}});
+   if(post.website_url)wp={link:post.website_url,slug:'echolink-'+post.id};
+   else if(site.connector==='nobleseek_db')wp=await writeNoble(sc,sc.secret,site,post,{onWrite:()=>{websiteSubmitted=true;}});
    else{
     const headers={authorization:'Basic '+Buffer.from((sc.secret.username||'')+':'+(sc.secret.password||'')).toString('base64')},base=publicURL(site.url).origin,slug='echolink-'+post.id;
     const existing=await remoteJSON(base+'/wp-json/wp/v2/posts?slug='+slug,{headers});
-    if(existing[0])wp=existing[0];else{remoteWriteStarted=true;wp=await remoteJSON(base+'/wp-json/wp/v2/posts',{method:'POST',headers:{...headers,'content-type':'application/json'},body:{title:post.title,content:'<p>'+post.caption.replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x])).replace(/\n/g,'</p><p>')+'</p>',status:'publish',slug}});}
+    if(existing[0])wp=existing[0];else{websiteSubmitted=true;wp=await remoteJSON(base+'/wp-json/wp/v2/posts',{method:'POST',headers:{...headers,'content-type':'application/json'},body:{title:post.title,content:'<p>'+post.caption.replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x])).replace(/\n/g,'</p><p>')+'</p>',status:'publish',slug}});}
    }
+   websiteConfirmed=true;await deliveryState(task,'website','confirmed',{phase:'Article committed to website database',url:wp.link,remoteId:wp.slug||String(wp.id||'')});
    await transaction(w,client=>client.query('UPDATE creator.posts SET website_url=$3 WHERE workspace_id=$1 AND id=$2',[w,post.id,publicURL(wp.link).href]));
-   await updateTask(task,50,'Website article published; preparing Facebook');
+   await updateTask(task,35,'Website · article saved; verifying it on the live domain');if(site.connector==='nobleseek_db')await verifyNoblePublic(site,wp.slug||'echolink-'+post.id);await deliveryState(task,'website','confirmed',{phase:'Live website article verified',url:wp.link});
+   await updateTask(task,50,'Website confirmed live · preparing Facebook');
   }
-  await updateTask(task,65,'Publishing caption and image to Facebook');let response;
+  else await deliveryState(task,'website','skipped',{phase:'Website publishing disabled for this post'});
+  await updateTask(task,55,'Facebook · checking this Page’s saved authorization');const c=await connectionFor(w,page.facebook_connection_id),identity=await facebookIdentity(c);if(identity.id!==page.fb_page_id)throw new AppError(400,'The token belongs to another Page.');
+  await deliveryState(task,'facebook','running',{phase:'Preparing media and caption'});await updateTask(task,65,'Facebook · uploading image and publishing caption');let response;
   if(post.creative.assetId){
    const asset=await transaction(w,client=>row(client,'assets',w,post.creative.assetId)),bytes=await readFile(asset.path),form=new FormData();form.set('caption',post.caption);form.set('source',new Blob([bytes],{type:asset.mime}),'creative.jpg');
-   const request=new Request('https://example.com',{method:'POST',body:form});remoteWriteStarted=true;response=await remoteJSON(graph(c)+'/'+page.fb_page_id+'/photos',{method:'POST',headers:{authorization:'Bearer '+c.secret.token,'content-type':request.headers.get('content-type')},body:Buffer.from(await request.arrayBuffer()),maxBytes:1000000});
-  }else{remoteWriteStarted=true;response=await remoteJSON(graph(c)+'/'+page.fb_page_id+'/feed',{method:'POST',headers:{authorization:'Bearer '+c.secret.token,'content-type':'application/json'},body:{message:post.caption}});}
-  const remoteId=response.post_id||response.id;if(!remoteId)throw new Error('Missing remote ID');
-  await updateTask(task,90,'Facebook publication confirmed; saving delivery records');
-  await transaction(w,async client=>{await client.query("UPDATE creator.posts SET status='published',fb_post_id=$3,published_at=now(),updated_at=now(),last_error=NULL WHERE workspace_id=$1 AND id=$2",[w,post.id,remoteId]);await client.query("UPDATE creator.publish_attempts SET outcome='published',remote_id=$3 WHERE workspace_id=$1 AND task_id=$2",[w,task.id,remoteId]);await client.query("UPDATE creator.usage_reservations SET status='consumed',updated_at=now() WHERE workspace_id=$1 AND post_id=$2",[w,post.id]);await audit(client,w,null,'post.published','post',post.id,{remoteId});await queueInstagramDelivery(client,w,page,post);await client.query('SAVEPOINT optional_link_comment');try{await queueLinkComment(client,w,page,post);}catch{await client.query('ROLLBACK TO SAVEPOINT optional_link_comment');await audit(client,w,null,'post.link_comment_queue_failed','post',post.id,{message:'The post was published, but its optional link comment could not be queued.'});}finally{await client.query('RELEASE SAVEPOINT optional_link_comment');}});
+   const request=new Request('https://example.com',{method:'POST',body:form});facebookSubmitted=true;response=await remoteJSON(graph(c)+'/'+page.fb_page_id+'/photos',{method:'POST',headers:{authorization:'Bearer '+c.secret.token,'content-type':request.headers.get('content-type')},body:Buffer.from(await request.arrayBuffer()),maxBytes:1000000});
+  }else{facebookSubmitted=true;response=await remoteJSON(graph(c)+'/'+page.fb_page_id+'/feed',{method:'POST',headers:{authorization:'Bearer '+c.secret.token,'content-type':'application/json'},body:{message:post.caption}});}
+  const remoteId=response.post_id||response.id;if(!remoteId)throw new Error('Missing remote ID');facebookConfirmed=true;
+  await deliveryState(task,'facebook','confirmed',{phase:'Facebook publication confirmed',remoteId,url:'https://www.facebook.com/'+remoteId});await updateTask(task,90,'Facebook confirmed · recording delivery and delayed comments');
+  await transaction(w,async client=>{await client.query("UPDATE creator.posts SET status='published',fb_post_id=$3,published_at=now(),updated_at=now(),last_error=NULL WHERE workspace_id=$1 AND id=$2",[w,post.id,remoteId]);await client.query("UPDATE creator.publish_attempts SET outcome='published',remote_id=$3 WHERE workspace_id=$1 AND task_id=$2",[w,task.id,remoteId]);await client.query("UPDATE creator.usage_reservations SET status='consumed',updated_at=now() WHERE workspace_id=$1 AND post_id=$2",[w,post.id]);await audit(client,w,null,'post.published','post',post.id,{remoteId});await client.query('SAVEPOINT optional_instagram');try{await queueInstagramDelivery(client,w,page,post);}catch{await client.query('ROLLBACK TO SAVEPOINT optional_instagram');await audit(client,w,null,'post.instagram_queue_failed','post',post.id,{message:'Facebook published; the optional Instagram delivery could not be queued.'});}finally{await client.query('RELEASE SAVEPOINT optional_instagram');}await client.query('SAVEPOINT optional_link_comment');try{await queueLinkComment(client,w,page,post);}catch{await client.query('ROLLBACK TO SAVEPOINT optional_link_comment');await audit(client,w,null,'post.link_comment_queue_failed','post',post.id,{message:'The post was published, but its optional link comment could not be queued.'});}finally{await client.query('RELEASE SAVEPOINT optional_link_comment');}});
   return {postId:post.id,remoteId,message:'Published. Optional website link comments follow this Page’s delivery settings.'};
- }catch(error){const uncertain=remoteWriteStarted&&!error.definiteRejection;await transaction(w,async client=>{await client.query('UPDATE creator.posts SET status=$4,last_error=$3,updated_at=now() WHERE workspace_id=$1 AND id=$2',[w,task.post_id,error instanceof AppError?error.message:'The remote publication outcome is unknown. Check the Page before retrying.',uncertain?'unknown':'failed']);await client.query('UPDATE creator.publish_attempts SET outcome=$3 WHERE workspace_id=$1 AND task_id=$2',[w,task.id,uncertain?'unknown':'rejected']);await client.query('UPDATE creator.usage_reservations SET status=$3,updated_at=now() WHERE workspace_id=$1 AND post_id=$2',[w,task.post_id,uncertain?'unknown':'released']);});
-  const failure=new AppError(409,uncertain?'Check the Facebook Page and optional website before retrying: delivery needs reconciliation.':error instanceof AppError?error.message:'Publication preparation failed. Check the Page credentials and media.',uncertain?'publication_unknown':'publication_rejected');if(!uncertain){failure.metaCode=error.metaCode;failure.metaSubcode=error.metaSubcode;}throw failure;}
+ }catch(error){const failureState=publicationFailure(error,{websiteSubmitted,websiteConfirmed,facebookSubmitted,facebookConfirmed,stage}),uncertain=failureState.unknown;
+  const destination=websiteConfirmed&&!facebookSubmitted?'facebook':failureState.destination;
+  // A confirmed website article remains visible even when live verification or Facebook fails.
+  if(!facebookConfirmed&&!(websiteConfirmed&&destination==='website'))await deliveryState(task,destination,uncertain?'unknown':'failed',{phase:failureState.message,error:failureState.message});
+  if(destination==='website'&&!facebookSubmitted)await deliveryState(task,'facebook','skipped',{phase:uncertain?'Not submitted · website needs reconciliation':'Not submitted · website stage failed'});
+  await transaction(w,async client=>{await client.query('UPDATE creator.posts SET status=$4,last_error=$3,updated_at=now() WHERE workspace_id=$1 AND id=$2',[w,task.post_id,failureState.message,uncertain?'unknown':'failed']);await client.query('UPDATE creator.publish_attempts SET outcome=$3 WHERE workspace_id=$1 AND task_id=$2',[w,task.id,uncertain?'unknown':'rejected']);await client.query('UPDATE creator.usage_reservations SET status=$3,updated_at=now() WHERE workspace_id=$1 AND post_id=$2',[w,task.post_id,uncertain?'unknown':'released']);});
+  const failure=new AppError(409,failureState.message,uncertain?'publication_unknown':'publication_rejected');if(!uncertain){failure.metaCode=error.metaCode;failure.metaSubcode=error.metaSubcode;}throw failure;}
+
 }
 async function verifyPage(task){
  const page=await transaction(task.workspace_id,db=>row(db,'pages',task.workspace_id,task.page_id));if(!page.facebook_connection_id||!page.fb_page_id)throw new AppError(400,'Save the Page ID and Facebook connection first.');
@@ -191,17 +203,20 @@ export async function runOne({publishOnly=false,excludePublish=false}={}){
  if(!task)return false;
  try{
   await transaction(task.workspace_id,async client=>{await entitlements(client,task.workspace_id);const account=(await client.query('SELECT a.status FROM creator.accounts a JOIN creator.workspaces w ON w.owner_id=a.id WHERE w.id=$1',[task.workspace_id])).rows[0];if(account.status!=='active')throw new AppError(403,'Account suspended.');});
-  const handler=handlers[task.kind];if(!handler)throw new AppError(400,'Unknown task type.');const result=await handler(task);await continuePipeline(task,result);await updateTask(task,100,'Complete');await transaction(task.workspace_id,client=>client.query("UPDATE creator.tasks SET status='succeeded',result=$3,finished_at=now(),lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,result]));
+  const handler=handlers[task.kind];if(!handler)throw new AppError(400,'Unknown task type.');let result;const heartbeat=setInterval(()=>transaction(task.workspace_id,db=>db.query("UPDATE creator.tasks SET heartbeat_at=now(),lease_until=now()+interval '8 minutes' WHERE workspace_id=$1 AND id=$2 AND status='running'",[task.workspace_id,task.id])).catch(()=>{}),15000);try{result=await handler(task);}finally{clearInterval(heartbeat);}await continuePipeline(task,result);await updateTask(task,100,'Complete');await transaction(task.workspace_id,client=>client.query("UPDATE creator.tasks SET status='succeeded',result=$3,finished_at=now(),lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,result]));
  }catch(error){const message=error instanceof AppError?error.message:'The task failed. Check the connection configuration and retry from a draft.';
   if(task.kind==='publish_instagram'&&error.code==='instagram_processing'&&(task.input.polls||0)<20){await transaction(task.workspace_id,db=>db.query("UPDATE creator.tasks SET status='queued',phase='Instagram processing image; checking again in 30 seconds',not_before=now()+interval '30 seconds',lease_until=NULL,input=input||$3::jsonb WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,JSON.stringify({polls:(task.input.polls||0)+1})]));return true;}
   if(task.kind==='publish_instagram')await transaction(task.workspace_id,db=>db.query("UPDATE creator.social_deliveries SET status=$3,last_error=$4 WHERE workspace_id=$1 AND post_id=$2 AND platform='instagram' AND status<>'published'",[task.workspace_id,task.post_id,error.code==='publication_unknown'?'unknown':'failed',message]));
   if(task.kind==='design_page_brand')await transaction(task.workspace_id,db=>db.query("UPDATE creator.page_branding SET status='failed',last_error=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.input.brandingId,message]));
   if(error.metaCode===190&&task.page_id)await transaction(task.workspace_id,async db=>{const page=await row(db,'pages',task.workspace_id,task.page_id);await pauseFacebookPage(db,task.workspace_id,page.id,page.facebook_connection_id,error.message);});
   if(['generate','creative','aggregate','import_products','sync_insights'].includes(task.kind)&&[502,503,504].includes(error.status)&&(task.input.retries||0)<2){await transaction(task.workspace_id,db=>db.query("UPDATE creator.tasks SET status='queued',phase=$3,last_error=$3,not_before=now()+interval '1 minute',lease_until=NULL,input=input||$4::jsonb WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,'Waiting for the provider; retrying in one minute',JSON.stringify({retries:(task.input.retries||0)+1})]));return true;}
-  if(['publish','manual_handoff'].includes(task.kind)&&['posting_gap','outside_window','daily_cap'].includes(error.code)){
+  if(['publish','manual_handoff'].includes(task.kind)&&error.code==='posting_gap'){
+   await transaction(task.workspace_id,async db=>{await workspaceLock(db,task.workspace_id);const page=await row(db,'pages',task.workspace_id,task.page_id),latest=(await db.query("SELECT max(published_at) AS at FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status='published'",[task.workspace_id,task.page_id])).rows[0].at,at=new Date(Math.max(Date.now()+15000,+new Date(latest)+page.gap_minutes*60000+1000));await db.query("UPDATE creator.tasks SET status='queued',phase='Waiting for the minimum gap after actual publication',not_before=$3,lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,at]);await db.query("UPDATE creator.posts SET scheduled_at=$3,planned_at=$3 WHERE workspace_id=$1 AND id=$2 AND status='scheduled'",[task.workspace_id,task.post_id,at]);});return true;
+  }
+  if(['publish','manual_handoff'].includes(task.kind)&&['outside_window','daily_cap'].includes(error.code)){
    try{await transaction(task.workspace_id,async db=>{await workspaceLock(db,task.workspace_id);const post=await row(db,'posts',task.workspace_id,task.post_id),page=await row(db,'pages',task.workspace_id,task.page_id);await queuePublication(db,task.workspace_id,null,page,post,{autoPick:true,ignoreTaskId:task.id});await db.query("UPDATE creator.tasks SET status='canceled',phase='Moved to the next available slot',finished_at=now(),lease_until=NULL WHERE id=$1",[task.id]);});return true;}catch{}
   }
-  await transaction(task.workspace_id,async client=>{await client.query("UPDATE creator.tasks SET status=$3,phase=$4,last_error=$4,finished_at=now(),lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,error.code==='publication_unknown'?'unknown':'failed',message]);if(['publish','manual_handoff'].includes(task.kind)){const post=await row(client,'posts',task.workspace_id,task.post_id);if(post.status!=='unknown'){await releasePublication(client,task.workspace_id,post.id);await client.query("UPDATE creator.posts SET status='approved',scheduled_at=NULL,last_error=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id,message]);}}});
+  await transaction(task.workspace_id,async client=>{await client.query("UPDATE creator.tasks SET status=$3,phase=$4,last_error=$4,finished_at=now(),lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,error.code==='publication_unknown'?'unknown':'failed',message]);if(['publish','manual_handoff'].includes(task.kind)){const post=await row(client,'posts',task.workspace_id,task.post_id);if(!['unknown','published'].includes(post.status)){await releasePublication(client,task.workspace_id,post.id);await client.query("UPDATE creator.posts SET status='failed',scheduled_at=NULL,last_error=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id,message]);}}});
  }
  return true;
 }

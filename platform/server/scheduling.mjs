@@ -28,12 +28,12 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
  for(let n=Math.ceil(+from/60000)*60000;n<end;n+=60000){const at=new Date(n);if(!inWindow(page,at))continue;if(spread&&((minute(pageClock(page,at).time)-minute(page.window_start)+1440)%1440)%step!==0)continue;if(!slotProblem(page,reservations,at))return at;}
  throw new AppError(409,'No open slot fits this Page’s window, daily target, posting gap and plan period. Adjust the Page schedule.','no_slot');
 }
-export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,await bookings(db,w,page.id,postId),{from,until,spread,target});}
-export async function publishGate(client,workspaceId,page,post,{now=new Date()}={}){
+export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,await bookings(db,w,page.id,postId),{from,until,spread:spread&&page.creative_policy?.scheduleMode!=='interval',target});}
+export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
  if(!page.active)throw new AppError(409,'Enable this Page before publishing.');
  if(post.approved_version!==post.version)throw new AppError(409,'Approve the current version before publishing.');
  if(!inWindow(page,now))throw new AppError(409,'Outside this Page’s posting window. Choose a time in the calendar.','outside_window');
- const slots=await bookings(client,workspaceId,page.id,post.id),problem=slotProblem(page,slots,now);
+ const reserved=await bookings(client,workspaceId,page.id,post.id),slots=execution?reserved.filter(s=>['published','publishing','unknown','ready_manual'].includes(s.status)):reserved,problem=slotProblem(page,slots,now);
  if(problem)throw new AppError(409,problem==='posting_gap'?'This time is too close to another Page post. Choose the next available slot.':problem==='daily_cap'?'This Page’s daily publishing target is already booked.':'Choose a time inside this Page’s posting window.',problem);
  if(slots.some(x=>['publishing','unknown'].includes(x.status)&&!x.at))throw new AppError(409,'Another publication is in progress or needs reconciliation.','publication_pending');
 }
