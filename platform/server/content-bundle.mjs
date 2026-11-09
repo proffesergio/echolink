@@ -59,6 +59,11 @@ export async function generateContentBundle({page,post,product,connection,secret
   parts=savedDraft?.fingerprint===fingerprint&&Array.isArray(savedDraft.parts)?savedDraft.parts.slice(0,3):[];
   for(let i=parts.length;i<3;i++){
    await onProgress(i+1,3);
+   if(news&&i===2){
+    // The destination is appended after website publication. A fixed invitation
+    // has no reporting/creative work and should not require another model load.
+    parts.push('বিস্তারিত পড়তে ভিজিট করুন আমাদের ওয়েবসাইট:');await onSection({fingerprint,parts:[...parts]});continue;
+   }
    const cap=news?[1750,450,160][i]:[400,900,650][i];
    const direction=news?['Write the headline and exactly 2 compact paragraphs, 70–100 Bengali words when supported.','At most 3 short sentences, the final prose sentence a genuine question; exactly 3 hashtags in a final block.','One Bengali CTA of 8–15 words, no URL.'][i]:['Write an English art direction in 55–85 words.','One brief Bengali/English hook, 3–4 short verified benefit bullets, the exact catalogue price, and one inbox CTA. At most 85 words.','Write 35–60 Bengali/English words in short blocks, then exactly 5 relevant hashtags.'][i];
    const sectionContract=/\[Part 1:[\s\S]*\[Part 2:[\s\S]*\[Part 3:/m.test(custom)?custom:preset;

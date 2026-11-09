@@ -30,5 +30,5 @@ test('CPU news saves a lead paragraph before a timeout and resumes remaining sec
  assert.equal(checkpoint.articleSegments.length,1);assert.equal(checkpoint.parts.length,0);
  const remaining=[sentence.repeat(3),'সড়ক সংস্কারে নির্দেশনা এসেছে। আপনার এলাকার পরিস্থিতি কেমন?\n#ঢাকা #সড়ক #সংবাদ','বিস্তারিত পড়তে ভিজিট করুন আমাদের ওয়েবসাইট:'];let resumed=0;
  const result=await generateContentBundle(args,{savedDraft:checkpoint,complete:async()=>remaining[resumed++],onSection:async()=>{}});
- assert.equal(resumed,3);assert.equal(result.article.paragraphCount,2);assert(result.article.text.includes(sentence));
+ assert.equal(resumed,2);assert.equal(result.article.paragraphCount,2);assert(result.article.text.includes(sentence));assert.equal(result.commentText,'বিস্তারিত পড়তে ভিজিট করুন আমাদের ওয়েবসাইট:');
 });
