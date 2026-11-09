@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import platform from '../deploy/vercel/api/platform.mjs';
+import {registryOptions} from '../deploy/vercel/lib/worker-route.mjs';
+test('cloud registry uses a small pool and verifies Aiven certificates despite URI overrides',()=>{
+ const options=registryOptions('postgres://reader:fixture@db.example/registry?sslmode=no-verify&ssl=false',Buffer.from('fixture-ca').toString('base64'));
+ assert.equal(options.max,1);assert.equal(options.ssl.rejectUnauthorized,true);assert.equal(options.ssl.ca,'fixture-ca');assert(!options.connectionString.includes('ssl'));
+});
 test('creator proxy preserves OAuth queries, private cookies and binary assets while rejecting foreign mutations',async()=>{
  const prior={fetch:globalThis.fetch,origin:process.env.DASHBOARD_PUBLIC_ORIGIN,worker:process.env.WORKER_ORIGIN,key:process.env.WORKER_BRIDGE_TOKEN};
  process.env.DASHBOARD_PUBLIC_ORIGIN='https://echolinkbd.vercel.app';process.env.WORKER_ORIGIN='https://worker.example.com';process.env.WORKER_BRIDGE_TOKEN='fixture-bridge-key-'.repeat(3);let captured;
@@ -9,7 +14,8 @@ test('creator proxy preserves OAuth queries, private cookies and binary assets w
   globalThis.fetch=async(url,options)=>{captured={url:new URL(url),options};return new Response(null,{status:302,headers:{location:'https://echolinkbd.vercel.app/','set-cookie':'session=fixture; HttpOnly; Secure; SameSite=Lax'}});};
   const redirect=await call('auth/callback/google&code=fixture-code&state=fixture-state');assert.equal(redirect.statusCode,302);assert.equal(captured.url.pathname,'/api/auth/callback/google');assert.equal(captured.url.searchParams.get('code'),'fixture-code');assert.equal(captured.url.searchParams.has('path'),false);assert.equal(captured.options.headers.cookie,'private=session');assert.match(redirect.headers['set-cookie'][0],/HttpOnly/);
   globalThis.fetch=async()=>new Response(Buffer.from([255,216,255,1]),{headers:{'content-type':'image/jpeg'}});const asset=await call('assets/fixture');assert.deepEqual(asset.body,Buffer.from([255,216,255,1]));
+  assert.equal((await call('brand-fonts','POST','https://echolinkbd.vercel.app',Buffer.alloc(1_500_000))).statusCode,200);assert.equal((await call('pages','POST','https://echolinkbd.vercel.app',Buffer.alloc(1_500_000))).statusCode,413);assert.equal((await call('brand-fonts','POST','https://echolinkbd.vercel.app',Buffer.alloc(3_000_001))).statusCode,413);
   assert.equal((await call('pages','PUT','https://attacker.example',{})).statusCode,403);assert.equal((await call('../internal/platform/tick')).statusCode,404);
-  globalThis.fetch=async()=>{throw new Error('private diagnostic');};const offline=await call('public');assert.equal(offline.statusCode,503);assert.match(offline.body,/platform:repair/);assert(!offline.body.includes('private diagnostic'));
+  globalThis.fetch=async()=>{throw new Error('private diagnostic');};const offline=await call('public');assert.equal(offline.statusCode,503);assert.equal(typeof JSON.parse(offline.body).error,'string');assert.doesNotMatch(offline.body,/private diagnostic|platform:repair|Windows|Ollama|worker PC|localhost|11434/);
  }finally{globalThis.fetch=prior.fetch;for(const [key,value]of Object.entries({DASHBOARD_PUBLIC_ORIGIN:prior.origin,WORKER_ORIGIN:prior.worker,WORKER_BRIDGE_TOKEN:prior.key})){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
 });

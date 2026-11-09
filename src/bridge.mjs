@@ -14,7 +14,7 @@ const server=createServer(async(req,res)=>{
   if(!(isPlatform&&['GET','HEAD','POST','PUT','DELETE','PATCH'].includes(req.method)||isLegacy&&['GET','POST'].includes(req.method)))return reject(404,'Dashboard route not found');
   try{
     let length=0;const chunks=[];
-    for await(const c of req){length+=c.length;if(length>(isPlatform?1_000_000:131072))return reject(413,'Request too large');chunks.push(c);}
+    for await(const c of req){length+=c.length;if(length>(isPlatform?(new URL(req.url,'http://bridge.local').pathname==='/api/brand-fonts'?3_000_000:1_000_000):131072))return reject(413,'Request too large');chunks.push(c);}
     const headers={Accept:'application/json'};
     for(const name of ['origin','cookie','content-type','x-workspace-id','stripe-signature','user-agent'])if(req.headers[name])headers[name]=req.headers[name];
     const upstream=await fetch((isPlatform?platform:worker)+req.url,{method:req.method,headers,...(chunks.length?{body:Buffer.concat(chunks)}:{}),redirect:'manual',signal:AbortSignal.timeout(250000)});

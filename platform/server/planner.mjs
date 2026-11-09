@@ -4,10 +4,11 @@ import {reservePublication,entitlements,releasePublication} from './quotas.mjs';
 import {nextSlot,publishGate,bookings,slotProblem} from './scheduling.mjs';
 export function readyForApproval(post){
  if(!post.caption?.trim())throw new AppError(400,'Generate or write the caption before approval.');
- if((post.creative.sourceImage||['image','product_sale'].includes(post.type))&&!post.creative.assetId)throw new AppError(409,'Design and review the image before approval.');
+ if((post.creative.sourceImage||['image','product_sale','reel'].includes(post.type))&&!post.creative.assetId)throw new AppError(409,'Design and review the image before approval.');
 }
 export async function approve(db,w,actor,post,{version,confirmWarnings=false,automatic=false}={}){
  if(version!==undefined&&version!==post.version)throw new AppError(409,'This draft changed. Refresh and review its latest caption and image.','version_changed');
+ if(post.seo?.safety?.requiresHuman&&(automatic||!actor))throw new AppError(409,'This sensitive content requires a human review and explicit approval.');
  readyForApproval(post);if(post.seo.editorialWarnings?.length&&!confirmWarnings)throw new AppError(409,'Review the editorial warnings and confirm before approval.');
  await db.query("UPDATE creator.posts SET status='approved',approved_version=version,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,post.id]);await audit(db,w,actor,automatic?'post.auto_authorized':'post.approved','post',post.id,{warningsAcknowledged:confirmWarnings,automatic});return {...post,status:'approved',approved_version:post.version};
 }
@@ -24,7 +25,7 @@ export async function queuePublication(db,w,actor,page,post,{at,autoPick=false,a
  let conflict=slotProblem(page,await bookings(db,w,page.id,post.id),at);if(conflict&&fallbackToSlot){at=await nextSlot(db,w,page,{postId:post.id,from:new Date(Date.now()+60000),until:new Date(plan.period_end)});conflict=null;}if(conflict)throw new AppError(409,'That slot conflicts with this Page’s window, daily target or another post. Use the next available slot.',conflict);
  await db.query("UPDATE creator.tasks SET status='canceled',phase='Schedule updated',finished_at=now() WHERE workspace_id=$1 AND post_id=$2 AND kind IN ('publish','manual_handoff') AND status='queued'",[w,post.id]);
  if(planOnly){await releasePublication(db,w,post.id);await db.query("UPDATE creator.posts SET planned_at=$3,scheduled_at=NULL,status=CASE WHEN approved_version=version THEN 'approved' ELSE 'review' END,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,post.id,at]);return {ok:true,planned:true,plannedAt:at,message:page.require_review?'Calendar slot prepared. Publication waits for your approval.':'Calendar slot prepared. Publication resumes when this Page is enabled and connected.'};}
- const automatic=!page.require_review;
+ const automatic=!page.require_review&&!post.seo?.safety?.requiresHuman;
  if(post.approved_version!==post.version){if(!approveCurrent&&!automatic)throw new AppError(409,'Review this post and choose Approve & schedule.');post=await approve(db,w,actor,post,{version,confirmWarnings:confirmWarnings||automatic,automatic});}
  await publishGate(db,w,page,post,{now:at});await reservePublication(db,w,post.id,at);
  await db.query("UPDATE creator.posts SET status='scheduled',planned_at=$3,scheduled_at=$3,last_error=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,post.id,at]);

@@ -16,8 +16,9 @@ export function validMediaSignature(workspace,asset,expires,actual,{now=Date.now
 export async function publicMedia(url){
  const asset=url.pathname.split('/').at(-1),workspace=url.searchParams.get('workspace'),expires=url.searchParams.get('expires');
  if(!validMediaSignature(workspace,asset,expires,url.searchParams.get('signature')))throw new AppError(404,'Media link expired or is invalid.');
- const row=await transaction(workspace,async db=>(await db.query('SELECT a.path FROM creator.assets a JOIN creator.posts p ON p.workspace_id=a.workspace_id AND p.id=a.post_id WHERE a.workspace_id=$1 AND a.id=$2 AND p.deleted_at IS NULL AND p.archived_at IS NULL',[workspace,asset])).rows[0]);
+ const row=await transaction(workspace,async db=>(await db.query('SELECT a.path,a.mime FROM creator.assets a JOIN creator.posts p ON p.workspace_id=a.workspace_id AND p.id=a.post_id WHERE a.workspace_id=$1 AND a.id=$2 AND p.deleted_at IS NULL AND p.archived_at IS NULL',[workspace,asset])).rows[0]);
  if(!row)throw new AppError(404,'Media is unavailable.');
+ if(row.mime==='video/mp4'){const bytes=await readFile(row.path);return new Response(bytes,{headers:{'content-type':'video/mp4','content-length':String(bytes.length),'cache-control':'private, no-store'}});}
  // Letterbox rather than crop the branded creative. A JPEG square is accepted
  // for Instagram feed photos and preserves every logo, title and footer.
  const bytes=await sharp(await readFile(row.path),{limitInputPixels:40000000}).resize(1080,1080,{fit:'contain',background:'#f0eee6'}).jpeg({quality:92}).toBuffer();

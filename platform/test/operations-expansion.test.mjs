@@ -11,9 +11,9 @@ test('product analysis selects factual technical callouts and never Colour or Co
  assert.equal(analyzeProduct({title:'USB C charger',description:'65 W power',attributes:{}}).callouts[0].value,'65 W');
  assert.equal(analyzeProduct({title:'Cotton polo',description:'Regular fit, 175 GSM cotton',attributes:{category:'Shirts'}}).type,'apparel');
 });
-test('comment links select products and website stories while retaining attribution fallback',()=>{
+test('comment links select products and website stories without exposing third-party source links',()=>{
  assert.equal(commentLink({type:'product_sale',website_url:'https://example.com/article'},{url:'https://example.com/product'}),'https://example.com/product');
- assert.equal(commentLink({type:'news',website_url:'https://www.fabrything.com/nobleseek/story',source_url:'https://example.com/source'}),'https://nobleseek.fabrything.com/nobleseek/story');assert.equal(commentLink({type:'original'}),null);assert.throws(()=>commentLink({type:'news',source_url:'http://127.0.0.1/secret'}));
+ assert.equal(commentLink({type:'news',website_url:'https://www.fabrything.com/nobleseek/story',source_url:'https://example.com/source'}),'https://nobleseek.fabrything.com/nobleseek/story');assert.equal(commentLink({type:'original'}),null);assert.equal(commentLink({type:'news',source_url:'https://example.com/source'}),null);assert.throws(()=>commentLink({type:'news',website_url:'http://127.0.0.1/secret'}));
 });
 test('reporting preserves genuine zero measurements and marks unavailable metrics without zero fabrication',async()=>{
  const zero=await metricReport(async()=>({data:[{total_value:{value:0}}]}),'https://example.com',{},'reach');assert.equal(zero.total,0);assert.equal(zero.status,'available');

@@ -1,3 +1,4 @@
+import {resolvePageFonts,fontOptions} from './fonts.mjs';
 import sharp from 'sharp';
 import {readFile} from 'node:fs/promises';
 import {transaction,audit} from './db.mjs';
@@ -10,11 +11,12 @@ import {productLogo} from './brand.mjs';
 import {env} from './env.mjs';
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 export async function renderPageBrand({kind,page,headline,prompt,logo,background}){
+ page={...page,designFonts:await resolvePageFonts(page)};
  const cover=kind==='cover',width=cover?1640:1080,height=cover?624:1080,dark=!/light|minimal white|সাদা/i.test(prompt),ink=dark?'#fff7ed':'#17313a',base=dark?'#142b34':'#eee9df',accent=page.brand?.color||'#ef806a',layers=[];
  layers.push({input:Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="${base}"/><circle cx="${width*.8}" cy="${height*.2}" r="${height*.8}" fill="${accent}" opacity=".12"/><path d="M0 ${height*.8}Q${width*.6} ${height*.3} ${width} ${height*.8}V${height}H0Z" fill="${accent}" opacity=".08"/></svg>`),left:0,top:0});
  if(background){layers.push({input:await sharp(background,{limitInputPixels:40000000}).resize(width,height,{fit:'cover'}).png().toBuffer(),left:0,top:0});layers.push({input:Buffer.from(`<svg width="${width}" height="${height}"><rect width="100%" height="100%" fill="${base}" opacity=".72"/></svg>`),left:0,top:0});}
  if(logo){const bytes=await productLogo(logo,{dark,mode:page.brand?.logoMode||'original',width:cover?230:560}),m=await sharp(bytes).metadata();layers.push({input:bytes,left:cover?210:Math.round((width-m.width)/2),top:Math.round((height-m.height)/2)});}
- if(cover||!logo){const value=headline||page.brand?.name||page.name,w=cover?850:800,bytes=await sharp({text:{text:`<span foreground="${ink}" weight="bold">${escape(value)}</span>`,font:'Nirmala UI '+(cover?62:72),width:w,rgba:true,align:cover?'left':'center',wrap:'word-char'}}).resize({width:w,height:cover?220:300,fit:'inside',withoutEnlargement:true}).png().toBuffer(),m=await sharp(bytes).metadata();layers.push({input:bytes,left:cover?600:Math.round((width-m.width)/2),top:Math.round((height-m.height)/2)});}
+ if(cover||!logo){const value=headline||page.brand?.name||page.name,w=cover?850:800,bytes=await sharp({text:{text:`<span foreground="${ink}" weight="bold">${escape(value)}</span>`,...fontOptions(page,'headline',cover?62:72),width:w,rgba:true,align:cover?'left':'center',wrap:'word-char'}}).resize({width:w,height:cover?220:300,fit:'inside',withoutEnlargement:true}).png().toBuffer(),m=await sharp(bytes).metadata();layers.push({input:bytes,left:cover?600:Math.round((width-m.width)/2),top:Math.round((height-m.height)/2)});}
  return {bytes:await sharp({create:{width,height,channels:3,background:base}}).composite(layers).jpeg({quality:94}).toBuffer(),width,height};
 }
 export async function designPageBrand(task,{updateTask}){

@@ -11,3 +11,7 @@ node_modules
 platform/.local
 platform/dist
 artifacts
+
+ca.pem
+
+/.local/

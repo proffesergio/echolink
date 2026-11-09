@@ -1,6 +1,8 @@
 # Oracle Cloud hosting assessment
 
-Checked 6 November 2026. **n8n can run on an Oracle Always Free VM. Moving n8n alone will not move EchoLink’s publishing worker or local AI off the PC.** No Oracle resources have been provisioned or charged by this change.
+Checked 8 November 2026. **n8n can run on an Oracle Always Free VM, but it is optional for EchoLink v2. Moving n8n alone will not move EchoLink’s publishing worker or local AI off the PC.**
+
+Oracle CLI 3.96.0 is installed and authenticated. The owner terminated the old Micro instance. A replacement Ubuntu A1 launch with a public IP and dedicated SSH key was attempted and rejected with `Out of host capacity`; its temporary networking was cleaned up. See the [actual migration status](ORACLE_MIGRATION.md) and [execution architecture](EXECUTION_ARCHITECTURE.md). No cloud worker is serving production.
 
 ## Current free resources
 
@@ -11,12 +13,14 @@ Oracle currently lists **1,500 OCPU-hours and 9,000 GB-hours per month** for Amp
 | Setup | What stays available when the PC sleeps? | Work required |
 | --- | --- | --- |
 | n8n on Oracle; worker + Ollama on Windows | n8n editor and its own triggers only | Docker n8n, private connection to Windows |
-| n8n + EchoLink worker on Oracle; Ollama on Windows | Dashboard, calendar and prepared-post publication; new local inference waits for the PC | Linux worker service, asset migration, stable HTTPS origin |
-| n8n + worker + inference on Oracle | Whole system, subject to capacity/reclamation | ARM-compatible dependencies and CPU inference benchmark |
+| EchoLink worker on Oracle; Ollama on Windows; n8n optional | Dashboard, calendar and prepared-post publication; new local inference waits for the PC | Linux worker service, asset migration, stable HTTPS origin |
+| Worker + inference on Oracle; n8n optional | Whole system, subject to capacity/reclamation | ARM-compatible dependencies and CPU inference benchmark |
 
-For this project, the second setup is the useful first migration: prepared Facebook/Instagram posts no longer depend on the Windows tunnel. Inference can remain local or use an optional remote provider. A 2-core CPU VM should be benchmarked before committing to multiple caption models; the free allocation includes no GPU. Product cutout support must also be tested on ARM Linux.
+For this project, the second setup is the useful first migration after capacity is available: prepared Facebook/Instagram posts would no longer depend on the Windows tunnel. Inference can remain local or use an optional remote provider. A 2-core CPU VM should be benchmarked before committing to multiple caption models; the free allocation includes no GPU. Product cutout support must also be tested on ARM Linux.
 
-## n8n installation and migration
+## Optional n8n installation and migration
+
+Skip this section when migrating only the current creator worker.
 
 1. Create an Always Free-eligible Ubuntu ARM VM in the home region. Keep the combined A1 allocation within 2 OCPUs / 12 GB. Keep the SSH private key on your PC.
 2. Install Docker Engine and Compose v2 using the distribution’s supported procedure. Follow [n8n’s Docker Compose guide](https://docs.n8n.io/deploy/host-n8n/install-options/install-using-docker-compose.md). Pin the **same n8n version as the working local installation** for the first move, and check that its image supports `linux/arm64` before pulling. An upgrade is a separate change.

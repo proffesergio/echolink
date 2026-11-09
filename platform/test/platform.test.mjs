@@ -1,3 +1,5 @@
+import {createServer} from 'node:http';
+import {createLocalInferenceGate,localInferenceGate} from '../server/inference-resources.mjs';
 import {verifyExpandedOperations} from './operations-db-check.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,8 +9,8 @@ import '../server/env.mjs';
 import {createApp} from '../server/index.mjs';
 import {query,transaction,closeDatabase} from '../server/db.mjs';
 import {reservePublication} from '../server/quotas.mjs';
-import {requireOwner} from '../server/auth.mjs';
-import {tickAutomations,continuePipeline,resumePreparedPosts,runOne} from '../server/jobs.mjs';
+import {requireOwner,provisionAccount} from '../server/auth.mjs';
+import {tickAutomations,continuePipeline,resumePreparedPosts,runOne,recoverExpiredTasks} from '../server/jobs.mjs';
 import {pauseFacebookPage} from '../server/facebook.mjs';
 import sharp from 'sharp';
 import {saveAsset} from '../server/creative.mjs';
@@ -38,7 +40,9 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
  let a,b,o;
  try{
   await t.test('anonymous state is rejected; signup, verification and sessions work',async()=>{
-   assert.equal((await call('/api/state')).status,401);a=await signup('Alpha creator','alpha-'+suffix+'@example.com');b=await signup('Beta creator','beta-'+suffix+'@example.com');o=await signup('Test platform owner',ownerEmail);assert.notEqual(a.workspace.id,b.workspace.id);assert.equal(a.actor.role,'admin');assert.equal(o.actor.role,'super_admin');
+   const reserved=await transaction(null,async db=>{const account=(await db.query("INSERT INTO creator.accounts(auth_subject,email,name,role,email_verified) VALUES($1,$2,'Reserved test owner','super_admin',false) RETURNING *",['bootstrap-owner:'+randomUUID(),ownerEmail])).rows[0];const ws=(await db.query("INSERT INTO creator.workspaces(name,owner_id) VALUES('Reserved owner workspace',$1) RETURNING id",[account.id])).rows[0];await db.query("INSERT INTO creator.memberships(workspace_id,account_id,role) VALUES($1,$2,'owner')",[ws.id,account.id]);await db.query("INSERT INTO creator.subscriptions(workspace_id,plan_id) VALUES($1,'free')",[ws.id]);return {accountId:account.id,workspaceId:ws.id};},{owner:true});
+   await assert.rejects(provisionAccount({id:randomUUID(),email:ownerEmail,name:'Unverified impostor',email_verified:false}),{code:'23505'});
+   assert.equal((await call('/api/state')).status,401);a=await signup('Alpha creator','alpha-'+suffix+'@example.com');b=await signup('Beta creator','beta-'+suffix+'@example.com');o=await signup('Test platform owner',ownerEmail);assert.notEqual(a.workspace.id,b.workspace.id);assert.equal(a.actor.role,'admin');assert.equal(o.actor.role,'super_admin');assert.equal(o.actor.id,reserved.accountId);assert.equal(o.workspace.id,reserved.workspaceId);
   });
   if(!a||!b||!o)throw new Error('Account setup failed.');
   let pageA,pageB,connectionA,postA;
@@ -56,6 +60,68 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    const foreign=await call('/api/pages/'+pageB.id,{method:'PUT',cookie:b.cookie,body:{...pageB,text_connection_id:connectionA.id}});assert.equal(foreign.status,404);
    const update=await call('/api/connections/'+connectionA.id,{method:'PUT',cookie:b.cookie,body:{name:'Attack',provider:'openai',config:{}}});assert.equal(update.status,404);
   });
+  await t.test('uploaded Bangla fonts are usable only inside their workspace and cannot become logos',async()=>{
+   const bytes=await readFile(new URL('../assets/fonts/NotoSansBengali.ttf',import.meta.url)),dataURL='data:font/ttf;base64,'+bytes.toString('base64');
+   assert.equal((await call('/api/brand-fonts',{method:'POST',cookie:a.cookie,body:{dataURL}})).status,400);
+   const uploaded=await call('/api/brand-fonts',{method:'POST',cookie:a.cookie,body:{dataURL,licensed:true}});assert.equal(uploaded.status,200);assert.equal(uploaded.data.supportsBangla,true);
+   assert((await call('/api/brand-fonts',{cookie:a.cookie})).data.some(f=>f.id===uploaded.data.id));
+   assert(!(await call('/api/brand-fonts',{cookie:b.cookie})).data.some(f=>f.id===uploaded.data.id));
+   assert.equal((await call('/api/assets/'+uploaded.data.id,{cookie:b.cookie})).status,404);
+   assert.equal((await call('/api/pages/'+pageB.id,{method:'PUT',cookie:b.cookie,body:{...pageB,brand:{headlineFontAssetId:uploaded.data.id}}})).status,404);
+   const page=await call('/api/pages/'+pageA.id,{method:'PUT',cookie:a.cookie,body:{...pageA,brand:{headlineFontAssetId:uploaded.data.id,bodyFontAssetId:uploaded.data.id}}});assert.equal(page.status,200);assert.equal(page.data.brand.headlineFontAssetId,uploaded.data.id);
+   assert.equal((await call('/api/pages/'+pageA.id,{method:'PUT',cookie:a.cookie,body:{...pageA,brand:{logoAssetId:uploaded.data.id}}})).status,400);
+  });
+  await t.test('news captions enter a separate resumable website article stage before scheduling',async()=>{
+   const sentence='স্থানীয় সড়কের বিষয়ে সংশ্লিষ্ট কর্তৃপক্ষ একটি নির্দেশনা দিয়েছে। সিদ্ধান্তের বিস্তারিত তথ্য প্রতিবেদনে তুলে ধরা হয়েছে।';let requests=0,fixtureConnection,fixturePost,fixtureWebsite;
+   const oldURL=process.env.PLATFORM_OLLAMA_URL,oldRun=localInferenceGate.run;
+   const mock=createServer(async(req,res)=>{res.setHeader('content-type','application/json');if(req.url==='/api/tags'||req.url==='/api/ps')return res.end(JSON.stringify({models:[{name:'news-fixture',size:2.5e9}]}));if(req.url==='/api/show')return res.end(JSON.stringify({capabilities:['completion']}));for await(const _ of req){};requests++;res.end(JSON.stringify({message:{content:(requests===1?sentence.repeat(12):'পরবর্তী তথ্য অনুযায়ী '+sentence.repeat(10))},done_reason:'stop'}));});
+   await new Promise(r=>mock.listen(0,'127.0.0.1',r));process.env.PLATFORM_OLLAMA_URL='http://127.0.0.1:'+mock.address().port;localInferenceGate.run=createLocalInferenceGate({memory:()=>8*1024**3}).run;
+   const before=await transaction(a.workspace.id,async db=>(await db.query('SELECT * FROM creator.pages WHERE id=$1',[pageA.id])).rows[0]);
+   try{
+    await transaction(a.workspace.id,async db=>{fixtureConnection=(await db.query("INSERT INTO creator.connections(workspace_id,name,provider,config,secret_cipher) VALUES($1,'Article fixture','ollama',$2,$3) RETURNING id",[a.workspace.id,{model:'news-fixture'},encryptSecret({},a.workspace.id)])).rows[0].id;fixtureWebsite=(await db.query("INSERT INTO creator.websites(workspace_id,name,url,kind,connector) VALUES($1,'Article source','https://news.example','news','wordpress') RETURNING id",[a.workspace.id])).rows[0].id;await db.query("UPDATE creator.pages SET kind='news',website_publishing=true,text_connection_id=$2,website_id=$3,require_review=true WHERE id=$1",[pageA.id,fixtureConnection,fixtureWebsite]);fixturePost=(await db.query("INSERT INTO creator.posts(workspace_id,page_id,type,title,body,caption,status) VALUES($1,$2,'news','সড়ক বিষয়ে নির্দেশনা',$3,$4,'review') RETURNING id",[a.workspace.id,pageA.id,sentence.repeat(30),sentence])).rows[0].id;});
+    await continuePipeline({id:randomUUID(),workspace_id:a.workspace.id,page_id:pageA.id,post_id:fixturePost,kind:'generate',input:{}},{postId:fixturePost});
+    const queued=await transaction(a.workspace.id,async db=>(await db.query('SELECT * FROM creator.tasks WHERE post_id=$1',[fixturePost])).rows);assert.equal(queued.length,1);assert.equal(queued[0].kind,'write_article');
+    await runOne({excludePublish:true});const saved=await transaction(a.workspace.id,async db=>(await db.query('SELECT * FROM creator.posts WHERE id=$1',[fixturePost])).rows[0]);assert(saved.seo.article.text.length>saved.caption.length*5);assert(saved.seo.article.wordCount>80);assert.equal(saved.seo.articleDraft,undefined);assert.equal(requests,2);assert.equal(saved.status,'review');assert.equal(saved.approved_version,null);
+    const list=await call('/api/state',{cookie:a.cookie});assert.equal(list.status,200);assert.equal(list.data.posts.find(p=>p.id===fixturePost).seo.article.text,undefined);assert(list.data.posts.find(p=>p.id===fixturePost).seo.article.wordCount>80);
+   }finally{localInferenceGate.run=oldRun;if(oldURL===undefined)delete process.env.PLATFORM_OLLAMA_URL;else process.env.PLATFORM_OLLAMA_URL=oldURL;mock.closeAllConnections();await new Promise(r=>mock.close(r));await transaction(a.workspace.id,async db=>{await db.query('UPDATE creator.pages SET kind=$2,website_publishing=$3,text_connection_id=$4,require_review=$5,website_id=$6 WHERE id=$1',[pageA.id,before.kind,before.website_publishing,before.text_connection_id,before.require_review,before.website_id]);if(fixturePost){await db.query('DELETE FROM creator.tasks WHERE post_id=$1',[fixturePost]);await db.query('DELETE FROM creator.posts WHERE id=$1',[fixturePost]);}if(fixtureConnection)await db.query('DELETE FROM creator.connections WHERE id=$1',[fixtureConnection]);if(fixtureWebsite)await db.query('DELETE FROM creator.websites WHERE id=$1',[fixtureWebsite]);});}
+  });
+  await t.test('memory protection keeps preparation queued with its retry time and completed stage intact',async()=>{
+   const previousReserve=process.env.PLATFORM_INFERENCE_RESERVE_MB;let task;
+   try{
+    task=await transaction(a.workspace.id,async db=>(await db.query("INSERT INTO creator.tasks(workspace_id,page_id,kind,progress,result) VALUES($1,$2,'generate',35,$3) RETURNING *",[a.workspace.id,pageA.id,{waiting:{code:'inference_resource_wait',stale:true}}])).rows[0]);
+    process.env.PLATFORM_INFERENCE_RESERVE_MB='16384';assert.equal(await runOne({excludePublish:true}),true);
+    const saved=await transaction(a.workspace.id,async db=>(await db.query('SELECT * FROM creator.tasks WHERE id=$1',[task.id])).rows[0]);
+    assert.equal(saved.status,'queued');assert.equal(saved.progress,35);assert.equal(saved.lease_until,null);
+    assert.equal(saved.result.waiting.code,'inference_resource_wait');assert.equal(saved.result.waiting.stale,undefined);
+    assert.match(saved.phase,/Automatic retry in 5 minutes/);assert.equal(saved.events.at(-1).progress,35);
+    assert.ok(+new Date(saved.not_before)-Date.now()>290000);assert.equal(saved.finished_at,null);
+   }finally{if(previousReserve===undefined)delete process.env.PLATFORM_INFERENCE_RESERVE_MB;else process.env.PLATFORM_INFERENCE_RESERVE_MB=previousReserve;if(task)await transaction(a.workspace.id,db=>db.query('DELETE FROM creator.tasks WHERE id=$1',[task.id]));}
+  });
+  await t.test('expired text preparation resumes while an uncertain publication is held for reconciliation',async()=>{
+   const ids=await transaction(a.workspace.id,async db=>(await db.query("INSERT INTO creator.tasks(workspace_id,page_id,kind,status,progress,lease_until) VALUES($1,$2,'generate','running',38,now()-interval '1 minute'),($1,$2,'publish','running',65,now()-interval '1 minute') RETURNING id",[a.workspace.id,pageA.id])).rows.map(r=>r.id));
+   try{await recoverExpiredTasks();const rows=await transaction(a.workspace.id,async db=>(await db.query('SELECT kind,status,progress FROM creator.tasks WHERE id=ANY($1::uuid[])',[ids])).rows);assert.equal(rows.find(t=>t.kind==='generate').status,'queued');assert.equal(rows.find(t=>t.kind==='generate').progress,38);assert.equal(rows.find(t=>t.kind==='publish').status,'unknown');}finally{await transaction(a.workspace.id,db=>db.query('DELETE FROM creator.tasks WHERE id=ANY($1::uuid[])',[ids]));}
+  });
+  await t.test('owner database profiles are encrypted, tenant-isolated and explicitly stage recovery destinations',async()=>{
+   const localURI=process.env.DATABASE_URL;
+   assert.equal((await call('/api/owner/databases',{cookie:a.cookie})).status,403);
+   const saved=await call('/api/owner/databases',{method:'POST',cookie:o.cookie,body:{name:'Isolated local test',provider:'local',connectionURL:localURI}});
+   assert.equal(saved.status,200);assert.equal(saved.data.secret_cipher,undefined);assert(!JSON.stringify(saved.data).includes(new URL(localURI).password));
+   const profile=saved.data.id;try{
+    const tested=await call('/api/owner/databases/'+profile+'/test',{method:'POST',cookie:o.cookie,body:{}});assert.equal(tested.status,200);assert(tested.data.ok);
+    const assigned=await call('/api/owner/workspaces/'+a.workspace.id+'/database',{method:'PUT',cookie:o.cookie,body:{profile_id:profile,mode:'dedicated_candidate'}});assert.equal(assigned.status,200);
+    const list=await call('/api/owner/databases',{cookie:o.cookie});assert.equal(list.data.policy.automaticFailover,false);assert.equal(list.data.policy.dedicatedRouting,false);assert(list.data.assignments.some(x=>x.workspace_id===a.workspace.id&&x.state==='awaiting_snapshot'));
+    const state=await call('/api/state',{cookie:a.cookie});assert(!JSON.stringify(state.data).includes(new URL(localURI).password));
+   }finally{await transaction(null,async db=>{await db.query('DELETE FROM creator.workspace_database_targets WHERE profile_id=$1',[profile]);await db.query('DELETE FROM creator.database_profiles WHERE id=$1',[profile]);},{owner:true});}
+  });
+  await t.test('list reads are compact, authenticated detail is complete and pulse sees content changes',async()=>{
+   const body='Long verified source facts. '.repeat(1000),before=await call('/api/pulse',{cookie:a.cookie});
+   const made=await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'Detail hydration regression',body,caption:'A useful caption.'}});assert.equal(made.status,200);
+   const id=made.data.id;try{const state=await call('/api/state',{cookie:a.cookie}),listed=state.data.posts.find(p=>p.id===id);assert.equal(listed.body.length,400);
+    const full=await call('/api/posts/'+id,{cookie:a.cookie});assert.equal(full.data.body,body);
+    const pulse=await call('/api/pulse',{cookie:a.cookie});assert(BigInt(pulse.data.revision)>BigInt(before.data.revision));assert.equal(pulse.data.posts,undefined);
+    assert.equal((await call('/api/posts/'+id,{cookie:b.cookie})).status,404);
+   }finally{await transaction(a.workspace.id,db=>db.query('DELETE FROM creator.posts WHERE workspace_id=$1 AND id=$2',[a.workspace.id,id]));}
+  });
   await t.test('news aggregation is not available on ecommerce or general Pages',async()=>{
    assert.equal((await call('/api/feeds',{method:'POST',cookie:a.cookie,body:{name:'Not news',page_id:pageA.id,url:'https://example.com/feed'}})).status,400);
    assert.equal((await call('/api/pages/'+pageA.id+'/aggregate',{method:'POST',cookie:a.cookie,body:{}})).status,400);
@@ -68,6 +134,16 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    const dry=await call('/api/posts/'+postA.id+'/dry-run',{method:'POST',cookie:a.cookie,body:{}});assert.equal(dry.data.approvalReady,true);assert.equal(dry.data.automaticLinkComments,false);
    assert.equal((await call('/api/state',{cookie:a.cookie})).data.entitlements.posts_used,0);
    const edit=await call('/api/posts/'+postA.id,{method:'PUT',cookie:a.cookie,body:{...postA,instagram_caption:'Instagram edited after approval'}});assert.equal(edit.data.seo.channelCaptions.instagram,'Instagram edited after approval');assert.equal(edit.data.caption,postA.caption);assert.equal(edit.data.status,'draft');assert.equal(edit.data.approved_version,null);
+  });
+  await t.test('editorial learning is Page scoped, version checked and preserved by settings saves',async()=>{
+   const foreign=await call('/api/posts/'+postA.id+'/feedback',{method:'POST',cookie:b.cookie,body:{outcome:'prefer',version:postA.version}});assert.equal(foreign.status,404);
+   const current=(await call('/api/posts/'+postA.id,{cookie:a.cookie})).data;
+   assert.equal((await call('/api/posts/'+postA.id+'/feedback',{method:'POST',cookie:a.cookie,body:{outcome:'prefer',version:current.version-1}})).status,409);
+   assert.equal((await call('/api/posts/'+postA.id+'/feedback',{method:'POST',cookie:a.cookie,body:{outcome:'prefer',note:'Clear factual opening',version:current.version}})).status,200);
+   let state=(await call('/api/state',{cookie:a.cookie})).data,p=state.pages.find(p=>p.id===pageA.id);assert.equal(p.creative_policy.editorialMemory.examples.length,1);
+   const saved=await call('/api/pages/'+p.id,{method:'PUT',cookie:a.cookie,body:{...p,creative_policy:{editorial:{styleNotes:'Short, clear paragraphs'},editorialMemory:{examples:[{caption:'injected'}]}}}});assert.equal(saved.status,200);assert.equal(saved.data.creative_policy.editorialMemory.examples[0].note,'Clear factual opening');
+   assert.equal((await call('/api/pages/'+p.id+'/reset-learning',{method:'POST',cookie:b.cookie,body:{}})).status,404);
+   assert.equal((await call('/api/pages/'+p.id+'/reset-learning',{method:'POST',cookie:a.cookie,body:{}})).status,200);
   });
   await t.test('five concurrent reservations yield exactly three slots and cannot exceed trial',async()=>{
    const posts=[];for(let i=0;i<5;i++)posts.push((await call('/api/posts',{method:'POST',cookie:a.cookie,body:{page_id:pageA.id,type:'original',title:'Quota '+i,caption:'Test draft'}})).data);
@@ -218,7 +294,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
  }finally{
   try{await transaction(null,async db=>{
    await db.query('DELETE FROM creator.activity WHERE actor_id=ANY($1::uuid[])',[accounts.map(a=>a.id)]);
-   for(const account of accounts){const w=account.w;for(const table of ['publication_deliveries','link_comments','analytics_reports','page_branding','social_deliveries','social_destinations','insight_snapshots','checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
+   for(const account of accounts){const w=account.w;for(const table of ['approval_notifications','publication_deliveries','link_comments','analytics_reports','page_branding','social_deliveries','social_destinations','insight_snapshots','checkout_intents','page_connections','mirror_outbox','page_mirrors','legacy_imports','publish_attempts','usage_reservations','assets','tasks','ad_drafts','campaigns','payments','activity','posts','products','feeds','automation_rules','pages','websites','connections'])await db.query(`DELETE FROM creator.${table} WHERE workspace_id=$1`,[w]);await db.query('DELETE FROM creator.subscriptions WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.memberships WHERE workspace_id=$1',[w]);await db.query('DELETE FROM creator.workspaces WHERE id=$1',[w]);await db.query('DELETE FROM creator.accounts WHERE id=$1',[account.id]);}
    for(const account of accounts)await db.query('DELETE FROM public.auth_user WHERE id=$1',[account.subject]);
   },{owner:true});}finally{
   await Promise.all(mailFiles.map(f=>unlink(f).catch(()=>{})));server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await closeDatabase();process.env.PLATFORM_PORT=original.port;process.env.PLATFORM_ORIGIN=original.origin;process.env.PLATFORM_OWNER_EMAIL=original.owner;

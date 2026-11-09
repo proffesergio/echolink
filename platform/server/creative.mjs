@@ -1,3 +1,4 @@
+import {resolvePageFonts,fontOptions} from './fonts.mjs';
 import {renderNewsCreative} from './news-design.mjs';
 import sharp from 'sharp';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -11,10 +12,11 @@ export const ratios={'1:1':[1080,1080],'4:5':[1080,1350],'9:16':[1080,1920],'16:
 export function rasterImage(bytes){return Buffer.isBuffer(bytes)&&(bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))||bytes[0]===255&&bytes[1]===216&&bytes[2]===255||bytes.subarray(0,4).toString()==='RIFF'&&bytes.subarray(8,12).toString()==='WEBP'||['GIF87a','GIF89a'].includes(bytes.subarray(0,6).toString()));}
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 function lines(text,max=27){const words=String(text||'').split(/\s+/),result=[''];for(const word of words){if((result.at(-1)+' '+word).length>max)result.push(word);else result[result.length-1]+=(result.at(-1)?' ':'')+word;}return result.slice(0,4);}
-async function typography(text,{width,height,size=48,color='#17242a',weight='bold'}){
- return sharp({text:{text:`<span foreground="${color}" weight="${weight}">${escape(text)}</span>`,font:`Nirmala UI ${size}`,width,rgba:true,wrap:'word-char',spacing:8}}).resize({width,height,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+async function typography(text,{width,height,size=48,color='#17242a',weight='bold',page={},role='body'}){
+ return sharp({text:{text:`<span foreground="${color}" weight="${weight}">${escape(text)}</span>`,...fontOptions(page,role,size),width,rgba:true,wrap:'word-char',spacing:8}}).resize({width,height,fit:'inside',withoutEnlargement:true}).png().toBuffer();
 }
 export async function renderCreative({post,page,product,background,sourcePhoto,brandLogo,website}){
+ page={...page,designFonts:await resolvePageFonts(page)};
  const [width,height]=ratios[post.creative.ratio]||ratios['1:1'],accent=page.brand?.color||'#d75f49',news=['news','blog'].includes(post.type)&&!product,portrait=height>width,landscape=width>height,ink=news?'#f7f6ef':'#18262b',muted=news?'#bcc5c7':'#657377';
  const imageURL=product?.image_url||post.creative.sourceImage;let image=sourcePhoto;
  if(imageURL&&!image){const r=await outbound(imageURL,{maxBytes:12_000_000});if(!r.ok)throw new AppError(502,'The source photo could not be downloaded. Choose another photo or a text-only creative.');image=r.bytes;}
@@ -34,7 +36,7 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
   layers.push({input:Buffer.from(`<svg width="128" height="68"><rect width="128" height="68" rx="12" fill="${plate}"/></svg>`),left:pad,top:30});
   layers.push({input:logo,left:pad+Math.round((128-m.width)/2),top:30+Math.round((68-m.height)/2)});brandX=pad+148;
  }
- layers.push({input:await typography(page.brand?.name||page.name,{width:width-brandX-pad,height:42,size:26,color:ink}),left:brandX,top:headerY});
+ layers.push({input:await typography(page.brand?.name||page.name,{width:width-brandX-pad,height:42,size:26,color:ink,page}),left:brandX,top:headerY});
  let photo,headline;
  if(news){
   photo=landscape?{x:Math.round(width*.49),y:155,w:Math.round(width*.46),h:height-235}:{x:pad,y:155,w:width-2*pad,h:Math.round(height*.47)};
@@ -50,18 +52,18 @@ export async function renderCreative({post,page,product,background,sourcePhoto,b
   layers.push({input:bytes,left:photo.x,top:photo.y});
  }
  const title=post.creative.headline||post.title;
- layers.push({input:await typography(title,{width:headline.w,height:Math.max(80,headline.h),size:news?58:56,color:ink}),left:headline.x,top:headline.y});
- if(news){const category=await typography(categoryLabel(post.seo?.category||'general',page.language),{width:Math.round(width*.28),height:40,size:24,color:accent});const m=await sharp(category).metadata();layers.push({input:category,left:width-pad-m.width,top:52});}
+ layers.push({input:await typography(title,{width:headline.w,height:Math.max(80,headline.h),size:news?58:56,color:ink,page,role:'headline'}),left:headline.x,top:headline.y});
+ if(news){const category=await typography(categoryLabel(post.seo?.category||'general',page.language),{width:Math.round(width*.28),height:40,size:24,color:accent,page});const m=await sharp(category).metadata();layers.push({input:category,left:width-pad-m.width,top:52});}
  let domain=page.creative_policy?.websiteLabel||website?.url||'';try{const u=new URL(domain.includes('://')?domain:'https://'+domain);domain=u.hostname.replace(/^www\./,'')+u.pathname.replace(/\/$/,'');}catch{domain='';}
  const cta=(news&&domain)||post.creative.cta||(news?(page.language==='English'?'THE STORY, CLEARLY':'সংবাদ সংক্ষেপ'):page.creative_policy?.goal==='sales'?'Explore & order':'Message us for details');
  const footerY=height-110,footerWidth=Math.min(width-pad*2,news?width-pad*2:420);
  if(!news)layers.push({input:Buffer.from(`<svg width="${footerWidth}" height="66"><rect width="100%" height="100%" rx="33" fill="#182c31"/></svg>`),left:pad,top:footerY});
- layers.push({input:await typography(cta,{width:footerWidth-40,height:40,size:news?23:25,color:news?muted:'#ffffff'}),left:pad+(news?0:22),top:footerY+17});
+ layers.push({input:await typography(cta,{width:footerWidth-40,height:40,size:news?23:25,color:news?muted:'#ffffff',page}),left:pad+(news?0:22),top:footerY+17});
  if(news)layers.push({input:Buffer.from(`<svg width="${width}" height="8"><rect width="${width}" height="8" fill="${accent}"/></svg>`),left:0,top:height-8});
  const output=sharp({create:{width,height,channels:4,background:'#ffffff'}}).composite(layers).jpeg({quality:93,mozjpeg:true});
  if(background&&!news)output.withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>');
  return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!image,designVersion:'studio-v5'};
 }
 export async function saveAsset(workspaceId,postId,creative){
- const id=randomUUID(),mime=creative.mime||'image/jpeg',dir=new URL('../.local/assets/'+workspaceId+'/',import.meta.url);await mkdir(dir,{recursive:true});const path=new URL(id+(mime==='image/png'?'.png':'.jpg'),dir);await writeFile(path,creative.bytes);return {id,path:fileURLToPath(path),mime,width:creative.width,height:creative.height};
+ const id=randomUUID(),mime=creative.mime||'image/jpeg',dir=new URL('../.local/assets/'+workspaceId+'/',import.meta.url);await mkdir(dir,{recursive:true});const path=new URL(id+(mime==='video/mp4'?'.mp4':mime==='image/png'?'.png':'.jpg'),dir);await writeFile(path,creative.bytes);return {id,path:fileURLToPath(path),mime,width:creative.width,height:creative.height};
 }

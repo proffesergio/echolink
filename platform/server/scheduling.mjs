@@ -24,8 +24,19 @@ export function slotProblem(page,reservations,at){
  if(timed.some(x=>Math.abs(at-new Date(x.at))<page.gap_minutes*60000))return 'posting_gap';return null;
 }
 export function findSlot(page,reservations,{from=new Date(Date.now()+60000),until=new Date(+from+7*86400000),spread=false,target=page.daily_cap}={}){
- const end=Math.min(+until,+from+8*86400000),minute=s=>Number(s.slice(0,2))*60+Number(s.slice(3)),duration=(minute(page.window_end)-minute(page.window_start)+1440)%1440||1440,step=Math.max(page.gap_minutes,Math.floor(duration/Math.max(1,target)));
- for(let n=Math.ceil(+from/60000)*60000;n<end;n+=60000){const at=new Date(n);if(!inWindow(page,at))continue;if(spread&&((minute(pageClock(page,at).time)-minute(page.window_start)+1440)%1440)%step!==0)continue;if(!slotProblem(page,reservations,at))return at;}
+ const end=Math.min(+until,+from+90*86400000),minute=s=>Number(s.slice(0,2))*60+Number(s.slice(3)),duration=(minute(page.window_end)-minute(page.window_start)+1440)%1440||1440,step=Math.max(page.gap_minutes,Math.floor(duration/Math.max(1,target)));
+ if(page.daily_cap<1)throw new AppError(409,'This Page has no daily publishing capacity.','no_slot');
+ const timed=reservations.filter(x=>x.at).map(x=>+new Date(x.at)).filter(Number.isFinite).sort((a,b)=>a-b),days=new Map(),gap=page.gap_minutes*60000;
+ for(const at of timed){const date=pageClock(page,new Date(at)).date;days.set(date,(days.get(date)||0)+1);}
+ for(let n=Math.ceil(+from/60000)*60000;n<end;n+=60000){
+  const at=new Date(n),clock=pageClock(page,at);
+  if((days.get(clock.date)||0)>=page.daily_cap){const tomorrow=new Date(Date.parse(clock.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);try{n=+wallTimeToInstant(tomorrow+'T00:00',page.timezone)-60000;}catch{}continue;}
+  if(!inWindow(page,at))continue;if(spread&&((minute(clock.time)-minute(page.window_start)+1440)%1440)%step!==0)continue;
+  let lo=0,hi=timed.length;while(lo<hi){const mid=(lo+hi)>>>1;if(timed[mid]<n)lo=mid+1;else hi=mid;}
+  const conflict=[timed[lo-1],timed[lo]].find(t=>Number.isFinite(t)&&Math.abs(n-t)<gap);
+  if(conflict===undefined)return at;
+  n=Math.max(n,Math.ceil((conflict+gap)/60000)*60000-60000);
+ }
  throw new AppError(409,'No open slot fits this Page’s window, daily target, posting gap and plan period. Adjust the Page schedule.','no_slot');
 }
 export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,await bookings(db,w,page.id,postId),{from,until,spread:spread&&page.creative_policy?.scheduleMode!=='interval',target});}

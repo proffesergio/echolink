@@ -2,7 +2,7 @@ import '../src/env.mjs';
 import {readFile} from 'node:fs/promises';
 
 // Only these bridge settings leave this PC. Never upload .env.local.
-const keys=['WORKER_ORIGIN','DASHBOARD_PUBLIC_ORIGIN','WORKER_BRIDGE_TOKEN',...(process.env.WORKER_REGISTRY_URL?['WORKER_REGISTRY_URL']:[])];
+const keys=['WORKER_ORIGIN','DASHBOARD_PUBLIC_ORIGIN','WORKER_BRIDGE_TOKEN',...(process.env.WORKER_REGISTRY_URL?['WORKER_REGISTRY_URL','WORKER_REGISTRY_PROVIDER','WORKER_REGISTRY_CA_CERT_BASE64'].filter(key=>process.env[key]):[])];
 for(const key of keys)if(!process.env[key])throw new Error(`Missing ${key}`);
 if(!process.env.VERCEL_TOKEN)throw new Error('Save VERCEL_TOKEN in local .env.local first');
 const project=JSON.parse(await readFile('deploy/vercel/.vercel/project.json','utf8'));

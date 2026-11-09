@@ -9,8 +9,12 @@ artifacts/
 .codex/
 .vercel/
 .superdesign/
+/ca.pem
+__pycache__/
 platform/.local/
 !platform/.env.test.example
 deploy/vercel/public/assets/
 deploy/vercel/public/index.html
 deploy/vercel/public/favicon.svg
+
+/.local/

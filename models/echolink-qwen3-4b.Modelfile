@@ -1,0 +1,11 @@
+# Pinned non-thinking Qwen3-4B Instruct checkpoint (Apache-2.0).
+# Do not replace this with the ambiguous qwen3:4b tag (thinking-only at verification).
+FROM qwen3:4b-instruct-2507-q4_K_M
+PARAMETER num_ctx 4096
+PARAMETER num_predict 900
+PARAMETER num_thread 2
+PARAMETER num_batch 64
+PARAMETER num_gpu 0
+PARAMETER temperature 0.6
+PARAMETER top_p 0.8
+PARAMETER top_k 20

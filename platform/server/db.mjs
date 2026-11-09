@@ -1,10 +1,12 @@
+import {databaseClientOptions,parseDatabaseSecret} from './database-profiles.mjs';
+import {instrumentDatabaseClient} from './database-telemetry.mjs';
 import './env.mjs';
 import {databaseDriver} from './database-driver.mjs';
 import {AppError} from './errors.mjs';
 let pool;
 export function database(){
   if(!process.env.DATABASE_URL)throw new AppError(503,'The local platform database is not configured.');
-  if(!pool){const driver=databaseDriver();pool=new driver.Pool({connectionString:process.env.DATABASE_URL,max:6,connectionTimeoutMillis:15000,idleTimeoutMillis:15000,statement_timeout:30000,keepAlive:true});pool.on('error',()=>console.error('Platform database idle connection interrupted. The next request will reconnect.'));}return pool;
+  if(!pool){const driver=databaseDriver();pool=new driver.Pool({...databaseClientOptions(parseDatabaseSecret(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT_BASE64?Buffer.from(process.env.DATABASE_CA_CERT_BASE64,'base64').toString():''),{transport:process.env.PLATFORM_DATABASE_TRANSPORT||'tcp',max:Math.max(1,Math.min(6,Number(process.env.DATABASE_POOL_MAX)||2))}),connectionTimeoutMillis:15000,statement_timeout:30000,query_timeout:35000,keepAlive:true});pool.on('connect',instrumentDatabaseClient);pool.on('error',()=>console.error('Platform database idle connection interrupted. The next request will reconnect.'));}return pool;
 }
 export const query=(sql,args=[])=>database().query(sql,args);
 export async function transaction(workspaceId,fn,{owner=false}={}){

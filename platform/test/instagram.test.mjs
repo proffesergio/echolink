@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {publishPhotoFlow,discoverInstagram} from '../server/instagram.mjs';
 import {signedMediaURL,validMediaSignature} from '../server/public-media.mjs';
+
+test('vertical video uses an Instagram REELS container with the same durable publishing flow',async()=>{
+ let payload;const result=await publishPhotoFlow({base:'https://graph.facebook.com/v26.0',accountId:'456',token:'fixture',imageURL:'https://example.com/signed-video',video:true,caption:'A reviewed vertical video caption',delivery:{status:'queued'},onContainer:async()=>{},onPublishing:async()=>{},onPublished:async()=>{},request:async(url,o)=>{if(url.endsWith('/media')){payload=o.body;return {id:'container'};}if(url.includes('status_code'))return {status_code:'FINISHED'};return {id:'published-video'};}});
+ assert.equal(payload.media_type,'REELS');assert.equal(payload.video_url,'https://example.com/signed-video');assert.equal(payload.image_url,undefined);assert.equal(result.id,'published-video');
+});
 test('signed JPEG URLs reject expiry, workspace changes and tampering',()=>{
  process.env.PLATFORM_ENCRYPTION_KEY||='test-signing-key-at-least-thirty-two-characters';process.env.PLATFORM_ORIGIN||='https://example.com';const w=randomUUID(),asset=randomUUID(),now=Date.now(),url=new URL(signedMediaURL(w,asset,{now})),expires=url.searchParams.get('expires'),signature=url.searchParams.get('signature');
  assert(validMediaSignature(w,asset,expires,signature,{now}));assert(!validMediaSignature(randomUUID(),asset,expires,signature,{now}));assert(!validMediaSignature(w,asset,expires,signature,{now:now+7200001}));assert(!validMediaSignature(w,asset,expires,'0'.repeat(64),{now}));

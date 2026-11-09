@@ -1,13 +1,15 @@
 # EchoLink creator platform: main project goal and implementation plan
 
-Updated: 2026-11-05. EchoLink is being expanded into a multi-niche creator
+Updated: 2026-11-08. EchoLink is being expanded into a multi-niche creator
 operations platform: multiple brands/Pages/channels, languages, content types and
 post formats, with optional per-Page website publication and link sharing. The
 news pipeline remains its first working module. Its seven Bangla requirements
 remain the news acceptance track; the reference image describes that pipeline,
 not the boundaries of the whole product.
 
-Current priority is the owner's three-part recovery and redesign request:
+Current priority: Page-scoped editorial intelligence and professional single-language generation. See [the editorial guide](docs/EDITORIAL_INTELLIGENCE.md) for implemented controls and the evaluation/fine-tuning/video roadmap. The Node.js worker now runs production services; legacy n8n workflows are inactive.
+
+Historical November 5 recovery work:
 
 1. Redesign the entire dashboard around the supplied Omniroute reference: compact
    charcoal/coral shell, connection categories/search, accurate provider states,
@@ -331,3 +333,56 @@ Saved live connections verified: Facebook token resolves to Noble Seek and Googl
 User reported a rejected Publish Now and endless loading. Diagnosis: the selected image returned HTTP 200/JPEG and the saved Page token identified Noble Seek, but Meta token inspection showed Ads/read scopes without `pages_manage_posts` or `pages_manage_engagement`. An unpublished-photo diagnostic returned HTTP 403/code 200 explicitly naming missing `pages_manage_posts`; no diagnostic object was created. The replacement token retained the same missing scopes, and the user confirmed their app's permission picker only offers Ads/read permissions. They must enable a Page-management use case or create an appropriate app; do not retry a live post until publishing permission is verified.
 
 Implemented scope-aware connection/publishing preflight, sanitized actionable Meta diagnostics and clean explicit retry state. Replace the shared animation with per-task calculated stage/feed percentages, heartbeat/deadline recovery, elapsed time and event logs; include n8n initiation and output preparation. Add a modern README/banner and contribution/security guides. Real publishing remains pending Meta authorization; no code can add ungranted app permissions.
+
+
+## Editorial intelligence update · November 2026
+
+Implemented: consistent Page language, audience-copy delivery filtering, model-assisted news ranking across configured RSS sources, related-report evidence, Page reference links with honest access status, and bounded human-reviewed style memory. See [Editorial intelligence](docs/EDITORIAL_INTELLIGENCE.md) for controls and limits. Future releases add evaluation datasets, optional authorized search providers, opt-in supervised adaptation and separately queued short-video production. Existing local inference memory safeguards and night batches remain active.
+
+
+## Database continuity · 8 November 2026
+
+Native local PostgreSQL 18.6 is installed with a loopback-only, memory-bounded cluster, non-superuser runtime, all 13 migrations and authentication tables. Full tests and a complete dump/restore rehearsal passed. Neon is refusing reads because its network-transfer quota is exhausted; deleting old rows cannot reset that quota. The production workspace has not been imported or switched to an empty database. Restore Neon access once or supply a recent complete backup, then use the [recovery procedure](docs/LOCAL_POSTGRES_RECOVERY.md) to preserve accounts, Page secrets, deduplication and delivery receipts before one-primary cutover.
+
+
+### Multi-database operations · 9 November 2026
+
+Local and Aiven PostgreSQL have 14 migrations, auth schema, restricted runtime roles and verified exports. Aiven CA verification is enabled. Added owner-only encrypted connection profiles, health tests, staged per-client recovery/dedicated candidates, traffic estimates, revision/task pulse reads, full-detail hydration and adaptive idle/error queue delays. Runtime profile secrets and the minimal route-reader settings are saved in sensitive Vercel production environment variables. The actual production primary has not been changed.
+
+Remaining: recover a full production snapshot from quota-blocked Neon, import/reconcile original identities, Page secrets, assets and uncertain deliveries, then release the matching backend/frontend. Dedicated live tenant routing and synchronized automatic failover remain separate work; staged profile assignments do not implement them. See [database architecture and verification](docs/DATABASE_ARCHITECTURE.md).
+
+
+### Production recovery hold · 9 November 2026
+
+Created the full-data no-compute branch `echolink-recovery-hold-20261109` from the actual platform branch `echolink-platform-local`; the existing manual snapshot covers the older `production` branch and was retained. Encrypted local environment/media backup authenticated and restored with 266 matching file checksums. Production SQL export remains blocked by `53000`. Owner selected requesting temporary export access from Neon; no billing change is authorized. [Support request and release steps](docs/PRODUCTION_RECOVERY.md).
+
+
+### Fresh operational primary and restored live service · 9 November 2026
+
+Owner explicitly selected continuing without importing Neon. Activated local `echolink_live`; preserved the prior Neon datasets/hold branch; rebuilt the verified owner workspace, two Pages, 20 RSS feeds, 100 products, saved prompts, available logo and logging. Both Facebook accounts, Fabrything Instagram, website connectors, Sheets and local model availability passed checks. Google owner sign-in claimed the reserved workspace. Vercel/live API checks pass. Page routines remain paused for operator startup; automatic publishing preferences are ready. Daily 03:30 SQL/media/environment backups and verified Aiven cloud snapshot restores are installed; snapshots do not promote automatically. Old accounts/subscriptions/drafts/receipts remain in Neon. [Current operating guide](docs/FRESH_START.md).
+
+## Echotent desk and typography — 9 November 2026
+
+- Shared local Qwen/Gemma prompt profiles with measured memory admission, serialized requests and visible selected-engine metrics. This is configuration and evidence-based prompting, not training new weights.
+- Separate source-grounded website news prose from social captions, with neutral news-desk structure, private evidence, no routine public source-link footer and article quality holds.
+- Workspace-isolated Unicode TTF/OTF uploads, Page headline/body font selection, Bangla preview and render integration.
+- Future: measured style/quality comparison across engine versions; supervised editorial examples; short-video typography and brand kit reuse.
+
+- Article preparation now runs as a separate resumable task with evidence-bound section checkpoints; publishing remains independent while the worker drains for maintenance.
+
+## Creator pipeline expansion — November 2026
+
+- Implemented: terminal-style Page pipelines with recorded stages, logs and countdowns; nine niche presets; optional per-Page approval notifications; crisis pre-pass; last-50-headline duplicate check; typed Reel storyboards and local FFmpeg rendering.
+- Implemented adapters, awaiting credentials/end-to-end checks: Pollinations images/speech, Hugging Face Inference, Pexels/Pixabay, WhatsApp/Telegram/Discord, optional BullMQ dispatch.
+- Supabase: placeholders and owner-managed provider profile prepared. Keep local PostgreSQL active until an isolated import and cutover are verified.
+- Preserve current owner Pages’ automatic publication setting. New approval controls are opt-in; sensitive-content holds require human action.
+- Next: object-storage video delivery, per-scene speech timing, YouTube OAuth/upload, Remotion templates, provider budget reporting, and permission-verified video publishing trials.
+# Worker portability and generation recovery
+
+- Implemented: queued model retries display a countdown and saved progress in the live workflow.
+- Implemented: CPU news writing saves each paragraph; owner-adjustable inference deadlines default to 20 minutes on Windows safe mode.
+- Configured: both owner Pages target a 24-hour buffer, 22:00–07:00 Dhaka generation, daytime rescue retained.
+- Implemented: BDT/৳ normalization from catalogue currency, portable PostgreSQL tool discovery, migration media-path validation and host diagnostics.
+- Documented: inference-first desktop move, full database/media cutover, private credential transfer, free-first media tool availability and project Reel-director skill.
+- Pending target hardware: Ubuntu setup/driver validation, measured GPU acceleration and complete migration acceptance. Current worker remains active.
+- Future: local TTS and transcription adapters, advanced Remotion renderer, dedicated generative-video workflow and YouTube delivery.

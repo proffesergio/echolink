@@ -8,6 +8,7 @@
   "rewrites": [
     { "source": "/admin/api/:path*", "destination": "/api/proxy?path=:path*" },
     { "source": "/api/:path*", "destination": "/api/platform?path=:path*" },
+    { "source": "/demo/:path*", "destination": "/demo/index.html" },
     { "source": "/((?!api/|admin/|assets/|_vercel/).*)", "destination": "/index.html" }
   ],
   "headers": [
