@@ -45,5 +45,5 @@ test('originality compares substantial unquoted prose, never an empty quoted sen
  const quality=reportQuality({title:'সেতু',text,facts:[{id:'F1',text:quoted}],sections:[{evidenceIds:['F1'],review:{supported:true}}],page,minWords:1});
  assert.equal(quality.verbatimRatio,0);
  const copied=reportQuality({title:'সেতু',text,facts:[{id:'F1',text}],sections:[{evidenceIds:['F1'],review:{supported:true}}],page,minWords:1});
- assert(copied.verbatimRatio>.4);assert(copied.warnings.some(w=>w.includes('verbatim')));
+ assert(copied.verbatimRatio>.4);assert(copied.warnings.some(w=>w.includes('unquoted source wording')));
 });
