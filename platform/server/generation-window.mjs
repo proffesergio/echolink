@@ -4,6 +4,7 @@ import {pageClock,inWindow,findSlot,wallTimeToInstant} from './scheduling.mjs';
 export const startsGeneration=kind=>['aggregate','generate','import_products'].includes(kind);
 
 export function generationAvailability(rule,page,reservations=[],{now=new Date()}={}){
+ if(rule.enabled===false)return {allowed:false,next:new Date(+now+5*60000),message:'This Page’s automation is paused. Preparation waits; existing scheduled delivery remains independent.'};
  const window=rule.generation_window||{};
  if(!window.enabled)return {allowed:true,emergency:false};
  const inside=inWindow({...page,window_start:window.start||'22:00',window_end:window.end||'07:00'},now);

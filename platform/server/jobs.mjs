@@ -7,7 +7,7 @@ import {queueApprovalNotification,sendApprovalNotification} from './notification
 import {bundleEnabled,generateContentBundle} from './content-bundle.mjs';
 import {generateNewsArticle} from './news-article.mjs';
 import {queueLoop} from './queue-loop.mjs';
-import {collectNewsFeeds,clusterStories,shortlistStories,rankStories,researchStory,articleHash} from './news-research.mjs';
+import {collectNewsFeeds,clusterStories,shortlistStories,rankStories,researchStory,articleHash,storySimilarity} from './news-research.mjs';
 import {analyzeReferences} from './reference-analysis.mjs';
 import {referenceFingerprint,EDITORIAL_VERSION,recordEditorialQuality} from './editorial-memory.mjs';
 import {cleanPublicCopy} from './public-copy.mjs';
@@ -45,6 +45,7 @@ import {bookings} from './scheduling.mjs';
 import {generationAvailability,startsGeneration} from './generation-window.mjs';
 import {collectReportEvidence,generateNewsReport} from './news-desk.mjs';
 import {websiteBeforeDesign} from './website-first.mjs';
+import {prepareNewsSocial} from './news-social-stage.mjs';
 import {freemem} from 'node:os';
 import {inferenceSettings,resourceWait} from './inference-resources.mjs';
 import {inferenceIdle} from './inference-idle.mjs';
@@ -89,6 +90,7 @@ async function testConnection(task){
 function wordsForService(id){return id==='wordpress'?'WordPress':'WooCommerce';}
 async function generate(task){
  const {post,page,product}=await transaction(task.workspace_id,async client=>{const post=await row(client,'posts',task.workspace_id,task.post_id);if(post.deleted_at||post.archived_at||['published','publishing','unknown','scheduled','ready_manual'].includes(post.status))throw new AppError(409,'Move the post to draft before generating.');return {post,page:await row(client,'pages',task.workspace_id,post.page_id),product:post.product_id?await row(client,'products',task.workspace_id,post.product_id):null};});
+ if(post.type==='news'){const original=post.seo?.research?.sources?.find(s=>s.url===post.source_url)?.title;if(original)post.title=original;}
  const prior=await transaction(task.workspace_id,async db=>(await db.query("SELECT id,title FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND status='published' ORDER BY published_at DESC LIMIT 50",[task.workspace_id,page.id])).rows);
  const safety=preflightContent(post,prior,page.creative_policy);
  if(safety.duplicateId){await transaction(task.workspace_id,db=>db.query("UPDATE creator.posts SET status='rejected',archived_at=now(),last_error='Duplicate topic in the last 50 published headlines' WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id]));return {postId:post.id,hold:true,message:'Duplicate topic skipped before inference.'};}
@@ -96,8 +98,10 @@ async function generate(task){
  if(!page.text_connection_id)throw new AppError(400,'Choose a text model on this Page first.');if(product&&Date.now()-new Date(product.fetched_at)>86400000)throw new AppError(409,'Refresh this product catalog before generating a sale post.');await updateTask(task,15,'Reading source facts and Page instructions');
  const c=await connectionFor(task.workspace_id,page.text_connection_id);
  if(post.type==='news'&&page.creative_policy?.contentFormat==='news_desk_v3'){
-  await updateTask(task,20,'Research · reading full reports before newspaper writing');const enriched=await collectReportEvidence(post);post.body=enriched.body;post.seo=enriched.seo;
-  await transaction(task.workspace_id,db=>db.query('UPDATE creator.posts SET body=$3,seo=$4 WHERE workspace_id=$1 AND id=$2 AND version=$5',[task.workspace_id,post.id,post.body,post.seo,post.version]));
+  await updateTask(task,20,'Research · reading full reports before newspaper writing');const feeds=await transaction(task.workspace_id,async db=>(await db.query('SELECT * FROM creator.feeds WHERE workspace_id=$1 AND page_id=$2 AND active',[task.workspace_id,page.id])).rows);let additionalSources=[];if(feeds.length){const scan=await collectNewsFeeds(task.workspace_id,page.id,feeds);additionalSources=scan.articles.filter(a=>a.url!==post.source_url&&storySimilarity(post.title,a.title)>=.5&&Math.abs(Date.parse(a.date)-Date.parse(post.seo?.research?.sources?.[0]?.publishedAt||new Date()))<2*86400000).sort((a,b)=>a.url.localeCompare(b.url)).slice(0,3);}const enriched=await collectReportEvidence(post,{additionalSources});post.body=enriched.body;post.seo=enriched.seo;
+  await transaction(task.workspace_id,db=>db.query('UPDATE creator.posts SET body=$3,seo=$4,title=$6 WHERE workspace_id=$1 AND id=$2 AND version=$5',[task.workspace_id,post.id,post.body,post.seo,post.version,post.title]));
+  const fullSafety=preflightContent(post,prior,page.creative_policy);
+  if(fullSafety.hold){post.seo={...post.seo,safety:{...post.seo.safety,requiresHuman:true,matches:fullSafety.matches,fingerprint:fullSafety.fingerprint}};await transaction(task.workspace_id,async db=>{await db.query("UPDATE creator.posts SET seo=$3,status='review',last_error='Full-source safety check requires human review before writing' WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id,post.seo]);await queueApprovalNotification(db,task.workspace_id,page,post,{force:true});});return {postId:post.id,hold:true,message:'Sensitive material found in the complete source report; human review required.'};}
  }
  const snapshot=await transaction(task.workspace_id,async db=>(await db.query('SELECT records FROM creator.insight_snapshots WHERE workspace_id=$1 AND page_id=$2 ORDER BY observed_at DESC LIMIT 1',[task.workspace_id,page.id])).rows[0]);
  const guidance=snapshot?summarizeInsights(snapshot.records,page.timezone):null;
@@ -112,14 +116,14 @@ async function generate(task){
  const inferenceRuns=[],onMetrics=metrics=>inferenceRuns.push(metrics);
  const productFocus=product?await selectProductFocus({product,connection:c,secret:c.secret},{onMetrics}):null;
  const bundled=bundleEnabled(page,post),report=post.type==='news'&&page.creative_policy?.contentFormat==='news_desk_v3';
- const generated=await (report?generateNewsReport:bundled?generateContentBundle:generateFactualCaption)({page,post,product,connection:c,secret:c.secret,compact,insights:guidance?.sampleSize>=5?guidance.recommendation:null},{onMetrics,onCorrection:()=>updateTask(task,45,'Checking source quantities and correcting unsupported claims'),savedDraft:post.seo?.bundleDraft,onProgress:(part,total,detail)=>updateTask(task,detail?.report?10+Math.round(part/total*55):20+part*15+(detail?.paragraph?detail.paragraph*3:0),(detail?.report?'News desk · writing report paragraph ':'Echotent · writing content section ')+part+' of '+total+(detail?.paragraph?' · article paragraph '+detail.paragraph+' of '+detail.paragraphs:'')),onSection:draft=>transaction(task.workspace_id,async db=>{const saved=await db.query("UPDATE creator.posts SET seo=jsonb_set(seo,'{bundleDraft}',$3::jsonb) WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed')",[task.workspace_id,post.id,JSON.stringify(draft),post.version]);if(!saved.rowCount)throw new AppError(409,'The draft changed during section preparation.');})});
+ const generated=await (report?generateNewsReport:bundled?generateContentBundle:generateFactualCaption)({page,post,product,connection:c,secret:c.secret,compact,insights:guidance?.sampleSize>=5?guidance.recommendation:null},{deferSocial:report&&page.website_publishing&&!page.require_review&&task.input.pipeline?.autoPublish===true,onMetrics,onCorrection:()=>updateTask(task,45,'Checking source quantities and correcting unsupported claims'),savedDraft:post.seo?.bundleDraft,onProgress:(part,total,detail)=>updateTask(task,detail?.report?10+Math.round(part/total*55):20+part*15+(detail?.paragraph?detail.paragraph*3:0),(detail?.report?'News desk · '+(detail.stage==='verify'?'independent source check ':detail.stage==='repair'?'correcting evidence section ':'writing evidence section '):'Echotent · writing content section ')+part+' of '+total+(detail?.paragraph?' · article paragraph '+detail.paragraph+' of '+detail.paragraphs:'')+(detail?.checks?.length?' · '+detail.checks[0].slice(0,180):'')),onSection:draft=>transaction(task.workspace_id,async db=>{const saved=await db.query("UPDATE creator.posts SET seo=jsonb_set(seo,'{bundleDraft}',$3::jsonb) WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed')",[task.workspace_id,post.id,JSON.stringify(draft),post.version]);if(!saved.rowCount)throw new AppError(409,'The draft changed during section preparation.');})});
  if(generated.hold){await transaction(task.workspace_id,db=>db.query("UPDATE creator.posts SET status='review',last_error=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id,generated.message]));return {postId:post.id,hold:true,message:generated.message};}
  const {caption,notes,facts,warnings,initialWarnings}=generated;
- if(caption.length<60)throw new AppError(422,'The model returned too little content. Choose a more capable model or edit the draft manually.');
+ if(caption.length<60&&!generated.article)throw new AppError(422,'The model returned too little content. Choose a more capable model or edit the draft manually.');
  let instagramCaption,instagramWarnings=[];
  const instagramEnabled=await transaction(task.workspace_id,async db=>(await db.query("SELECT id FROM creator.social_destinations WHERE workspace_id=$1 AND page_id=$2 AND enabled AND platform='instagram'",[task.workspace_id,page.id])).rowCount>0);
  if(generated.instagramCaption){instagramCaption=generated.instagramCaption;}
- else if(instagramEnabled){
+ else if(instagramEnabled&&!generated.article?.socialPending&&!generated.article?.needsReview){
   if(compact&&page.creative_policy?.captionGeneration!=='separate'){
    instagramCaption=formatInstagramCaption(caption,page);notes.push('Efficient channel mode: Instagram layout derives from the same caption; separate AI instructions are used only in independent mode.');
   }else{
@@ -129,10 +133,10 @@ async function generate(task){
   instagramCaption=result.caption;instagramWarnings=result.warnings;notes.push(...result.notes);
   }
  }
- await updateTask(task,85,'Saving channel captions together for the same calendar slot');
+ await updateTask(task,85,generated.article?.socialPending?'Saving the checked full report; Facebook copy waits for its live website URL':'Saving channel captions together for the same calendar slot');
  if(product)post.seo={...post.seo,productFingerprint:productFingerprint(product)};
   await transaction(task.workspace_id,async client=>{
- const seo={...post.seo,...(productFocus?{productFocus}:{}),...(product&&page.creative_policy?.commerce?.includePrice&&product.price!=null?{priceSnapshot:{amount:Number(product.price),currency:product.currency}}:{}),...(generated.article?{article:generated.article,commentText:generated.commentText}:{}),...(generated.designBrief?{designBrief:generated.designBrief,priceSnapshot:generated.priceSnapshot}:{}),inferenceRuns,channelCaptions:instagramCaption?{instagram:instagramCaption}:{},title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:[...warnings,...instagramWarnings.map(w=>'Instagram: '+w)],editorialProfile:{version:EDITORIAL_VERSION,revision:page.creative_policy?.editorialMemory?.revision||0,referenceAnalyzedAt:page.creative_policy?.referenceAnalysis?.analyzedAt||null},generationNotes:notes};
+ const seo={...post.seo,...(generated.newsroomAudit?{newsroomAudit:generated.newsroomAudit}:{}),...(productFocus?{productFocus}:{}),...(product&&page.creative_policy?.commerce?.includePrice&&product.price!=null?{priceSnapshot:{amount:Number(product.price),currency:product.currency}}:{}),...(generated.article?{article:generated.article,commentText:generated.commentText}:{}),...(generated.designBrief?{designBrief:generated.designBrief,priceSnapshot:generated.priceSnapshot}:{}),inferenceRuns,channelCaptions:instagramCaption?{instagram:instagramCaption}:{},title:post.title.slice(0,60),description:caption.replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim().slice(0,160),hashtags:caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[],alt:product?.title||post.title,language:page.language,editorialWarnings:[...warnings,...instagramWarnings.map(w=>'Instagram: '+w)],editorialProfile:{version:EDITORIAL_VERSION,revision:page.creative_policy?.editorialMemory?.revision||0,referenceAnalyzedAt:page.creative_policy?.referenceAnalysis?.analyzedAt||null},generationNotes:notes};
   delete seo.bundleDraft;delete seo.rebuildReport;
   const updated=await client.query("UPDATE creator.posts SET caption=$3,title=COALESCE($6,title),status='review',approved_version=NULL,last_error=NULL,version=version+1,updated_at=now(),seo=$5 WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed') RETURNING id",[task.workspace_id,post.id,caption,post.version,seo,generated.title||null]);
   if(!updated.rowCount)throw new AppError(409,'The draft changed while the model worked. Generate again from the current version.');
@@ -154,11 +158,13 @@ async function writeArticle(task){
 async function creative(task){
  await inferenceIdle.releaseIdle(true);
  const {post,page,product}=await transaction(task.workspace_id,async client=>{const post=await row(client,'posts',task.workspace_id,task.post_id);if(['published','publishing','unknown','scheduled','ready_manual'].includes(post.status))throw new AppError(409,'Move the post to draft first.');return {post,page:await row(client,'pages',task.workspace_id,post.page_id),product:post.product_id?await row(client,'products',task.workspace_id,post.product_id):null};});
+ if(task.input.pipeline?.ruleId){const rule=await transaction(task.workspace_id,db=>row(db,'automation_rules',task.workspace_id,task.input.pipeline.ruleId));if(!rule.enabled)return {postId:post.id,hold:true,message:'Automation paused before website/social preparation; no new delivery submitted.'};}
  if(task.input.pipeline?.autoPublish&&post.type==='news'&&post.seo?.article?.policyVersion==='news_desk_v3'&&page.creative_policy?.contentFormat==='news_desk_v3'&&page.website_publishing&&page.active&&!page.require_review&&env().publishing&&!criticalEditorialWarnings(post.seo?.editorialWarnings).length&&!post.seo?.safety?.requiresHuman){
   if(!post.seo?.article?.text)throw new AppError(409,'Write the complete website report before designing its news card.');
   const site=await transaction(task.workspace_id,db=>row(db,'websites',task.workspace_id,page.website_id)),connection=await connectionFor(task.workspace_id,site.connection_id);
   await websiteBeforeDesign({task,page,post,site,connection},{updateTask});
  }
+ if(post.type==='news'&&post.seo?.article?.socialPending){const connection=await connectionFor(task.workspace_id,page.text_connection_id);await prepareNewsSocial({task,page,post,connection},{updateTask});}
  if(task.input.reuseAsset&&post.creative.assetId)return {postId:post.id,message:'Existing verified product image retained; updated copy can be scheduled.'};
  await updateTask(task,15,product?'Analysing product category, verified specifications and visual direction':'Preparing brand, format and source photo');let background,sourcePhoto,cutoutQuality,cutout='not-requested',backgroundMethod='designed-studio';const warnings=[],policy=page.creative_policy||{};
  if(product?.image_url&&policy.removeBackground!==false){await updateTask(task,25,'Isolating the real product and checking its edges and full silhouette');const response=await outbound(product.image_url,{maxBytes:12_000_000});if(!response.ok)throw new AppError(502,'The catalog product photo could not be downloaded.');sourcePhoto=response.bytes;try{const result=await removeProductBackground(sourcePhoto,{product});sourcePhoto=result.bytes;cutout=result.method;cutoutQuality=result.quality;}catch(error){cutout='original-photo';warnings.push(error instanceof AppError?error.message:'Background removal unavailable; original photo retained.');}}
@@ -261,7 +267,7 @@ async function publish(task){
    }
    websiteConfirmed=true;await deliveryState(task,'website','confirmed',{phase:'Article committed to website database',url:wp.link,remoteId:wp.slug||String(wp.id||'')});
    await transaction(w,client=>client.query('UPDATE creator.posts SET website_url=$3 WHERE workspace_id=$1 AND id=$2',[w,post.id,publicURL(wp.link).href]));
-   await updateTask(task,35,'Website · article saved; verifying it on the live domain');if(site.connector==='nobleseek_db')await verifyNoblePublic(site,wp.slug||'echolink-'+post.id);await deliveryState(task,'website','confirmed',{phase:'Live website article verified',url:wp.link});
+   await updateTask(task,35,'Website · article saved; verifying it on the live domain');if(site.connector==='nobleseek_db')await verifyNoblePublic(site,wp.slug||'echolink-'+post.id,{expectedText:post.seo?.article?.generationVersion==='newsroom-v4'?post.seo.article.text:undefined});await deliveryState(task,'website','confirmed',{phase:'Live website article verified',url:wp.link});
    await updateTask(task,50,'Website confirmed live · preparing Facebook');
   }
   else await deliveryState(task,'website','skipped',{phase:'Website publishing disabled for this post'});
@@ -356,7 +362,7 @@ export async function continuePipeline(task,result){
   if(!pipeline&&page.require_review){await queueApprovalNotification(db,w,page,post);return;}
   const input={...(pipeline?{pipeline}:{}),...(task.input.urgent?{urgent:true}:{})};
   if(task.kind==='aggregate'){await requireGenerationCapacity(db,w);await enqueue(db,w,'generate',{pageId:page.id,postId,input});}
-  else if(['generate','write_article'].includes(task.kind)&&(pipeline?.makeCreative||post.creative.sourceImage||['image','product_sale'].includes(post.type))){await requireGenerationCapacity(db,w);await enqueue(db,w,'creative',{pageId:page.id,postId,input});}
+  else if(['generate','write_article'].includes(task.kind)&&(post.seo?.article?.socialPending||pipeline?.makeCreative||post.creative.sourceImage||['image','product_sale'].includes(post.type))){await requireGenerationCapacity(db,w);await enqueue(db,w,'creative',{pageId:page.id,postId,input});}
   else if(['generate','write_article','creative','render_reel'].includes(task.kind)&&(rule?.auto_schedule??true)){
    const factualHold=criticalEditorialWarnings(post.seo.editorialWarnings).length>0||post.seo?.safety?.requiresHuman&&post.approved_version!==post.version;
    const automatic=!factualHold&&(rule?.auto_publish??true)&&page.active&&!page.require_review&&env().publishing&&(page.fb_verified||page.destination_type==='facebook_profile');

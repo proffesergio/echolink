@@ -1,4 +1,5 @@
 import {AppError} from './errors.mjs';
+import {newsReportProblem} from './news-quality.mjs';
 const clocks=new Map();
 export function pageClock(page,now=new Date()){
  let format=clocks.get(page.timezone);if(!format){format=new Intl.DateTimeFormat('en-CA',{timeZone:page.timezone,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});clocks.set(page.timezone,format);}
@@ -41,6 +42,7 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
 }
 export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,await bookings(db,w,page.id,postId),{from,until,spread:spread&&page.creative_policy?.scheduleMode!=='interval',target});}
 export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
+ const newsroomProblem=newsReportProblem(post,page);if(newsroomProblem)throw new AppError(409,newsroomProblem,'newsroom_review');
  if(!page.active)throw new AppError(409,'Enable this Page before publishing.');
  if(post.approved_version!==post.version)throw new AppError(409,'Approve the current version before publishing.');
  if(!inWindow(page,now))throw new AppError(409,'Outside this Page’s posting window. Choose a time in the calendar.','outside_window');

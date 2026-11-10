@@ -1,0 +1,12 @@
+import React from 'react';
+export function NewsroomSummary({post}){
+ if(post.type!=='news')return null;const article=post.seo?.article;
+ if(!article)return <p className="meta">News desk: full reporting and evidence checks come first. Facebook copy waits for the website article.</p>;
+ if(article.generationVersion!=='newsroom-v4')return post.status==='published'?null:<p className="meta">Earlier report format · regenerate for the complete newsroom checks.</p>;
+ return <div className="banner"><div><strong>{article.needsReview?'Newsroom · editorial correction needed':article.socialPending?'Newsroom · report prepared, website/social stages pending':'Newsroom · source checks complete'}</strong><p>{article.wordCount} words · {article.paragraphCount} paragraphs · {article.reviewedSections} reviewed sections · {Math.round((article.evidenceCoverage||0)*100)}% assigned evidence coverage</p><small>{post.website_url?'Website article saved. Facebook copy and design use that report.':'The complete article must be saved and verified on the website before its automatic Facebook version.'} Model checks reduce mistakes; they are not independent verification of the original reporting.</small></div></div>;
+}
+export function NewsroomAudit({post}){
+ if(post.type!=='news')return null;const audit=post.seo?.newsroomAudit,draft=post.seo?.bundleDraft,sections=audit?.sections||draft?.reportSections||[],pending=draft?.failedSection||draft?.pendingSection;
+ if(!sections.length&&!pending)return null;
+ return <details><summary>Private newsroom evidence and checks</summary><p className="meta">These records stay inside your workspace. Model review is not independent verification of the source. Editing a checked report requires a new check before publication.</p>{sections.map((s,i)=><section className="panel" key={i}><strong>Section {i+1} · {s.review?.supported?'model check completed':'needs review'}</strong>{audit?.evidence&&<details><summary>Assigned source facts</summary>{audit.evidence.filter(f=>s.evidenceIds?.includes(f.id)).map(f=><p className="meta" key={f.id}>{f.text}</p>)}</details>}<p className="caption">{s.text}</p></section>)}{pending&&<section className="panel"><strong>Section {(pending.index||0)+1} · waiting for correction or review</strong>{(pending.issues||pending.warnings||[]).map((issue,i)=><p className="error-text" key={i}>{issue}</p>)}<p className="caption">{pending.text}</p></section>}</details>;
+}

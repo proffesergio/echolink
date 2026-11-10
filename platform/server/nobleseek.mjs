@@ -1,4 +1,5 @@
 import {articleText} from './news-article.mjs';
+import {load} from 'cheerio';
 import {databaseDriver} from './database-driver.mjs';
 import {AppError} from './errors.mjs';
 import {publicURL,remoteJSON} from './net.mjs';
@@ -32,9 +33,10 @@ export async function writeNoble(c,secret,site,post,{onWrite=()=>{},database=wit
  });
 }
 
-export async function verifyNoblePublic(site,slug,{request=remoteJSON}={}){
+export async function verifyNoblePublic(site,slug,{request=remoteJSON,expectedText}={}){
  const endpoint=new URL('/api/store/nobleseek/articles/'+encodeURIComponent(slug)+'/',site.url);
  const result=await request(endpoint.href,{timeout:20000});const article=result.data||result;
  if(article.slug!==slug)throw new AppError(502,'The website API has not exposed this exact article yet. Facebook is waiting; the database article is preserved.');
+ if(expectedText){const normalized=text=>String(text).normalize('NFC').replace(/\s+/gu,' ').trim(),actual=load('<div>'+String(article.body_html||article.body||'').replace(/<\/p\s*>/gi,'</p> ')+'</div>')('div').text();if(normalized(actual)!==normalized(expectedText))throw new AppError(502,'The live website article does not yet match the complete checked report. Facebook preparation is waiting; inspect the website CMS/cache.');}
  return {verifiedAt:new Date().toISOString(),url:new URL('/nobleseek/'+slug,site.url).href};
 }

@@ -5,6 +5,7 @@ import {outbound,remoteJSON,publicURL} from './net.mjs';
 import {AppError} from './errors.mjs';
 import {readFabrythingCatalog} from './fabrything.mjs';
 import {productDetails} from './content-policy.mjs';
+import {extractNewsHTML} from './news-extraction.mjs';
 const clean=value=>load('<div>'+String(value||'')+'</div>')('div').text().replace(/\s+/g,' ').trim();
 export function canonicalArticleURL(value){const parsed=new URL(value);parsed.hash='';const url=publicURL(parsed.href);for(const key of [...url.searchParams.keys()])if(/^utm_/i.test(key)||['fbclid','gclid'].includes(key))url.searchParams.delete(key);url.searchParams.sort();return url.href;}
 export function normalizeProduct(p,website){
@@ -44,7 +45,6 @@ export async function readFeed(feed){
  return (parsed.items||[]).slice(0,40).filter(x=>x.link).flatMap(item=>{try{return[{title:clean(item.title).slice(0,140),url:canonicalArticleURL(item.link),body:clean(item['content:encoded']||item.content||item.contentSnippet).slice(0,16000),date:item.isoDate||item.pubDate,category:item.categories?.join(' ')||'',image:item.mediaContent?.$?.url||item.mediaThumbnail?.$?.url||(/image/i.test(item.enclosure?.type||'')?item.enclosure.url:null)||load(item['content:encoded']||item.content||'')('img').first().attr('src')||null}];}catch{return[];}}).sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
 }
 export async function articleDetails(article){
- const response=await outbound(article.url);if(!response.ok)return article;const $=load(response.bytes.toString());$('script,style,nav,footer,aside').remove();
- const articleText=$('article').first().text().trim()||$('main').first().text().trim();const image=$('meta[property="og:image"]').attr('content')||$('meta[name="twitter:image"]').attr('content'),category=$('meta[property="article:section"]').attr('content')||article.category;
- return {...article,category,body:(articleText.length>article.body.length?articleText:article.body).replace(/\s+/g,' ').slice(0,20000),image:image?publicURL(new URL(image,article.url).href).href:article.image};
+ const response=await outbound(article.url);if(!response.ok)return article;const report=extractNewsHTML(response.bytes.toString());
+ return {...article,category:report.category||article.category,body:(report.body||article.body||'').slice(0,30000),extraction:report.extraction,publishedAt:report.publishedAt||article.date,image:report.image?publicURL(new URL(report.image,article.url).href).href:article.image};
 }

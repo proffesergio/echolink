@@ -1,0 +1,23 @@
+import '../platform/server/env.mjs';
+import {transaction,closeDatabase} from '../platform/server/db.mjs';
+import {decryptSecret} from '../platform/server/vault.mjs';
+import {collectReportEvidence,generateNewsReport} from '../platform/server/news-desk.mjs';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
+const file=new URL('../.codex/newsroom-check/report.json',import.meta.url),full=process.argv.includes('--full');
+const selected=process.argv.find(a=>a.startsWith('--post='))?.slice(7)||null;if(selected&&!/^[a-f0-9-]{36}$/.test(selected))throw Error('Use a valid post UUID.');
+// Read-only production selection. No website/social delivery function is imported.
+try{
+ const input=await transaction(null,async db=>{
+  const post=(await db.query("SELECT s.* FROM creator.posts s JOIN creator.pages p ON p.id=s.page_id JOIN creator.workspaces w ON w.id=p.workspace_id JOIN creator.accounts a ON a.id=w.owner_id WHERE lower(a.email)=$1 AND p.kind='news' AND s.source_url IS NOT NULL AND s.deleted_at IS NULL AND ($2::uuid IS NULL OR s.id=$2) ORDER BY length(s.body) DESC LIMIT 1",[process.env.PLATFORM_OWNER_EMAIL.toLowerCase(),selected])).rows[0];if(!post)throw Error('No owner news evidence is available.');
+  const page=(await db.query('SELECT * FROM creator.pages WHERE id=$1',[post.page_id])).rows[0],connection=(await db.query('SELECT * FROM creator.connections WHERE id=$1',[page.text_connection_id])).rows[0];return {page,post,connection,secret:decryptSecret(connection.secret_cipher,page.workspace_id)};
+ },{owner:true});
+ const writer=process.argv.find(a=>a.startsWith('--writer='))?.slice(9);if(writer){if(!/^[a-zA-Z0-9_.:/@-]{1,160}$/.test(writer))throw Error('Invalid writer model.');input.connection.config={...input.connection.config,taskModels:{...input.connection.config.taskModels,news_article:writer}};}
+ const reviewer=process.argv.find(a=>a.startsWith('--reviewer='))?.slice(11);if(reviewer){if(!/^[a-zA-Z0-9_.:/@-]{1,160}$/.test(reviewer))throw Error('Invalid reviewer model.');input.connection.config={...input.connection.config,taskModels:{...input.connection.config.taskModels,news_review:reviewer}};}
+ const context=Number(process.argv.find(a=>a.startsWith('--context='))?.slice(10));if(context){if(!Number.isInteger(context)||context<1024||context>32768)throw Error('Invalid writing context.');input.connection.config={...input.connection.config,taskContextTokens:{...input.connection.config.taskContextTokens,news_article:context}};}
+ input.post=await collectReportEvidence(input.post);await mkdir(new URL('../.codex/newsroom-check/',import.meta.url),{recursive:true});let savedDraft;try{savedDraft=JSON.parse(await readFile(file,'utf8')).checkpoint;}catch{}
+ const result=await generateNewsReport(input,{savedDraft,deferSocial:true,onProgress:async(part,total,detail)=>console.log(JSON.stringify({stage:detail.stage,section:part,total,checks:detail.checks?.length?detail.checks:undefined})),onMetrics:m=>console.log(JSON.stringify({model:m.model,purpose:m.purpose,inputTokens:m.inputTokens,outputTokens:m.outputTokens,seconds:m.seconds})),onSection:async checkpoint=>{
+  await mkdir(new URL('../.codex/newsroom-check/',import.meta.url),{recursive:true});await writeFile(file,JSON.stringify({checkedAt:new Date().toISOString(),postId:input.post.id,checkpoint},null,2),{mode:0o600});
+  if(!full&&checkpoint.reportSections?.length&& !checkpoint.failedSection)throw Object.assign(Error('One real writing + independent review section completed; private checkpoint saved. No publication submitted.'),{code:'verified_section'});
+ }});
+ await writeFile(new URL('../.codex/newsroom-check/result.json',import.meta.url),JSON.stringify(result,null,2),{mode:0o600});console.log(JSON.stringify({held:!!result.hold,message:result.message,words:result.article?.wordCount,paragraphs:result.article?.paragraphCount,needsReview:result.article?.needsReview,privateResult:'.codex/newsroom-check/result.json',realPublicationSubmitted:false}));if(result.hold||result.article?.needsReview)process.exitCode=1;
+}catch(error){if(error.code==='verified_section')console.log(error.message);else{console.error(error.message);process.exitCode=1;}}finally{await closeDatabase();}

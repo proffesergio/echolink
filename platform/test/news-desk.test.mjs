@@ -1,22 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateNewsReport,newsSocialCaption,NEWS_COMMENT_CTA} from '../server/news-desk.mjs';
-const page={name:'Noble Seek',language:'Bangla',niche:'News',website_publishing:true,creative_policy:{linkComments:{enabled:true}}},sentence='ঢাকার সড়ক সংস্কারের বিষয়ে সংশ্লিষ্ট কর্তৃপক্ষ বিস্তারিত নির্দেশনা দিয়েছে।';
-test('news captions contain a first-comment invitation instead of a mandatory question and omit external URLs',()=>{
- const caption=newsSocialCaption('সড়কের বিষয়ে নির্দেশনা এসেছে। #ঢাকা',page);assert(caption.includes(NEWS_COMMENT_CTA));assert.equal((caption.match(/#/g)||[]).length,3);assert(!newsSocialCaption(sentence,{...page,website_publishing:false}).includes('প্রথম কমেন্ট'));
+import {parseSectionReview,parseWrittenFacts} from '../server/news-report-writer.mjs';
+import {evidenceConflicts} from '../server/news-quality.mjs';
+import {factModalityWarnings} from '../server/news-quality.mjs';
+import {evidenceLedger,reportGroups,newsWords,sectionWarnings,newsReportProblem,reviewedNewsHash} from '../server/news-quality.mjs';
+import {captionLanguageWarnings} from '../server/caption-generation.mjs';
+const page={name:'Noble Seek',kind:'news',language:'Bangla',niche:'News',website_publishing:true,creative_policy:{contentFormat:'news_desk_v3',linkComments:{enabled:true}}};
+const nouns='সড়ক বিদ্যালয় হাসপাতাল পাঠাগার বাজার নদী উদ্যান সেতু বাস টার্মিনাল কৃষি বন পানি বিদ্যুৎ খাল বন্দর গবেষণা শিল্প ক্রীড়া শিক্ষা স্বাস্থ্য প্রশিক্ষণ পরিবহন'.split(' ');
+// Synthetic fixtures are never sent to a publisher.
+const post={type:'news',title:'নগর উন্নয়ন পরিকল্পনা প্রকাশ',source_url:'https://example.com/report',seo:{},body:nouns.map((n,i)=>n+' বিষয়ে কর্তৃপক্ষ '+(i+21)+' সদস্যের দলের নির্দিষ্ট কার্যক্রম প্রকাশ করেছে এবং প্রকল্পের নথিতে '+n+' সংক্রান্ত দায়িত্ব পালনের পরিকল্পনা ও সংশ্লিষ্ট এলাকার প্রয়োজনীয় প্রস্তুতির বিস্তারিত বিবরণ জানিয়েছে।').join('\n\n')};
+const connection={provider:'ollama',config:{model:'fixture',contextTokens:4096}};
+const groupFrom=prompt=>JSON.parse(prompt.match(/Assigned evidence: (.*?)\nOriginal source lead/s)[1]);
+async function complete(_c,_s,prompt,{purpose}){
+ if(purpose==='news_review'){const data=JSON.parse(prompt.slice(prompt.indexOf('\n{')+1));return JSON.stringify({supported:true,coveredIds:data.evidence.map(f=>f.id),issues:[]});}
+ assert(purpose==='news_article','Facebook caption must wait for website confirmation');assert(prompt.length<3200);
+ const group=groupFrom(prompt),texts=group.map(f=>f.text.replace('বিষয়ে কর্তৃপক্ষ','নিয়ে সংশ্লিষ্ট কর্তৃপক্ষ').replace('নির্দিষ্ট কার্যক্রম','নির্ধারিত কার্যক্রম').replace('প্রকল্পের নথিতে','প্রকাশিত নথিতে').replace('দায়িত্ব পালনের পরিকল্পনা','দায়িত্ব বাস্তবায়নের পরিকল্পনা').replace('বিস্তারিত বিবরণ জানিয়েছে','বিস্তারিত তথ্য দিয়েছে'));return JSON.stringify({sentences:group.map((f,i)=>({id:f.id,text:texts[i]}))});
+}
+test('news captions contain a first-comment invitation and three hashtags',()=>{const caption=newsSocialCaption('পরিকল্পনার বিষয়ে নির্দেশনা এসেছে। #ঢাকা',page);assert(caption.includes(NEWS_COMMENT_CTA));assert.equal((caption.match(/#/g)||[]).length,3);});
+test('complete evidence, independent review and checkpoints precede any social caption',async()=>{
+ let saved,writes=0;await assert.rejects(()=>generateNewsReport({page,post,connection},{complete:async(...args)=>{if(args[3].purpose==='news_article'&&++writes===2)throw Error('timeout');return complete(...args);},onSection:async d=>{saved=structuredClone(d);}}),/timeout/);assert.equal(saved.reportSections.length,1);
+ let resumed=0;const result=await generateNewsReport({page,post,connection},{savedDraft:saved,complete:async(...args)=>{if(args[3].purpose==='news_article')resumed++;return complete(...args);}});
+ assert.equal(resumed,reportGroups(evidenceLedger(post),{budget:Math.floor(4096*.28)}).length-1);assert(result.article.wordCount>=450);assert(result.article.paragraphCount>=6);assert.equal(result.caption,'');assert.equal(result.article.socialPending,true);assert.equal(result.article.generationVersion,'newsroom-v4');assert.equal(result.article.evidenceCoverage,1);assert.deepEqual(result.warnings,[]);
 });
-test('full reports keep paragraph checkpoints, assemble long website prose and only then request the short caption',async()=>{
- const post={type:'news',title:'সড়ক সংস্কার',body:sentence.repeat(100),seo:{}},connection={provider:'ollama',config:{model:'fixture'}};let saved,calls=0;
- const complete=async(_c,_s,_p,{purpose})=>{if(++calls===2)throw new Error('timeout');return 'শিরোনাম: সড়কের নির্দেশনা\n\n'+sentence.repeat(10);};
- await assert.rejects(()=>generateNewsReport({page,post,connection},{complete,onSection:async s=>{saved=structuredClone(s);}}),/timeout/);assert.equal(saved.reportSegments.length,1);
- let paragraphs=0,captionRequested=false;const result=await generateNewsReport({page,post,connection},{savedDraft:saved,complete:async(_c,_s,_p,{purpose})=>{if(purpose==='news_caption'){captionRequested=true;assert.equal(paragraphs,4);return sentence;}paragraphs++;return sentence.repeat(10);}});
- assert(captionRequested);assert(result.article.wordCount>=320);assert.equal(result.article.policyVersion,'news_desk_v3');assert(result.caption.includes(NEWS_COMMENT_CTA));assert(result.article.text.length>result.caption.length*5);
+test('thin, repeated RSS evidence is held before inference instead of padded',async()=>{const result=await generateNewsReport({page,post:{...post,body:'পরিকল্পনা প্রকাশ করেছে সংশ্লিষ্ট কর্তৃপক্ষ।'.repeat(200)},connection},{complete:async()=>{throw Error('must not run');}});assert(result.hold);assert.match(result.message,/unique source words/);});
+test('reviewer cannot approve missing facts, and evidence windows preserve complete sentences',()=>{assert.equal(parseSectionReview('{"supported":true,"issues":[],"coveredIds":[]}',[{id:'F1'}]).supported,false);const facts=evidenceLedger(post),groups=reportGroups(facts,{budget:700});assert.equal(groups.flat().length,facts.length);assert(groups.flat().every(f=>f.text.endsWith('।')));assert(newsWords(facts.map(f=>f.text).join(' '))>=450);});
+test('unfinished paragraphs fail checks without forcing factual statements to change meaning',()=>{const group=evidenceLedger(post).slice(0,1);assert(sectionWarnings('এখানে ৯৯৯ জনের বিষয়ে বলা হয়েছে কিন্তু এই বাক্যটি',group,page).some(w=>w.includes('unfinished')));});
+test('corrupted Hangul words and dropped denials cannot pass Bengali newsroom checks',()=>{assert(captionLanguageWarnings('বাংলাদেশের ও윅েস্ট ইন্ডিজের ম্যাচের তথ্য।',page).length);assert(sectionWarnings('এই ঘটনার বিষয়ে সংশ্লিষ্ট ব্যক্তির বক্তব্য নিয়ে বিস্তারিত আলোচনা করা হয়েছে।',[{id:'F1',text:'তিনি অভিযোগটি অস্বীকার করেছেন।'}],page).some(w=>w.includes('denial')));});
+test('ordinal reversals are caught even when written as Bengali words',()=>{assert(sectionWarnings('খেলার চতুর্থ দিনে দলটি মাঠে নামে এবং খেলা শেষে সংশ্লিষ্ট বিষয়ে বিস্তারিত তথ্য প্রকাশ করে।',[{id:'F1',text:'খেলার পঞ্চম দিনে দলটি মাঠে নামে।'}],page).some(w=>w.includes('ordinal')));});
+test('not attempting cannot be rewritten as attempting unsuccessfully, and possibility is not an outcome',()=>{assert(factModalityWarnings('তবে সে চেষ্টা করেননি স্বাগতিকরা।','স্বাগতিকরা লক্ষ্যে পৌঁছাতে পারেননি।').length);assert.equal(factModalityWarnings('তবে সে চেষ্টা করেননি স্বাগতিকরা।','কিন্তু স্বাগতিকরা সে চেষ্টা করেননি।').length,0);assert(factModalityWarnings('জয়ের সম্ভাবনা ছিল।','দলটি জয়ী হয়েছে।').length);});
+test('rewritten sections cannot omit IDs, swap numeric units or conceal source conflicts',()=>{
+ assert.throws(()=>parseWrittenFacts('{"sentences":[{"id":"F1","text":"সম্পূর্ণ বাক্যের বিবরণ।"}]}',[{id:'F1'},{id:'F2'}]),/Every assigned/);
+ assert(sectionWarnings('দলটি ৮০ রান করে এবং তাদের জন্য ৩৬৯ ওভারের পরিকল্পনা ছিল বলে বিস্তারিত প্রতিবেদনে বলা হয়েছে।',[{id:'F1',text:'৮০ ওভারে ৩৬৯ রান করতে হতো।'}],page).some(w=>w.includes('unit')));
+ assert(evidenceConflicts([{id:'F1',source:0,text:'নগরের নতুন প্রকল্পে কাজের দায়িত্বে ৫ জন কর্মকর্তাকে নিয়োগ দিয়েছে কর্তৃপক্ষ।'},{id:'F2',source:1,text:'নগরের নতুন প্রকল্পে কাজের দায়িত্বে ৬ জন কর্মকর্তাকে নিয়োগ দিয়েছে কর্তৃপক্ষ।'}]).length);
 });
-test('sparse evidence is held before inference instead of inventing newspaper-length reporting',async()=>{
- const result=await generateNewsReport({page,post:{title:'সংবাদ',body:sentence,seo:{}},connection:{}},{complete:async()=>{throw new Error('must not call');}});assert(result.hold);assert.match(result.message,/source evidence/);
+test('an old generated headline never becomes newsroom source evidence',async()=>{let story;await assert.rejects(()=>generateNewsReport({page,post:{...post,title:'CORRUPTED GENERATED TITLE',seo:{research:{sources:[{url:post.source_url,title:'মূল প্রতিবেদনের শিরোনাম'}]}}},connection},{complete:async(_c,_s,p)=>{story=p;throw Error('inspected');}}),/inspected/);assert(story.includes('মূল প্রতিবেদনের শিরোনাম'));assert(!story.includes('CORRUPTED'));
 });
-test('Bengali report evidence stays bounded for small-context local models',async()=>{
- let calls=0;
- await assert.rejects(()=>generateNewsReport({page,post:{title:'সংবাদ',body:sentence.repeat(200),seo:{}},connection:{config:{contextTokens:4096}}},{complete:async(_c,_s,prompt)=>{calls++;assert(prompt.length<2800);throw Error('budget checked');}}),/budget checked/);
- assert.equal(calls,1);
-});
+test('caption-length and caption-format instructions do not contaminate website writing',async()=>{let prompt;const configured={...page,creative_policy:{...page.creative_policy,postTypePrompts:{news:{caption:'CAPTION_ONLY_RULE'}},editorial:{styleNotes:'SHORT_CAPTION_RULE',articleStyleNotes:'NEWSPAPER_VOICE'}}};await assert.rejects(()=>generateNewsReport({page:configured,post,connection},{complete:async(_c,_s,p)=>{prompt=p;throw Error('inspected');}}),/inspected/);assert(prompt.includes('NEWSPAPER_VOICE'));assert(!prompt.includes('CAPTION_ONLY_RULE'));assert(!prompt.includes('SHORT_CAPTION_RULE'));});
+test('publishing refuses legacy, pending or changed report text',()=>{const text=post.body+'\n\n',article={generationVersion:'newsroom-v4',text,reviewedSections:6,evidenceCoverage:1,needsReview:false,socialPending:false,reviewedTextHash:reviewedNewsHash(post.title,text)},prepared={...post,seo:{article}};assert.equal(newsReportProblem(prepared,page),null);assert.match(newsReportProblem({...prepared,seo:{article:{...article,text:text+'changed'}}},page),/changed/);assert.match(newsReportProblem({...prepared,seo:{article:{...article,socialPending:true}}},page),/website/);assert.match(newsReportProblem({...prepared,seo:{article:{}}},page),/Regenerate/);});

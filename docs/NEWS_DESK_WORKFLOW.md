@@ -1,4 +1,4 @@
-# News desk: report first, social post second
+# Newsroom v4: evidence, complete report, website, then Facebook
 
 Select a news Page, then **Page settings → Design & prompts → Output format →
 News desk · complete website report first**. NobleSeek is configured for this mode.
@@ -8,21 +8,36 @@ records, while necessary prose attribution and uncertainty remain in the article
 
 The flow is:
 
-1. Collect full available reporting, not just an RSS excerpt.
-2. Write a neutral Bangladeshi newspaper-style report in saved paragraph steps:
-   factual lead, developments, documented context, implications and known next
-   steps. The normal target is five substantive paragraphs, approximately
-   400–550 Bengali words when supported. Thin reporting uses a smaller report or
-   stays held rather than being expanded with invented facts.
-3. Prepare two short social-summary sentences. Append the configured first-comment
-   invitation and relevant hashtags. A closing engagement question is optional.
-4. For an enabled automatic Page, publish and verify the complete website report
-   before preparing its news-card image. Human-review Pages retain their review
-   requirement; drafts explicitly saved outside automation are not auto-published.
-5. Render the news image with its original source photo, Page logo, selected
+1. Extract the full article body from article containers or structured data. Menus,
+   related-story widgets and navigation are excluded. Related reports come from
+   the Page's configured feeds and matching event cluster, not arbitrary browsing.
+2. Build a private evidence ledger of whole sentences. Exact repeats do not count
+   as more evidence. Detect overlapping reports with conflicting quantities or
+   outcomes and hold them for an editor. At least 450 unique source words are
+   required for this full-report mode; thin RSS summaries are held.
+3. Write original, neutral newspaper prose in bounded sections. Aim for complete
+   coverage, normally 450–850+ words with at least six readable paragraphs when
+   supported. Preserve chronology, names, direct quotes, denials and attribution.
+   No padding, invented interviews, moral judgement or unsupported analysis.
+4. A separate configured `news_review` model checks each section against assigned
+   facts and returns constrained JSON. Deterministic checks also reject unrelated
+   scripts, unfinished sentences, unsupported figures, lost denials and repeated
+   material. Native Ollama JSON constraints preserve source numbers, ordinals and
+   negation during writing. A final originality check holds reports with excessive
+   unquoted verbatim source wording. One correction is attempted;
+   unresolved problems stay held. Draft writing and accepted section checkpoints
+   survive provider errors. Overall coverage, length and reviewed-text hash are
+   checked before publication.
+5. For an enabled automatic Page, write the complete checked report to the website.
+   Verify that its live API exposes the exact full text, not just the slug. Only
+   then call the caption model for two short social sentences, configured first-
+   comment invitation and relevant hashtags, followed by the news-card design.
+   Human-review/manual drafts can prepare a preview without automatically writing
+   to the public website. Their explicit approval requirements remain in place.
+6. Render the news image with its original source photo, Page logo, selected
    Bangla headline font, category at upper right and the bottom badge:
    **বিস্তারিত জানতে প্রথম কমেন্ট দেখুন**.
-6. Reserve the next permitted Facebook slot and publish the card/short caption.
+7. Reserve the next permitted Facebook slot and publish the card/short caption.
    The existing delayed link-comment job uses the confirmed website article URL.
    The delay remains at least five minutes; no automation-timer text appears in
    the audience-facing caption.
@@ -30,6 +45,51 @@ The flow is:
 Website writes retain their durable destination receipts. A lost submitted
 response is held for reconciliation. A confirmed URL survives a later image,
 Facebook or public-verification failure and is not blindly republished.
+
+`news_desk_v3` remains the saved Page setting for compatibility; generated reports
+now carry `generationVersion: newsroom-v4`. Earlier short reports cannot silently
+pass the new automatic publication gate. Changes to reviewed article text also
+invalidate that gate. Published historical articles are not rewritten automatically.
+
+Model agreement does **not** prove the original reporting is true, and no model
+configuration guarantees zero mistakes. Sensitive material still requires human
+review. Necessary attribution remains in prose even though routine source-link
+footers are omitted. The approach follows accuracy/attribution principles described
+by [Reuters](https://reutersagency.com/about/standards-values/) and
+[AP](https://www.ap.org/about/news-values-and-principles/telling-the-story/),
+without claiming their endorsement or certification. Native Ollama reviews use
+[structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
+
+## Verify without publishing
+
+```bash
+node scripts/verify-newsroom.mjs --post=POST_UUID
+node scripts/verify-newsroom.mjs --post=POST_UUID --writer=gemma3:4b-it-q4_K_M --full
+```
+
+The first command stops after one accepted writing/review pair; `--full` assembles
+the entire report. These commands only read production source records and save
+private files under `.codex/newsroom-check/`. They never submit a website article
+or Facebook post. A held/invalid report exits with failure. A temporary writer
+override does not change Page settings. Choose a model installed on the worker;
+RAM admission, context limits and the CPU deadline still apply.
+
+To prepare existing unsent automatic news drafts for v4 (backup first, preserving
+published/website-confirmed stories, sensitive holds and commerce):
+
+```bash
+node scripts/upgrade-newsroom.mjs
+node scripts/upgrade-newsroom.mjs --apply
+```
+
+## Separate website and social writing instructions
+
+Under **Page settings → Design & prompts → Editorial**, use **Website report
+voice** for newspaper style. Social caption voice and post-type caption rules
+do not shorten or format the website report. Open a draft to inspect its private
+**Newsroom evidence and checks**: accepted sections, assigned source facts and
+the actual reason a section was held. These audit records are omitted from the
+lightweight dashboard list.
 
 ## Upload a Bangla headline font
 

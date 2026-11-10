@@ -3,9 +3,11 @@ import {deliveryState,publicationFailure} from './publication-state.mjs';
 import {writeNoble,verifyNoblePublic} from './nobleseek.mjs';
 import {publicURL,remoteJSON} from './net.mjs';
 import {AppError} from './errors.mjs';
+import {newsReportProblem} from './news-quality.mjs';
 export async function websiteBeforeDesign({task,page,post,site,connection},{updateTask,write=writeNoble,verify=verifyNoblePublic,request=remoteJSON,transact=transaction,receipt=deliveryState}={}){
  let submitted=false,confirmed=!!post.website_url;
  try{
+  const problem=newsReportProblem(post,page,{social:false});if(problem)throw new AppError(409,problem,'newsroom_review');
   if(!['nobleseek_db','wordpress'].includes(site.connector))throw new AppError(400,'This website does not support article publication.');
   if(!confirmed)await transact(task.workspace_id,async db=>{
    await workspaceLock(db,task.workspace_id);const previous=(await db.query("SELECT status FROM creator.publication_deliveries WHERE workspace_id=$1 AND post_id=$2 AND destination='website' FOR UPDATE",[task.workspace_id,post.id])).rows[0];
@@ -22,7 +24,7 @@ export async function websiteBeforeDesign({task,page,post,site,connection},{upda
    confirmed=true;await receipt(task,'website','confirmed',{phase:'Complete report saved before design',url:article.link,remoteId:article.slug||String(article.id||'')});
    await transact(task.workspace_id,db=>db.query('UPDATE creator.posts SET website_url=$3,updated_at=now() WHERE workspace_id=$1 AND id=$2',[task.workspace_id,post.id,publicURL(article.link).href]));post.website_url=article.link;
   }
-  await updateTask(task,10,'Website · checking the live report before designing the Facebook post');if(site.connector==='nobleseek_db')await verify(site,article.slug||'echolink-'+post.id);
+  await updateTask(task,10,'Website · checking the live report before preparing Facebook copy and design');if(site.connector==='nobleseek_db')await verify(site,article.slug||'echolink-'+post.id,{expectedText:post.seo?.article?.text});
   await receipt(task,'website','confirmed',{phase:'Full website report verified; news design can begin',url:post.website_url});return post.website_url;
  }catch(error){
   if(error.code==='publication_unknown')throw error;

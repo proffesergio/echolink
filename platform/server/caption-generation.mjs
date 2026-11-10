@@ -5,9 +5,9 @@ import {groundedProductCaption,groundedBanglaProductCaption} from './grounded-pr
 import {hasOperationalCopy} from './public-copy.mjs';
 export function captionLanguageWarnings(caption,page){
  const prose=String(caption||'').replace(/#[\p{L}\p{M}\p{N}_]+/gu,'');
- if(page.language==='Bilingual-Mix'&&((prose.match(/[\u0980-\u09ff]/gu)||[]).length<12||/[\p{Script=Devanagari}\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(prose)))return ['Language policy requires natural Bengali product copy with useful English terms, without unrelated scripts.'];
+ if(page.language==='Bilingual-Mix'&&((prose.match(/[\u0980-\u09ff]/gu)||[]).length<12||/[\p{Script=Devanagari}\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(prose)))return ['Language policy requires natural Bengali product copy with useful English terms, without unrelated scripts.'];
  if(page.language==='Bangla'&&((prose.match(/[\u0980-\u09ff]/gu)||[]).length<12||/(?:^|[।!?]\s+|\n)[A-Za-z][^।\n]{12,}\b(?:is|are|with|for|your|our|the|this|discover|message|crafted|designed)\b[^।\n]{8,}[.!?]/iu.test(prose)))return ['Language policy requires a Bangla caption without a parallel English summary.'];
- if(page.language==='Bangla'&&(/[\p{Script=Devanagari}\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(prose)||/[\u0980-\u09ff][A-Za-z]{3,}/u.test(prose)))return ['Language policy found unrelated script or a corrupted mixed-script word. Correct it against the source before publication.'];
+ if(page.language==='Bangla'&&(/[\p{Script=Devanagari}\p{Script=Cyrillic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(prose)||/[\u0980-\u09ff][A-Za-z]{3,}/u.test(prose)))return ['Language policy found unrelated script or a corrupted mixed-script word. Correct it against the source before publication.'];
  if(page.language==='English'&&/[\u0980-\u09ff]{3,}/u.test(caption))return ['Language policy requires a consistent English caption.'];
  return [];
 }

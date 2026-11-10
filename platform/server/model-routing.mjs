@@ -1,5 +1,5 @@
 import {AppError} from './errors.mjs';
-export const modelPurposes=['research','product_analysis','news_article','news_caption','first_comment','design_brief','product_caption','instagram_caption','storyboard','reference_analysis'];
+export const modelPurposes=['research','product_analysis','news_article','news_review','news_caption','first_comment','design_brief','product_caption','instagram_caption','storyboard','reference_analysis'];
 const complex=new Set(['news_article','storyboard','reference_analysis','news_bundle','product_bundle']);
 export function modelRoute(connection,purpose='general',prompt=''){
  const config=connection.config||{};if(connection.provider!=='ollama'||!config.automaticRouting)return {connection,purpose,complexity:'default'};
