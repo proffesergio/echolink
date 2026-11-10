@@ -8,7 +8,7 @@ import {productFingerprint} from '../server/product-preflight.mjs';
 import {createLocalInferenceGate,localInferenceGate} from '../server/inference-resources.mjs';
 
 test('native local captions enforce non-thinking, context/CPU caps and report real token metrics',async()=>{
- let payload;const oldURL=process.env.PLATFORM_OLLAMA_URL;
+ let payload;const oldURL=process.env.PLATFORM_OLLAMA_URL,oldThreads=process.env.PLATFORM_INFERENCE_THREADS;process.env.PLATFORM_INFERENCE_THREADS='2';
  const server=createServer(async(req,res)=>{res.setHeader('content-type','application/json');
   if(req.url==='/api/tags')return res.end(JSON.stringify({models:[{name:'fixture:4b',size:2e9}]}));
   if(req.url==='/api/ps')return res.end(JSON.stringify({models:[{name:'fixture:4b'}]}));
@@ -19,7 +19,7 @@ test('native local captions enforce non-thinking, context/CPU caps and report re
  // changing free RAM while an unrelated production model is running.
  const metrics=[],originalRun=localInferenceGate.run;localInferenceGate.run=createLocalInferenceGate({memory:()=>8*1024**3}).run;
  try{assert.match(await textCompletion({provider:'ollama',config:{model:'fixture:4b',contextTokens:32000,maxOutputTokens:2048}},{},'Fixture facts',{onMetrics:m=>metrics.push(m)}),/verified facts/);assert.equal(payload.think,false);assert.equal(payload.options.num_ctx,4096);assert.equal(payload.options.num_thread,2);assert.equal(payload.options.num_gpu,0);assert.equal(payload.options.num_predict,1800);assert.equal(payload.keep_alive,'30s');assert.equal(metrics[0].tokensPerSecond,10);}
- finally{localInferenceGate.run=originalRun;if(oldURL===undefined)delete process.env.PLATFORM_OLLAMA_URL;else process.env.PLATFORM_OLLAMA_URL=oldURL;server.closeAllConnections();await new Promise(r=>server.close(r));}
+ finally{if(oldThreads===undefined)delete process.env.PLATFORM_INFERENCE_THREADS;else process.env.PLATFORM_INFERENCE_THREADS=oldThreads;localInferenceGate.run=originalRun;if(oldURL===undefined)delete process.env.PLATFORM_OLLAMA_URL;else process.env.PLATFORM_OLLAMA_URL=oldURL;server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
 test('compact prompts bound source size without inventing facts; Instagram adaptation retains qualifications',()=>{
  const page={name:'Fixture',niche:'News',language:'Bangla',creative_policy:{channelCaptions:{instagram:{style:'concise'}}}},post={type:'news',title:'Fixture source',body:'Source details. '.repeat(1000)};

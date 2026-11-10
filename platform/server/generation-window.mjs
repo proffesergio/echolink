@@ -1,4 +1,7 @@
 import {pageClock,inWindow,findSlot,wallTimeToInstant} from './scheduling.mjs';
+// Only starting resource-heavy source/copy work observes generation hours.
+// Finishing a prepared design and booking delivery must not be parked all day.
+export const startsGeneration=kind=>['aggregate','generate','import_products'].includes(kind);
 
 export function generationAvailability(rule,page,reservations=[],{now=new Date()}={}){
  const window=rule.generation_window||{};

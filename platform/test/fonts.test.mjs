@@ -10,7 +10,7 @@ test('Unicode font validation rejects disguised, corrupt and oversize uploads an
  for(const invalid of [Buffer.from('<svg onload="evil"/>'),bytes.subarray(0,32),Buffer.alloc(FONT_MAX_BYTES+1)])assert.throws(()=>inspectFont(invalid),e=>e.status===400);
 });
 test('headline and body font choices stay independent and their actual font file reaches image rendering',async()=>{
- const page={name:'বাংলা সংবাদ',language:'Bangla',brand:{},designFonts:{headline:{family:'Noto Sans Bengali',path:fileURLToPath(file)}},creative_policy:{}};
+ const page={name:'বাংলা সংবাদ',language:'Bangla',brand:{},website_publishing:true,designFonts:{headline:{family:'Noto Sans Bengali',path:fileURLToPath(file)}},creative_policy:{linkComments:{enabled:true}}};
  assert.equal(fontOptions(page,'headline',44).fontfile,fileURLToPath(file));assert.equal(fontOptions(page,'body',20,'Georgia').font,'Georgia 20');
- const result=await renderNewsCreative({page,post:{title:'বাংলা সংবাদের নতুন শিরোনাম',seo:{},creative:{}},width:1080,height:1350});assert(result.bytes.length>10000);assert.equal(result.height,1350);
+ const result=await renderNewsCreative({page,post:{title:'বাংলা সংবাদের নতুন শিরোনাম',seo:{},creative:{}},width:1080,height:1350});assert(result.bytes.length>10000);assert.equal(result.height,1350);assert(result.visibleText.includes('বিস্তারিত জানতে প্রথম কমেন্ট দেখুন'));
 });

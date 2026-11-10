@@ -1,4 +1,5 @@
 import {nichePresets} from './niches.mjs';
+import {pageCatalogue,catalogueFeedURL,newCataloguePolicy} from './meta-catalogue.mjs';
 import {queueApprovalNotification} from './notifications.mjs';
 import {inferenceHost,inspectInferenceHost,saveInferenceHost} from './inference-host.mjs';
 import {listFonts,uploadFont} from './fonts.mjs';
@@ -69,6 +70,17 @@ export async function api(request,path,body={},identityVerifier){
  if(path==='/api/public'&&method==='GET')return transaction(null,async db=>({identity:identityStatus(),local:!env().production,publishingEnabled:env().publishing,plans:(await db.query('SELECT * FROM creator.plans WHERE enabled ORDER BY page_limit')).rows,providers,paymentMethods:(await db.query('SELECT id,label,markets,instructions,enabled FROM creator.payment_methods ORDER BY id')).rows}));
  const actor=await resolveActor(request,identityVerifier),w=actor.workspaceId;
  if(method!=='GET')requireVerified(actor);
+ const catalogue=path.match(/^\/api\/pages\/([a-f0-9-]{36})\/meta-catalogue$/);
+ if(catalogue&&['GET','POST'].includes(method))return transaction(w,async db=>{
+  const result=await pageCatalogue(db,w,catalogue[1]);let policy=result.page.creative_policy?.metaCatalogue;
+  if(method==='POST'){
+   if(!['enable','rotate','disable'].includes(body.action))throw new AppError(400,'Choose enable, rotate or disable.');
+   policy=body.action==='enable'&&policy?.enabled?policy:newCataloguePolicy(body.action!=='disable');
+   await db.query("UPDATE creator.pages SET creative_policy=jsonb_set(creative_policy,'{metaCatalogue}',$3::jsonb),updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,catalogue[1],JSON.stringify(policy)]);
+   await audit(db,w,actor,'catalogue.feed.'+body.action,'page',catalogue[1]);
+  }
+  return {csv:result.csv,included:result.included,excluded:result.excluded,issues:result.issues,total:result.total,lastImportedAt:result.lastImportedAt,feedURL:catalogueFeedURL(w,catalogue[1],policy),enabled:policy?.enabled===true};
+ });
  if(path==='/api/state'&&method==='GET'){const requestStarted=performance.now();return transaction(w,async db=>{
   const contentRevision=(await db.query('SELECT revision::text FROM creator.workspace_revisions WHERE workspace_id=$1',[w])).rows[0]?.revision||'0';
   const data={actor:{id:actor.id,name:actor.name,email:actor.email,role:actor.role,email_verified:actor.email_verified},workspace:actor.workspace,workspaces:actor.workspaces,entitlements:await entitlements(db,w,{allowExpired:true}),providers:connectionTypes.filter(p=>!p.ownerOnly||actor.role==='super_admin'),publishingEnabled:env().publishing,environment:env().production?'production':'development'};

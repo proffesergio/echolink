@@ -1,6 +1,6 @@
 import {assertModelUse} from './model-routing.mjs';
 import {inferenceHost} from './inference-host.mjs';
-import {freemem,totalmem} from 'node:os';
+import {freemem,totalmem,availableParallelism} from 'node:os';
 import {AppError} from './errors.mjs';
 import {remoteJSON} from './net.mjs';
 import {inferenceIdle,ollamaCloudModel} from './inference-idle.mjs';
@@ -16,7 +16,7 @@ export function inferenceSettings(config={},environment=process.env){
  const name=host?.profile||environment.PLATFORM_INFERENCE_PROFILE||'windows_safe',profile=inferenceProfiles[name]||inferenceProfiles.windows_safe;
  const limit=(key,base,min,max)=>Math.max(min,Math.min(max,Number(environment[key])||base));
  const maxContext=limit('PLATFORM_INFERENCE_MAX_CONTEXT',profile.contextTokens,1024,32768);
- return {name,...profile,timeoutSeconds:limit('PLATFORM_INFERENCE_TIMEOUT_SECONDS',profile.timeoutSeconds,30,3600),remote:host?.remote??environment.PLATFORM_INFERENCE_REMOTE==='true',maxModelGB:limit('PLATFORM_INFERENCE_MAX_MODEL_GB',profile.maxModelGB,1,24),contextTokens:Math.max(1024,Math.min(maxContext,Number(config.contextTokens)||profile.contextTokens)),maxOutputTokens:Math.max(128,Math.min(profile.maxOutputTokens,Number(config.maxOutputTokens)||profile.maxOutputTokens)),reserveMB:limit('PLATFORM_INFERENCE_RESERVE_MB',profile.reserveMB,1024,16384),thinking:false};
+ return {name,...profile,threads:Math.floor(limit('PLATFORM_INFERENCE_THREADS',profile.threads,1,availableParallelism())),timeoutSeconds:limit('PLATFORM_INFERENCE_TIMEOUT_SECONDS',profile.timeoutSeconds,30,3600),remote:host?.remote??environment.PLATFORM_INFERENCE_REMOTE==='true',maxModelGB:limit('PLATFORM_INFERENCE_MAX_MODEL_GB',profile.maxModelGB,1,24),contextTokens:Math.max(1024,Math.min(maxContext,Number(config.contextTokens)||profile.contextTokens)),maxOutputTokens:Math.max(128,Math.min(profile.maxOutputTokens,Number(config.maxOutputTokens)||profile.maxOutputTokens)),reserveMB:limit('PLATFORM_INFERENCE_RESERVE_MB',profile.reserveMB,1024,16384),thinking:false};
 }
 export const resourceWait=(message,admission)=>Object.assign(new AppError(503,message,'inference_resource_wait'),{admission});
 export function memoryAdmission({freeBytes,modelBytes,resident=false,settings}){
@@ -76,7 +76,7 @@ export function createLocalInferenceGate({memory=freemem,request=remoteJSON,moni
     throw error;
    }finally{clearInterval(monitor);release();}
   },
-  status:()=>({profile:inferenceSettings().name,totalMB:Math.floor(totalmem()/MiB),freeMB:Math.floor(memory()/MiB),active,lastAdmission:last}),
+  status:()=>({profile:inferenceSettings().name,threads:inferenceSettings().threads,timeoutSeconds:inferenceSettings().timeoutSeconds,totalMB:Math.floor(totalmem()/MiB),freeMB:Math.floor(memory()/MiB),active,lastAdmission:last}),
  };
 }
 export const localInferenceGate=createLocalInferenceGate();

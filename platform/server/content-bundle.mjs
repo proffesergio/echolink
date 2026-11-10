@@ -9,6 +9,14 @@ import {AppError} from './errors.mjs';
 import {createHash} from 'node:crypto';
 import {inferenceSettings} from './inference-resources.mjs';
 import {editorialPrompt} from './editorial-memory.mjs';
+import {newsSocialCaption} from './news-desk.mjs';
+import {groundedBanglaProductCaption} from './grounded-product-caption.mjs';
+export function catalogueProductCopy(page,product){
+ const analysis=analyzeProduct(product),brand='#'+String(page.name||'Shop').replace(/[^\p{L}\p{M}\p{N}_]/gu,'');
+ const base=groundedBanglaProductCaption('',page,product).split('\n\n').filter(s=>!s.startsWith('#'));
+ const caption=base.map(s=>s.includes('\n')?s.split('\n').map(line=>'• '+line).join('\n'):analysis.callouts.length===1&&s.includes(':')?'• '+s:s).join('\n\n');
+ return prepareCaption(caption+'\n\n'+brand+' #পণ্যেরতথ্য',page,product).caption;
+}
 
 export const NEWS_BUNDLE_PROMPT=`You are an expert AI journalist and social media manager for Noble Seek, a premium Bangladeshi news portal. Process the supplied research into exactly three parts separated by a line containing ---; no conversational filler.
 Write natively in professional, grammatically correct, standard colloquial Bengali (প্রমিত চলিত বাংলা), without mixing সাধু and চলিত registers. Remain objective, neutral and authoritative; no personal opinions. Separate conflicting facts neutrally, or use বিভিন্ন সূত্র অনুযায়ী only when more than one supplied source actually supports that statement. Never invent reporting, context, quotes or attribution.
@@ -98,20 +106,22 @@ export async function generateContentBundle({page,post,product,connection,secret
  if(news){
   const match=parts[0].match(/^শিরোনাম:\s*([^\n]+)\n+([\s\S]+)$/u);if(!match)throw new AppError(422,'The news article needs a Bengali headline and complete body.','content_format');
   const title=articleText(match[1]).slice(0,140),text=articleText(match[2]),paragraphCount=text.split(/\n\s*\n/).filter(Boolean).length,wordCount=text.split(/\s+/).filter(Boolean).length;
-  let caption=prepareCaption(parts[1],page).caption;const brand='#'+String(page.name||'News').replace(/[^\p{L}\p{M}\p{N}_]/gu,'');caption=tagged(caption,3,[brand,'#সংবাদ','#বাংলাসংবাদ']);
+  const caption=newsSocialCaption(prepareCaption(parts[1],page).caption,page);
   const commentText=articleText(parts[2]).replace(/\s+/g,' ').slice(0,300);
   warnings.push(...editorialWarnings(caption,facts,page.niche),...captionLanguageWarnings(caption,page),...editorialWarnings(title+'\n'+text,facts,page.niche).map(w=>'Website article: '+w),...captionLanguageWarnings(text,page).map(w=>'Website article: '+w));
   if(paragraphCount<2||paragraphCount>3||wordCount<Math.min(70,String(facts.text).split(/\s+/).length*.6))warnings.push('Website article depth needs review: expected 2–3 complete paragraphs with sufficient supported detail.');
-  const prose=withoutTags(caption);if(tags(caption).length!==3||!/\?\s*$/u.test(prose)||(prose.match(/[।!?]+(?:\s|$)/gu)||[]).length>3)warnings.push('Content format: Facebook news caption needs at most three sentences, a closing question and exactly three final hashtags.');
+  if(tags(caption).length!==3)warnings.push('Content format: Facebook news caption needs three relevant final hashtags.');
   if(tags(caption).length&&caption.slice(caption.lastIndexOf(tags(caption)[0])).replace(/#[\p{L}\p{M}\p{N}_]+/gu,'').trim())warnings.push('Content format: news hashtags must form the final caption block.');
   if(!/[\u0980-\u09ff]/u.test(commentText)||/[।!?].+[।!?]/u.test(commentText))warnings.push('Content format: first-comment CTA must be one short Bengali sentence.');
   return {caption,title,article:{text,wordCount,paragraphCount,generatedAt:new Date().toISOString(),policyVersion:'news_desk_v2',warnings:warnings.filter(w=>w.startsWith('Website article: ')),needsReview:criticalEditorialWarnings(warnings).length>0},commentText,facts,warnings,notes,initialWarnings:[],rawCaption:raw};
  }
- const prepared=prepareCaption(parts[1],page,product),type=analyzeProduct(product).type,brand='#'+String(page.name||'Shop').replace(/[^\p{L}\p{M}\p{N}_]/gu,''),categoryTags=type==='apparel'?['#Fashion','#EverydayStyle']:['#ProductDetails','#UsefulProducts'];
- const instagram=tagged(prepareCaption(parts[2],page,product).caption,5,[brand,...categoryTags,'#ShopOnline','#পণ্যেরতথ্য']);
- warnings.push(...editorialWarnings(parts[0],facts,page.niche).map(w=>'Design brief: '+w),...captionLanguageWarnings(parts[1],page),...captionLanguageWarnings(parts[2],page),...(prepared.notes.some(n=>n.includes('instructions'))?['Audience copy echoed generation instructions.']:[]),...editorialWarnings(prepared.caption,facts,page.niche),...captionLanguageWarnings(prepared.caption,page),...editorialWarnings(instagram,facts,page.niche).map(w=>'Instagram: '+w),...captionLanguageWarnings(instagram,page).map(w=>'Instagram: '+w));
+ const fallback=captionLanguageWarnings(parts[1],page).length||captionLanguageWarnings(parts[2],page).length;
+ const prepared=prepareCaption(fallback?catalogueProductCopy(page,product):parts[1],page,product),type=analyzeProduct(product).type,brand='#'+String(page.name||'Shop').replace(/[^\p{L}\p{M}\p{N}_]/gu,''),categoryTags=type==='apparel'?['#Fashion','#EverydayStyle']:['#ProductDetails','#UsefulProducts'];
+ if(fallback)notes.push('Model language failed validation; verified catalogue copy used for both channels.');
+ const instagram=tagged(prepareCaption(fallback?catalogueProductCopy(page,product):parts[2],page,product).caption,5,[brand,...categoryTags,'#ShopOnline','#পণ্যেরতথ্য']);
+ warnings.push(...editorialWarnings(parts[0],facts,page.niche).map(w=>'Design brief: '+w),...(prepared.notes.some(n=>n.includes('instructions'))?['Audience copy echoed generation instructions.']:[]),...editorialWarnings(prepared.caption,facts,page.niche),...captionLanguageWarnings(prepared.caption,page),...editorialWarnings(instagram,facts,page.niche).map(w=>'Instagram: '+w),...captionLanguageWarnings(instagram,page).map(w=>'Instagram: '+w));
  const bulletCount=(prepared.caption.match(/^(?:[•●▪\-✓✔✅🔹🔸✨💡🎯📌⚡🛍️]+)\s*.+/gmu)||[]).length;
- if(bulletCount<3||bulletCount>4)warnings.push('Content format: Facebook product caption needs 3–4 verified benefit bullets.');
+ if(bulletCount<Math.min(3,analyzeProduct(product).callouts.length)||bulletCount>4)warnings.push('Content format: Facebook product caption needs verified benefit bullets when catalogue details are available.');
  if(tags(instagram).length<5||tags(instagram).length>7)warnings.push('Content format: Instagram caption needs 5–7 relevant hashtags.');
  if(product.price!=null&&!prepared.caption.replace(/[০-৯]/g,c=>String('০১২৩৪৫৬৭৮৯'.indexOf(c))).replaceAll(',','').includes(String(Number(product.price))))warnings.push('Content format: the current catalogue price is missing from the Facebook caption.');
  if(instagram.length>2200)warnings.push('Content format: Instagram caption exceeds 2200 characters.');

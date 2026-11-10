@@ -240,3 +240,7 @@ Moving to a desktop or dedicated worker? Follow [New PC setup and migration](doc
 ### Creator pipeline controls
 
 See [niche presets, the visual workflow, approval notifications, Reels and optional Supabase/Redis setup](docs/CREATOR_PIPELINES.md). Existing Pages keep their current auto-posting preference; cloud services require your own configured credentials.
+
+Full newspaper reports, website-before-design delivery, Bangla typography and backlog recovery: [News desk workflow](docs/NEWS_DESK_WORKFLOW.md).
+
+Product catalogue integration: [Meta CSV export and scheduled feed setup](docs/META_PRODUCT_CATALOGUE.md).

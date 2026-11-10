@@ -12,6 +12,7 @@ import {recoverExpiredTasks,startWorker,tickAutomations} from './jobs.mjs';
 import {closeDatabase} from './db.mjs';
 import {guardedDispatch} from './dispatch.mjs';
 import {publicMedia} from './public-media.mjs';
+import {publicCatalogueFeed} from './meta-catalogue.mjs';
 const root=fileURLToPath(new URL('../dist/',import.meta.url)),mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
 const security={'x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY','cache-control':'no-store','content-security-policy':"default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com"};
 async function readBody(req,limit=1_000_000){const chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>limit)throw new AppError(413,'This request is too large.');chunks.push(chunk);}return Buffer.concat(chunks);}
@@ -21,6 +22,7 @@ export function createApp(){return createServer(async(req,res)=>{
   const url=new URL(req.url,env().origin),method=req.method;let response;
   if(url.pathname==='/api/health'&&method==='GET')response=Response.json({ok:true,app:'EchoLink',version:2,publishingEnabled:env().publishing});
   else if(/^\/api\/public-media\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicMedia(url);
+  else if(/^\/api\/catalogue-feed\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicCatalogueFeed(url);
   else if(url.pathname==='/internal/platform/tick'&&method==='POST'){
    const expected=process.env.PLATFORM_WORKER_TOKEN||'',actual=String(req.headers['x-echolink-worker-key']||'');
    if(expected.length<32||actual.length!==expected.length||!timingSafeEqual(Buffer.from(actual),Buffer.from(expected)))throw new AppError(401,'Worker authentication required.');

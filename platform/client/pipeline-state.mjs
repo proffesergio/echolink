@@ -30,6 +30,11 @@ export function pipelineForPage(state,page,{postId=null,now=Date.now()}={}){
   if(page.website_publishing&&publishing.progress<50){fb.status='pending';fb.progress=0;fb.note='Waiting for website confirmation';}
   else if(page.website_publishing){web.status=chosen?.website_url?'done':'pending';web.progress=chosen?.website_url?100:0;web.note=chosen?.website_url?'Website URL confirmed':'Awaiting website receipt';}
  }
+ if(page.creative_policy?.contentFormat==='news_desk_v3'){
+  const web=stages.find(s=>s.id==='website'),design=stages.find(s=>s.id==='design'),creating=chain.find(t=>t.kind==='creative'&&t.status==='running');
+  if(creating&&/^Website/.test(creating.phase||'')){web.status='running';web.task=creating;web.progress=creating.progress;web.note=creating.phase;design.status='pending';design.progress=0;design.note='Waiting for the full website report to be verified';}
+  const index=stages.indexOf(web);stages.splice(index,1);stages.splice(2,0,web);
+ }
  const active=tasks.filter(t=>t.status==='running'),waiting=tasks.filter(t=>t.status==='queued');
  return {page,post:chosen,posts,stages,tasks:chain,active,waiting,retry:chain.filter(isPreparationWait).sort((a,b)=>new Date(a.not_before)-new Date(b.not_before))[0],next:posts.filter(p=>p.status==='scheduled'&&p.scheduled_at).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at))[0],events:chain.flatMap(t=>(t.events||[]).map(e=>({...e,taskId:t.id,kind:t.kind,status:t.status}))).sort((a,b)=>new Date(a.at)-new Date(b.at)).slice(-70),now};
 }

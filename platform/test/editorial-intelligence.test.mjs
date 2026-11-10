@@ -10,7 +10,7 @@ import {generateFactualCaption,captionLanguageWarnings} from '../server/caption-
 import {validate} from '../server/validation.mjs';
 test('audience copy removes Bengali/English delivery instructions without touching real news facts',()=>{
  const text='ঢাকায় নতুন প্রকল্পের কাজ শুরু হয়েছে।\n৫ মিনিট পর ওয়েবসাইটে লিঙ্কসহ প্রথম কমেন্ট অটোমেটিক হবে।\nবিস্তারিত প্রথম কমেন্টে 👇';
- const clean=cleanPublicCopy(text);assert.equal(clean.caption,'ঢাকায় নতুন প্রকল্পের কাজ শুরু হয়েছে।');assert.equal(clean.removed.length,2);
+ const clean=cleanPublicCopy(text);assert.equal(clean.caption,'ঢাকায় নতুন প্রকল্পের কাজ শুরু হয়েছে।\n\nবিস্তারিত প্রথম কমেন্টে 👇');assert.equal(clean.removed.length,1);
  assert(!hasOperationalCopy('এআই প্রযুক্তি নিয়ে গবেষণা চলছে।'));assert(!hasOperationalCopy('The government announced a new technology policy.'));
  assert.equal(cleanPublicCopy('Facts. #News').caption,'Facts. #News');assert(hasOperationalCopy('The source link will automatically be posted in a comment after 5 minutes.'));
 });

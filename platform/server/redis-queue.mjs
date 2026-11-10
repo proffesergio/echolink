@@ -1,7 +1,7 @@
 import {Queue,Worker,DelayedError} from 'bullmq';
 import IORedis from 'ioredis';
 import {transaction} from './db.mjs';
-const delivery=new Set(['publish','manual_handoff','publish_instagram','post_link_comment','apply_page_brand','notify_approval']);
+const delivery=new Set(['publish','manual_handoff','publish_instagram','post_link_comment','apply_page_brand','notify_approval','sync_insights']);
 export const queueJobId=task=>'task-'+task.id+'-'+new Date(task.not_before).getTime();
 export const queueDelay=(task,now=Date.now())=>Math.max(0,new Date(task.not_before).getTime()-now);
 // SQL is the durable outbox and publication ledger. Redis transports IDs only.

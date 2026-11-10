@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generationAvailability} from '../server/generation-window.mjs';
+import {generationAvailability,startsGeneration} from '../server/generation-window.mjs';
 import {generationBuffer} from '../server/generation-buffer.mjs';
 import {findSlot} from '../server/scheduling.mjs';
 const page={kind:'ecommerce',timezone:'Asia/Dhaka',daily_cap:50,gap_minutes:10,window_start:'00:00',window_end:'00:00',creative_policy:{scheduleMode:'interval'}},rule={daily_target:50,buffer_hours:168,refill_minutes:60,batch_size:2,generation_window:{enabled:true,start:'22:00',end:'07:00',emergency_refill:false}};
+test('generation hours gate new work rather than holding completion, calendar delivery or insights',()=>{
+ for(const kind of ['aggregate','generate','import_products'])assert(startsGeneration(kind));
+ for(const kind of ['creative','write_article','publish','publish_instagram','sync_insights'])assert(!startsGeneration(kind));
+});
 test('overnight hours are separate from publication hours and span midnight in the Page timezone',()=>{
  const day=new Date('2026-11-08T06:00:00Z');const waiting=generationAvailability(rule,page,[],{now:day});assert.equal(waiting.allowed,false);assert.equal(waiting.next.toISOString(),'2026-11-08T16:00:00.000Z');
  for(const now of [new Date('2026-11-08T17:00:00Z'),new Date('2026-11-08T20:00:00Z')])assert.equal(generationAvailability(rule,page,[],{now}).allowed,true);
