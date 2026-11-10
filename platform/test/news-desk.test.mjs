@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateNewsReport,newsSocialCaption,NEWS_COMMENT_CTA} from '../server/news-desk.mjs';
 import {parseSectionReview,parseWrittenFacts} from '../server/news-report-writer.mjs';
-import {evidenceConflicts} from '../server/news-quality.mjs';
+import {reportQuality,evidenceConflicts} from '../server/news-quality.mjs';
 import {factModalityWarnings} from '../server/news-quality.mjs';
 import {evidenceLedger,reportGroups,newsWords,sectionWarnings,newsReportProblem,reviewedNewsHash} from '../server/news-quality.mjs';
 import {captionLanguageWarnings} from '../server/caption-generation.mjs';
@@ -38,3 +38,12 @@ test('an old generated headline never becomes newsroom source evidence',async()=
 });
 test('caption-length and caption-format instructions do not contaminate website writing',async()=>{let prompt;const configured={...page,creative_policy:{...page.creative_policy,postTypePrompts:{news:{caption:'CAPTION_ONLY_RULE'}},editorial:{styleNotes:'SHORT_CAPTION_RULE',articleStyleNotes:'NEWSPAPER_VOICE'}}};await assert.rejects(()=>generateNewsReport({page:configured,post,connection},{complete:async(_c,_s,p)=>{prompt=p;throw Error('inspected');}}),/inspected/);assert(prompt.includes('NEWSPAPER_VOICE'));assert(!prompt.includes('CAPTION_ONLY_RULE'));assert(!prompt.includes('SHORT_CAPTION_RULE'));});
 test('publishing refuses legacy, pending or changed report text',()=>{const text=post.body+'\n\n',article={generationVersion:'newsroom-v4',text,reviewedSections:6,evidenceCoverage:1,needsReview:false,socialPending:false,reviewedTextHash:reviewedNewsHash(post.title,text)},prepared={...post,seo:{article}};assert.equal(newsReportProblem(prepared,page),null);assert.match(newsReportProblem({...prepared,seo:{article:{...article,text:text+'changed'}}},page),/changed/);assert.match(newsReportProblem({...prepared,seo:{article:{...article,socialPending:true}}},page),/website/);assert.match(newsReportProblem({...prepared,seo:{article:{}}},page),/Regenerate/);});
+
+test('originality compares substantial unquoted prose, never an empty quoted sentence',()=>{
+ const quoted='“এই এলাকার বাসিন্দারা প্রতিদিন যাতায়াতের জন্য নতুন সেতুর ওপর নির্ভর করেন বলে তিনি জানিয়েছেন।”';
+ const text='তিনি এলাকার বাসিন্দাদের নিয়মিত যাতায়াত ও সেতুর প্রয়োজনীয়তার বিষয়টি ব্যাখ্যা করেছেন।';
+ const quality=reportQuality({title:'সেতু',text,facts:[{id:'F1',text:quoted}],sections:[{evidenceIds:['F1'],review:{supported:true}}],page,minWords:1});
+ assert.equal(quality.verbatimRatio,0);
+ const copied=reportQuality({title:'সেতু',text,facts:[{id:'F1',text}],sections:[{evidenceIds:['F1'],review:{supported:true}}],page,minWords:1});
+ assert(copied.verbatimRatio>.4);assert(copied.warnings.some(w=>w.includes('verbatim')));
+});

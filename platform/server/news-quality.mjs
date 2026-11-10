@@ -70,7 +70,7 @@ export function reportQuality({title,text,facts,sections,page,minWords=450}){
  if(wordCount<minWords)warnings.push('Website article depth needs review: complete reporting requires at least '+minWords+' supported words; produced '+wordCount+'.');
  if(paragraphs.length<6)warnings.push('Website article depth needs review: expected at least six complete newspaper paragraphs.');
  const covered=new Set(sections.flatMap(s=>s.evidenceIds||[])),coverage=facts.length?facts.filter(f=>covered.has(f.id)).length/facts.length:0;
- const unquoted=value=>normalized(value.replace(/[“"‘'][^”"’'\n]+[”"’']/gu,'')),publicProse=unquoted(text),copiedWords=facts.filter(f=>newsWords(f.text)>=10&&publicProse.includes(unquoted(f.text))).reduce((n,f)=>n+newsWords(f.text),0),verbatimRatio=copiedWords/Math.max(1,wordCount);
+ const unquoted=value=>normalized(value.replace(/[“"‘'][^”"’'\n]+[”"’']/gu,'')),publicProse=unquoted(text),copiedWords=facts.map(f=>unquoted(f.text)).filter(prose=>newsWords(prose)>=10&&publicProse.includes(prose)).reduce((n,prose)=>n+newsWords(prose),0),verbatimRatio=copiedWords/Math.max(1,wordCount);
  if(verbatimRatio>.4)warnings.push('Content format: too much unquoted source wording remains in the complete report. Rewrite the prose before publication.');
  if(coverage<.9)warnings.push('Source qualification: important evidence sections were omitted from the report.');
  if(wordCount>newsWords(sourceText)*1.65)warnings.push('Website article depth needs review: expansion exceeds the available source reporting.');
