@@ -1,0 +1,20 @@
+flowchart TD
+  frontend -->|"calls"| proxy
+  proxy -->|"routes through protected bridge/tunnel"| supervisor
+  supervisor -->|"supervises"| worker
+  worker -->|"claims leased tasks"| queue
+  worker -->|"tenant-scoped state"| database
+  worker -->|"reads full evidence"| research
+  research -->|"supplies facts"| writer
+  writer -->|"selects composition contract"| composition
+  writer -->|"validates prose"| quality
+  writer -->|"calls writer/reviewer sequentially"| inference
+  host -->|"sets operator profile"| inference
+  editor -->|"sets Page voice/temperature"| composition
+  quality -->|"gates publication"| website
+  website -->|"must confirm first"| social
+  social -->|"continues creative/calendar delivery"| worker
+  writer -->|"saves private audit"| audit
+  qa -->|"tests without delivery"| writer
+  policy -->|"informs checks, not certification"| quality
+  handoff -->|"records measured outcomes"| qa

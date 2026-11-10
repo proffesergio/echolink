@@ -15,7 +15,10 @@ The flow is:
    as more evidence. Detect overlapping reports with conflicting quantities or
    outcomes and hold them for an editor. At least 450 unique source words are
    required for this full-report mode; thin RSS summaries are held.
-3. Write original, neutral newspaper prose in bounded sections. Aim for complete
+3. Write original, neutral newspaper prose in bounded sections. Natural paragraph
+   composition combines/reorders supported facts; conservative anchored mode is
+   also available under Page editorial settings. Writing temperature defaults to
+   0.7; the independent reviewer remains at 0. Aim for complete
    coverage, normally 450–850+ words with at least six readable paragraphs when
    supported. Preserve chronology, names, direct quotes, denials and attribution.
    No padding, invented interviews, moral judgement or unsupported analysis.
@@ -136,3 +139,8 @@ operator can change this CPU-thread budget; it is capped at available local CPU
 threads. More threads are not a guarantee of faster generation for every model.
 News article paragraph progress and resource/retry waits are recorded separately
 from website, design and social-delivery receipts.
+
+For current hardware settings and the next-machine handoff, read
+[INFERENCE_QUALITY.md](INFERENCE_QUALITY.md), [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
+and [PROJECT_MEMORY.json](PROJECT_MEMORY.json). Meta-specific limitations and
+primary sources are documented in [EDITORIAL_POLICY.md](EDITORIAL_POLICY.md).

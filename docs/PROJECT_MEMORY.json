@@ -1,0 +1,207 @@
+{
+  "updated": "2026-11-10",
+  "entry": "docs/AGENT_HANDOFF.md",
+  "runtime": "platform Node worker + React/Vite; n8n optional",
+  "nodes": [
+    {
+      "id": "frontend",
+      "file": "platform/client/app.jsx",
+      "role": "React/Vite dashboard; Vercel static frontend"
+    },
+    {
+      "id": "proxy",
+      "file": "deploy/vercel/api/platform.mjs",
+      "role": "Protected API proxy; no persistent jobs on Vercel"
+    },
+    {
+      "id": "supervisor",
+      "file": "scripts/platform-supervisor.mjs",
+      "role": "Worker, bridge, Ollama health, tunnel/route heartbeat"
+    },
+    {
+      "id": "worker",
+      "file": "platform/server/jobs.mjs",
+      "role": "Persistent preparation and independent publication lanes"
+    },
+    {
+      "id": "queue",
+      "file": "platform/server/queue-loop.mjs",
+      "role": "Serial lanes, backoff, PostgreSQL task leases"
+    },
+    {
+      "id": "database",
+      "file": "platform/server/db.mjs",
+      "role": "Local PostgreSQL primary; tenant isolation"
+    },
+    {
+      "id": "research",
+      "file": "platform/server/news-desk.mjs",
+      "role": "Full-source evidence gathering; original source titles"
+    },
+    {
+      "id": "writer",
+      "file": "platform/server/news-report-writer.mjs",
+      "role": "Resumable writing and separate strict review"
+    },
+    {
+      "id": "composition",
+      "file": "platform/server/news-composition.mjs",
+      "role": "Natural Bengali paragraph contract; per-Page temperature"
+    },
+    {
+      "id": "quality",
+      "file": "platform/server/news-quality.mjs",
+      "role": "Facts, depth, originality, reviewed-text hash; fail closed"
+    },
+    {
+      "id": "inference",
+      "file": "platform/server/inference-resources.mjs",
+      "role": "One model/request; full CPU quality profile and emergency guard"
+    },
+    {
+      "id": "host",
+      "file": "platform/server/inference-host.mjs",
+      "role": "Owner-only local/LAN host and machine-profile selection"
+    },
+    {
+      "id": "website",
+      "file": "platform/server/website-first.mjs",
+      "role": "Durable website receipt and exact public full-text verification"
+    },
+    {
+      "id": "social",
+      "file": "platform/server/news-social-stage.mjs",
+      "role": "Social caption only after confirmed automatic website report"
+    },
+    {
+      "id": "editor",
+      "file": "platform/client/editorial.jsx",
+      "role": "Per-Page report voice, composition and sampling controls"
+    },
+    {
+      "id": "audit",
+      "file": "platform/client/newsroom.jsx",
+      "role": "Private section checks; never external fact-certification"
+    },
+    {
+      "id": "policy",
+      "file": "docs/EDITORIAL_POLICY.md",
+      "role": "Original value, licensed media, no fake engagement; eligibility not guaranteed"
+    },
+    {
+      "id": "qa",
+      "file": "scripts/verify-newsroom.mjs",
+      "role": "Read-only real model QA; private checkpoints; never publishes"
+    },
+    {
+      "id": "handoff",
+      "file": "docs/AGENT_HANDOFF.md",
+      "role": "Current state and verified results; start here"
+    }
+  ],
+  "edges": [
+    {
+      "from": "frontend",
+      "to": "proxy",
+      "relation": "calls"
+    },
+    {
+      "from": "proxy",
+      "to": "supervisor",
+      "relation": "routes through protected bridge/tunnel"
+    },
+    {
+      "from": "supervisor",
+      "to": "worker",
+      "relation": "supervises"
+    },
+    {
+      "from": "worker",
+      "to": "queue",
+      "relation": "claims leased tasks"
+    },
+    {
+      "from": "worker",
+      "to": "database",
+      "relation": "tenant-scoped state"
+    },
+    {
+      "from": "worker",
+      "to": "research",
+      "relation": "reads full evidence"
+    },
+    {
+      "from": "research",
+      "to": "writer",
+      "relation": "supplies facts"
+    },
+    {
+      "from": "writer",
+      "to": "composition",
+      "relation": "selects composition contract"
+    },
+    {
+      "from": "writer",
+      "to": "quality",
+      "relation": "validates prose"
+    },
+    {
+      "from": "writer",
+      "to": "inference",
+      "relation": "calls writer/reviewer sequentially"
+    },
+    {
+      "from": "host",
+      "to": "inference",
+      "relation": "sets operator profile"
+    },
+    {
+      "from": "editor",
+      "to": "composition",
+      "relation": "sets Page voice/temperature"
+    },
+    {
+      "from": "quality",
+      "to": "website",
+      "relation": "gates publication"
+    },
+    {
+      "from": "website",
+      "to": "social",
+      "relation": "must confirm first"
+    },
+    {
+      "from": "social",
+      "to": "worker",
+      "relation": "continues creative/calendar delivery"
+    },
+    {
+      "from": "writer",
+      "to": "audit",
+      "relation": "saves private audit"
+    },
+    {
+      "from": "qa",
+      "to": "writer",
+      "relation": "tests without delivery"
+    },
+    {
+      "from": "policy",
+      "to": "quality",
+      "relation": "informs checks, not certification"
+    },
+    {
+      "from": "handoff",
+      "to": "qa",
+      "relation": "records measured outcomes"
+    }
+  ],
+  "decisions": {
+    "newsDelivery": "checked complete website report -> exact verification -> social copy/design -> calendar -> Facebook -> delayed comment",
+    "sampling": "production anchored writer 0.7; reviewer 0; free composition experimental/held; no accuracy claims from temperature",
+    "resources": "windows_quality; CPU4; writer4096; context ceiling8192; output ceiling3072; reserve768MiB; abort512MiB",
+    "tests": "update handoff with final measured results; do not infer success from passing mocks",
+    "secrets": "ignored env files and .codex; never print or commit",
+    "historical": "docs/status.md is historical; do not use as current deployment state"
+  }
+}

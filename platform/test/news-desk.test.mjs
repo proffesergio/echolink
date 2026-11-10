@@ -47,3 +47,14 @@ test('originality compares substantial unquoted prose, never an empty quoted sen
  const copied=reportQuality({title:'সেতু',text,facts:[{id:'F1',text}],sections:[{evidenceIds:['F1'],review:{supported:true}}],page,minWords:1});
  assert(copied.verbatimRatio>.4);assert(copied.warnings.some(w=>w.includes('unquoted source wording')));
 });
+
+test('natural composition uses the Page writing temperature while independent reviews stay deterministic',async()=>{
+ const configured={...page,creative_policy:{...page.creative_policy,editorial:{articleWritingMode:'composed',articleTemperature:0.75}}};let writes=0,reviews=0,repaired=false;
+ const result=await generateNewsReport({page:configured,post,connection},{complete:async(c,_s,p,{purpose})=>{
+  const data=JSON.parse(p.slice(p.indexOf('\n{')+1).split('\nEdit previousDraft')[0]);
+  if(purpose==='news_review'){reviews++;assert.equal(c.config.temperature,0);return JSON.stringify({supported:true,coveredIds:data.evidence.map(f=>f.id),issues:[]});}
+  writes++;if(data.previousDraft){repaired=true;assert.equal(c.config.temperature,0.3);assert(data.previousDraft.includes('প্রথম দফায়'));}else assert.equal(c.config.temperature,0.75);assert.equal(c.config.maxOutputTokens,2400);
+  const texts=data.evidence.map(f=>f.text.replace('বিষয়ে কর্তৃপক্ষ','নিয়ে সংশ্লিষ্ট কর্তৃপক্ষ').replace('নির্দিষ্ট কার্যক্রম','নির্ধারিত কার্যক্রম').replace('প্রকল্পের নথিতে','প্রকাশিত নথিতে').replace('দায়িত্ব পালনের পরিকল্পনা','দায়িত্ব বাস্তবায়নের পরিকল্পনা').replace('বিস্তারিত বিবরণ জানিয়েছে','বিস্তারিত তথ্য দিয়েছে'));const mid=Math.ceil(texts.length/2);
+  return JSON.stringify({paragraphs:[(writes===1?'প্রথম দফায় ':'')+texts.slice(0,mid).join(' '),texts.slice(mid).join(' ')],coveredIds:data.evidence.map(f=>f.id)});
+ }});assert.equal(writes,reviews+1);assert(repaired);assert.equal(result.article.writingMode,'composed');assert.equal(result.article.writingTemperature,0.75);assert.equal(result.article.needsReview,false);assert.equal(result.caption,'');
+});
