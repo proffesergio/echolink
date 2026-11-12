@@ -56,7 +56,7 @@ Usage views show measured activity and its collection window. Capacity indicator
 
 ## A managed relationship
 
-EchoLink is offered as a SaaS product with workspace access, onboarding and integrations arranged with our team. This private repository supports the product's development; it is not a self-service installation package. Deployment procedures, credentials and operating configuration are not part of this product overview.
+EchoLink is offered as a SaaS product with workspace access, onboarding and integrations arranged with our team. This repository supports the product's development. Workspace access and managed deployments are arranged with the service owner. Deployment procedures, credentials and operating configuration are not part of this product overview.
 
 For a walkthrough, onboarding or a conversation about your Pages, contact [support@fabrything.com](mailto:support@fabrything.com) or [chat with the EchoLink team](https://wa.me/8801353529899).
 

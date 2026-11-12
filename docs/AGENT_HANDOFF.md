@@ -16,7 +16,7 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 - Root `.env.local` supplies operator/bridge tools; `platform/.env.local` supplies
   the worker. Host selection also lives in ignored `platform/.local/inference-host.json`.
 - `npm run db:backup` writes private custom-format dumps under `.codex/backups/`.
-- GitHub repository proffesergio/echolink is PRIVATE as of November12, verified through the GitHub API. Owner requested a controlled SaaS repository; do not make it public or add README installation instructions. Main workflows remain configured; deployment status must be verified separately.
+- GitHub repository proffesergio/echolink is PUBLIC again by the owner’s explicit November12 fallback authorization, after private-repository deployment still failed after the owner reported connecting GitHub. Keep the README client-facing and without installation steps. Do not claim public source is secret or impossible to run; private visibility needs the correct Vercel owner/author association first.
 
 ## Local operations and monitoring — November 12
 
@@ -59,7 +59,7 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 - README is now a client-facing SaaS overview with product/demo/contact links,
   truthful delivered/planned capabilities and no installation steps or host details.
   Root package is private/UNLICENSED to avoid accidental package publication.
-  Operational guides stay in the now-private source repository for authorized use.
+  Operational guides remain in source; the owner later explicitly authorized a public-repository fallback for Vercel. Source code and those guides are therefore visible.
 - Runbook and scope/limitations: `docs/LOCAL_OPERATIONS.md`. Metrics/health code:
   `platform/server/operations-telemetry.mjs`, `operations-monitor.mjs`; commands:
   `scripts/ensure-platform.mjs`, `platform-status.mjs`. No new backend model or
@@ -72,17 +72,17 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   Live entry `index-Bf6ByUy9.js`, Operations chunk `app-CsVyjIjY.js`.
   Homepage, entry, Operations chunk and public health returned200; anonymous
   Operations returned401. This includes the approved monitor and final typography.
-- One later mobile-only CSS fix removes the hidden sidebar shadow. It is built
+- One later mobile-only CSS fix removes the hidden sidebar shadow. It was built
   and browser-verified locally (`index-D342ZObb.js` / `app-n02bVhhs.js`) but its
-  deployment `dpl_BwWkoiDQjkyVp7x9ESyA1Nwbqqc8` is BLOCKED, not deployed.
+  private deployment `dpl_BwWkoiDQjkyVp7x9ESyA1Nwbqqc8` was BLOCKED.
   API reason: commit author lacks deployment access; `TEAM_ACCESS_REQUIRED`,
   `isVerified:false`. Making the repository private activated Hobby author checks.
-  Do not restore public visibility or falsify author identity to bypass this.
+  The owner explicitly authorized making the repository public if needed for this deployment. After a second private retry failed, that fallback was applied; no author identity was falsified.
 - GitHub authenticated owner is proffesergio; current commit email matches that
   GitHub user's public email. Vercel CLI identity is billsfariji-4299. User was
   asked to connect proffesergio in the actual Hobby owner account's Vercel Login
   Connections, then reply Connected. No paid seat/plan upgrade was purchased.
-  After the owner link is fixed, retry the built release and verify the live entry.
+  Owner replied Connected, but retry dpl_6Do21YVBjufTdGrsMHPVCVpJyvoC still returned BLOCKED. Public fallback authorized/applied; final release verification follows below.
 - Isolated Operations preview accounts/servers were cleaned up. The interrupted
   browser screenshot fixture was removed only from creator_test; final full suite
   passed. No production publishing/inference restart was needed for frontend work.

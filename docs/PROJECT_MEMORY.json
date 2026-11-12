@@ -285,7 +285,7 @@
       "pendingMobilePolish": {
         "id": "dpl_BwWkoiDQjkyVp7x9ESyA1Nwbqqc8",
         "status": "BLOCKED",
-        "reason": "TEAM_ACCESS_REQUIRED: private repo Git author not verified as Hobby project owner. User asked to link GitHub proffesergio in Vercel owner Login Connections.",
+        "reason": "Private-repository TEAM_ACCESS_REQUIRED remained after owner connection confirmation; owner authorized public fallback and visibility restored. Retrying final release.",
         "frontendBundle": "index-D342ZObb.js",
         "operationsBundle": "app-n02bVhhs.js"
       }
@@ -293,6 +293,6 @@
     "operations": "Nov12 local backend monitoring active: owner-only API and operator-token loopback route; cached health, HTTP/upstream/DB/pool/queue/process/native-token metrics, redacted bounded counters, private24h aggregates/30s checkpoints. Not whole-PC packet capture, provider billing or remote VRAM. One host; no load balancer or auto failover.",
     "startup": "npm run platform:up preserves healthy worker/bridge, starts prepared selected local PostgreSQL, otherwise uses graceful restart. platform:start/repair aliases now safe. platform:status supports --watch/--json; keep local PC awake.",
     "operationsUI": "User approved Nov12; implemented Owner Operations with real read-only API,30s refresh/stale recovery, live count charts, infrastructure/queue/connector/query/model details. SuperDesign target e6ab4822-d1b9-4a3e-b949-da5f0f8e6f48 + completed 12ui target alignment. No fake raster charts or load-balancer claims.",
-    "repository": "GitHub proffesergio/echolink visibility changed PUBLIC -> PRIVATE by owner request Nov12; ADMIN access verified. Root private:true/UNLICENSED, README client-facing SaaS only/no setup, models/host configuration excluded from overview. Prior public copies cannot be recalled."
+    "repository": "GitHub proffesergio/echolink made PRIVATE at first on Nov12. Private author-access check remained blocked after owner replied Connected. Owner explicitly authorized public fallback if required for Vercel; visibility restored PUBLIC and verified. README SaaS/client-only with no setup. Root private:true/UNLICENSED prevents package publishing; it does not hide public source or operating guides. No author identity was changed."
   }
 }

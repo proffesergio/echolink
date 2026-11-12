@@ -120,3 +120,11 @@ visibility back or substitute another person's Git identity. No paid plan change
 has been authorized or made.
 
 Reference: https://vercel.com/docs/deployments/troubleshoot-project-collaboration
+
+Update November12: the owner replied Connected, but the next private deployment
+(dpl_6Do21YVBjufTdGrsMHPVCVpJyvoC) remained BLOCKED. The owner then explicitly
+authorized making the repository public if required for Vercel. That fallback
+was applied and public visibility verified. The README stays SaaS/client-facing
+without setup steps, but public source and historical guides are visible. Root
+package private:true prevents package publication; it is not source access control.
+No Git identity was falsified and no paid plan was enabled.
