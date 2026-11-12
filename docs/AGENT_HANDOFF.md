@@ -141,6 +141,39 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 - Bengali news; product caption language follows Page settings; price BDT/৳.
 - Free local inference. Do not buy credits or delete working models unasked.
 
+## Settings/grid refresh and NobleSeek logo — November12
+
+- New request: clean up Page Settings and other popups, redesign Content grid,
+  and restore NobleSeek branding on news creatives. UI implementation awaits
+  explicit new-screen approval required by the invoked SuperDesign workflow.
+  Review request is pending in chat; no frontend changes have been made yet.
+- Designs in the existing CMS project: Page Settings dialog
+  https://p.superdesign.dev/draft/6c13b372-bba3-4da6-9d22-a002970f4953 (v3);
+  Content Grid https://p.superdesign.dev/draft/b5ef7ba5-a27d-4783-9ca6-eea7deadc200 (v2).
+  They preserve the approved shell and exact EchoLink wordmark. Proposed dialog:
+  left section navigation, grouped fields, scrolling body/sticky footer. Grid:
+  complete uncropped previews, short summaries and clear details/edit actions.
+- 12ui conversion targets: settings18d984eb-c438-44a8-8b95-aa3f2bd2dc2b,
+  responsive derivative992aaa64-362d-4059-9177-af7a7f04fb09; grid
+  88a31da4-3125-47c9-b31e-bf99d74b89f4, linked responsive
+  2f8e9224-6ab1-4141-b81a-f2c79ab8778c. All completed. Targets/HTML/resume
+  are private under .superdesign. Read their responsive output before integration;
+  use each unchanged target LayerDoc with 12ui improve for implementation closeout.
+- Logo root cause: current Noble Seek Page had NO logo asset at all. Matched its
+  existing clean NobleSeek mark to its currently fetched actual Facebook Page
+  picture, then saved a tenant-scoped asset and attached logoAssetId under a row
+  lock without overwriting an existing upload. Prior brand saved privately in
+  .codex/backups/nobleseek-brand-before-logo.json. No posts/receipts were modified.
+- News renderer studio-v8 now honors logoLightWidth, explicit light variants and
+  adaptive treatment of the original transparent mark. Original opaque artwork
+  remains intact. Private render of a real saved newsroom item shows the actual
+  logo: .codex/brand-review/nobleseek-restored-news.jpg. This is a private render,
+  not a model QA run, website write or social publication.
+- 15 focused rendering/brand/recovery tests and all208 portable tests pass.
+  Graceful platform restart applied the renderer with active/unknown receipts
+  preserved. Following checks: all seven services healthy; one real preparation
+  resumed with inference concurrency1 and emergency guard still active.
+
 ## Current inference and newsroom work
 
 - PC: i5-6500 / 4 logical threads / ~12 GiB RAM / GT730; CPU inference.

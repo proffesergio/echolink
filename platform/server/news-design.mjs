@@ -1,6 +1,7 @@
 import {fontOptions} from './fonts.mjs';
 import sharp from 'sharp';
 import {categoryLabel} from './content-policy.mjs';
+import {productLogo} from './brand.mjs';
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 export function newsHeadline(post){
  const title=(post.creative?.headline||post.title||'').trim(),words=title.split(/\s+/),requested=post.creative?.highlight?.trim();
@@ -13,7 +14,14 @@ export async function renderNewsCreative({post,page,photo,brandLogo,website,widt
  svg('<rect width="100%" height="100%" fill="#080b0d"/>');
  if(photo)layers.push({input:await sharp(photo,{limitInputPixels:40000000}).rotate().resize(width,photoH,{fit:'cover'}).png().toBuffer(),left:0,top:photoY});
  svg(`<defs><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#080b0d"/><stop offset=".32" stop-color="#080b0d" stop-opacity=".15"/><stop offset=".68" stop-color="#080b0d" stop-opacity="0"/><stop offset="1" stop-color="#080b0d" stop-opacity=".78"/></linearGradient></defs><rect width="${width}" height="${photoH}" fill="url(#shade)"/>`,width,photoH,0,photoY);
- if(brandLogo){const size=Math.round(width*.12),logo=await sharp(brandLogo).trim().resize(size,size,{fit:'inside'}).png().toBuffer();layers.push({input:logo,left:pad,top:Math.round(height*.025)});}
+ if(brandLogo){
+  const scale=width/1080,logoWidth=Math.round(Math.max(48,Math.min(200,Number(page.brand?.logoLightWidth)||104))*scale);
+  // Explicit light artwork takes precedence. Adaptive treatment applies only
+  // to the original transparent mark, just as it does on product creatives.
+  const prepared=await productLogo(brandLogo,{dark:true,mode:page.brand?.logoLightAssetId?'original':page.brand?.logoMode||'original',width:logoWidth});
+  const logo=await sharp(prepared).resize({width:logoWidth,height:Math.round(height*.1),fit:'inside',withoutEnlargement:true}).png().toBuffer();
+  layers.push({input:logo,left:pad,top:Math.round(height*.025)});
+ }
  else{const logo=await sharp({text:{text:`<span foreground="#ffffff" weight="bold">${escape(page.name)}</span>`,...fontOptions(page,'body',27,'Segoe UI'),width:Math.round(width*.4),rgba:true}}).png().toBuffer();layers.push({input:logo,left:pad,top:30});}
  const category=categoryLabel(post.seo?.category||'general',page.language),stamp=new Intl.DateTimeFormat(page.language==='English'?'en-GB':'bn-BD',{timeZone:page.timezone||'Asia/Dhaka',day:'numeric',month:'long',year:'numeric'}).format(new Date(post.created_at||Date.now()));
  const meta=await sharp({text:{text:`<span foreground="#bfc8cd">${escape(stamp)}\n${escape(category)}</span>`,...fontOptions(page,'body',22),width:Math.round(width*.55),align:'right',spacing:10,rgba:true}}).png().toBuffer(),mm=await sharp(meta).metadata();layers.push({input:meta,left:width-pad-mm.width,top:Math.round(height*.04)});
@@ -24,5 +32,5 @@ export async function renderNewsCreative({post,page,photo,brandLogo,website,widt
  svg(`<rect width="${width}" height="64" fill="${accent}"/>`,width,64,0,height-64);
  if(domain){const footer=await sharp({text:{text:`<span foreground="#ffffff">${escape(domain)}</span>`,...fontOptions(page,'body',24,'Segoe UI'),width:width-pad*2,align:'center',rgba:true}}).png().toBuffer(),m=await sharp(footer).metadata();layers.push({input:footer,left:Math.round((width-m.width)/2),top:height-48});}
  const credit=String(page.creative_policy?.editorial?.imageCredit||'').trim();if(photo&&credit){const label=await sharp({text:{text:`<span foreground="#dddddd">${escape(credit)}</span>`,...fontOptions(page,'body',15),width:width-pad*2,align:'right',rgba:true}}).png().toBuffer(),cm=await sharp(label).metadata();layers.push({input:label,left:width-pad-cm.width,top:height-85-cm.height});}
- return {bytes:await sharp({create:{width,height,channels:3,background:'#080b0d'}}).composite(layers).jpeg({quality:94}).toBuffer(),width,height,sourcePhotoUsed:!!photo,designVersion:'studio-v7',headlineHighlight:headline.highlight,highlightColor:headline.color,visibleText:[category,headline.title,pillText,domain]};
+ return {bytes:await sharp({create:{width,height,channels:3,background:'#080b0d'}}).composite(layers).jpeg({quality:94}).toBuffer(),width,height,sourcePhotoUsed:!!photo,brandLogoUsed:!!brandLogo,designVersion:'studio-v8',headlineHighlight:headline.highlight,highlightColor:headline.color,visibleText:[category,headline.title,pillText,domain]};
 }
