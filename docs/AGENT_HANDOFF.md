@@ -612,3 +612,9 @@ operator CPU/context overrides; remote CPUs are not capped by this worker's coun
   Chrome at320/390/768/1280 verifies exact supported manual prompt payloads,
   unsaved edits, Profile labels, reduced motion and pause; zero JS errors and
   real API requests. Existing GitHub/Vercel workflow files remain unchanged.
+- Release6bc0071 pushed to main. Existing Actions43302756707 test+deploy SUCCESS;
+  production deployment dpl_FUqzCy1ELSUcxofDNE6iE3Sd5BU9 READY at
+  https://echolinkbd.vercel.app. Native Git deployment also READY. Live HTML and
+  app-CGLpkk04.js verified with workflow/Profile/pause markers; anonymous state401.
+  Worker health remains version2 without new feature markers: remote backend
+  activation/migrations are still pending, and no restart was performed here.
