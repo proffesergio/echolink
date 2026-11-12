@@ -7,7 +7,7 @@ import {queueApprovalNotification,sendApprovalNotification} from './notification
 import {bundleEnabled,generateContentBundle} from './content-bundle.mjs';
 import {generateNewsArticle} from './news-article.mjs';
 import {queueLoop} from './queue-loop.mjs';
-import {collectNewsFeeds,clusterStories,shortlistStories,rankStories,researchStory,articleHash,storySimilarity} from './news-research.mjs';
+import {collectNewsFeeds,clusterStories,shortlistStories,rankStories,researchStory,researchLatestEligible,articleHash,storySimilarity} from './news-research.mjs';
 import {analyzeReferences} from './reference-analysis.mjs';
 import {referenceFingerprint,EDITORIAL_VERSION,recordEditorialQuality} from './editorial-memory.mjs';
 import {cleanPublicCopy} from './public-copy.mjs';
@@ -23,7 +23,8 @@ import {transaction,audit,workspaceLock} from './db.mjs';
 import {AppError} from './errors.mjs';
 import {decryptSecret,encryptSecret} from './vault.mjs';
 import {testAI,textCompletion,imageGeneration,checkTextCapacity} from './providers.mjs';
-import {fetchProducts} from './catalog.mjs';
+import {fetchProducts,articleDetails} from './catalog.mjs';
+import {prepareBriefEvidence} from './news-brief-writer.mjs';
 import {renderCreative,saveAsset} from './creative.mjs';
 import {remoteJSON,publicURL,outbound} from './net.mjs';
 import {entitlements,reservePublication,releasePublication,requireGenerationCapacity} from './quotas.mjs';
@@ -119,7 +120,7 @@ async function generate(task){
  const inferenceRuns=[],onMetrics=metrics=>inferenceRuns.push(metrics);
  const productFocus=product?await selectProductFocus({product,connection:c,secret:c.secret},{onMetrics}):null;
  const bundled=bundleEnabled(page,post),report=post.type==='news'&&page.creative_policy?.contentFormat==='news_desk_v3';
- const generated=await (report?generateNewsReport:bundled?generateContentBundle:generateFactualCaption)({page,post,product,connection:c,secret:c.secret,compact,insights:guidance?.sampleSize>=5?guidance.recommendation:null},{deferSocial:report&&page.website_publishing&&!page.require_review&&task.input.pipeline?.autoPublish===true,onMetrics,onCorrection:()=>updateTask(task,45,'Checking source quantities and correcting unsupported claims'),savedDraft:post.seo?.bundleDraft,onProgress:(part,total,detail)=>updateTask(task,detail?.report?10+Math.round(part/total*55):20+part*15+(detail?.paragraph?detail.paragraph*3:0),(detail?.report?'News desk · '+(detail.stage==='quality'?'checking full-report completeness and originality ':detail.stage==='verify'?'independent source check ':detail.stage==='repair'?'correcting evidence section ':'writing evidence section '):'Echotent · writing content section ')+part+' of '+total+(detail?.paragraph?' · article paragraph '+detail.paragraph+' of '+detail.paragraphs:'')+(detail?.checks?.length?' · '+detail.checks[0].slice(0,180):'')),onSection:draft=>transaction(task.workspace_id,async db=>{const saved=await db.query("UPDATE creator.posts SET seo=jsonb_set(seo,'{bundleDraft}',$3::jsonb) WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed')",[task.workspace_id,post.id,JSON.stringify(draft),post.version]);if(!saved.rowCount)throw new AppError(409,'The draft changed during section preparation.');})});
+ const generated=await (report?generateNewsReport:bundled?generateContentBundle:generateFactualCaption)({page,post,product,connection:c,secret:c.secret,compact,insights:guidance?.sampleSize>=5?guidance.recommendation:null},{deferSocial:report&&page.website_publishing&&!page.require_review&&task.input.pipeline?.autoPublish===true,onMetrics,onCorrection:()=>updateTask(task,45,'Checking source quantities and correcting unsupported claims'),savedDraft:post.seo?.bundleDraft,onProgress:(part,total,detail)=>updateTask(task,detail?.report?10+Math.round(part/total*55):20+part*15+(detail?.paragraph?detail.paragraph*3:0),(detail?.report?'News desk · '+(detail.stage==='quality'?'checking full-report completeness and originality ':detail.stage==='verify'?'independent source check ':detail.stage==='repair'?'correcting report ':'writing report '):'Echotent · writing content section ')+part+' of '+total+(detail?.paragraph?' · article paragraph '+detail.paragraph+' of '+detail.paragraphs:'')+(detail?.checks?.length?' · '+detail.checks[0].slice(0,180):'')),onSection:draft=>transaction(task.workspace_id,async db=>{const saved=await db.query("UPDATE creator.posts SET seo=jsonb_set(seo,'{bundleDraft}',$3::jsonb) WHERE workspace_id=$1 AND id=$2 AND version=$4 AND status IN ('draft','review','approved','failed')",[task.workspace_id,post.id,JSON.stringify(draft),post.version]);if(!saved.rowCount)throw new AppError(409,'The draft changed during section preparation.');})});
  if(generated.hold){await transaction(task.workspace_id,db=>db.query("UPDATE creator.posts SET status='review',last_error=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,post.id,generated.message]));return {postId:post.id,hold:true,message:generated.message};}
  const {caption,notes,facts,warnings,initialWarnings}=generated;
  if(caption.length<60&&!generated.article)throw new AppError(422,'The model returned too little content. Choose a more capable model or edit the draft manually.');
@@ -219,20 +220,34 @@ async function aggregate(task){
  const clusters=clusterStories(scan.articles),shortlist=shortlistStories(clusters,{recent,categories:page.creative_policy?.newsCategories||[],notBefore:cutoff,latest});
  if(!shortlist.length)return {draftsCreated:0,feedsFailed:scan.failed,message:'No fresh unseen story remains after related-story and exact-URL checks.'};
  await updateTask(task,50,'Research · ranking '+shortlist.length+' story clusters from '+scan.feedsRead+' feeds');
- const metrics=[];
- const selection=latest?{story:shortlist[0],method:'latest',reason:'Newest unseen source publication first; factual and crisis checks remain mandatory.'}:shortlist.some(s=>crisisMatches(s.primary.title+' '+s.primary.body,page.creative_policy?.sensitiveKeywords).length)?{story:shortlist[0],method:'balanced_safety',reason:'Keyword safety pre-pass kept sensitive research out of model ranking.'}:await rankStories(shortlist,{page,connection,onMetrics:m=>metrics.push(m)});
- const {article,research}=await researchStory(selection,{onProgress:n=>updateTask(task,65+n*5,'Research · reading related report '+n+' (up to two)')});
- research.feedsRead=scan.feedsRead;research.feedsFailed=scan.failed;research.candidatesScanned=scan.articles.length;research.clustersFound=clusters.length;research.inferenceRuns=metrics;
- // Check every related URL, including archived/trashed fingerprints, in the same
- // Page transaction. Normal worker source preparation is serialized.
- const hashes=selection.story.articles.map(a=>articleHash(a.url));
- const inserted=await transaction(task.workspace_id,async db=>{await workspaceLock(db,task.workspace_id);
-  if((await db.query('SELECT id FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND source_hash=ANY($3::text[]) LIMIT 1',[task.workspace_id,page.id,hashes])).rowCount)return null;
-  const prior=(await db.query("SELECT title FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND created_at>now()-interval '3 days' ORDER BY created_at DESC LIMIT 500",[task.workspace_id,page.id])).rows;
-  if(!shortlistStories([selection.story],{recent:prior,notBefore:cutoff,latest}).length)return null;
-  return(await db.query(`INSERT INTO creator.posts(workspace_id,page_id,type,title,body,source_url,source_hash,creative,seo) VALUES($1,$2,'news',$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id`,[task.workspace_id,page.id,article.title,article.body,article.url,articleHash(article.url),{sourceImage:article.image,ratio:'4:5',style:'editorial'},{category:categoryFor(article),research}])).rows[0];
- });
- return {postId:inserted?.id,draftsCreated:inserted?1:0,feedsFailed:scan.failed,message:inserted?'Ranked story selected; research evidence saved privately with this draft.':'This story was already selected; the next refill will check another cluster.'};
+ const metrics=[];let held=0;
+ const saveResearched=async({selection,article,research,message=null})=>{
+  research.feedsRead=scan.feedsRead;research.feedsFailed=scan.failed;research.candidatesScanned=scan.articles.length;research.clustersFound=clusters.length;research.inferenceRuns=metrics;
+  const hashes=selection.story.articles.map(a=>articleHash(a.url));
+  return transaction(task.workspace_id,async db=>{await workspaceLock(db,task.workspace_id);
+   if((await db.query('SELECT id FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND source_hash=ANY($3::text[]) LIMIT 1',[task.workspace_id,page.id,hashes])).rowCount)return null;
+   const prior=(await db.query("SELECT title FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND created_at>now()-interval '3 days' ORDER BY created_at DESC LIMIT 500",[task.workspace_id,page.id])).rows;
+   if(!shortlistStories([selection.story],{recent:prior,notBefore:cutoff,latest}).length)return null;
+   return(await db.query(`INSERT INTO creator.posts(workspace_id,page_id,type,title,body,source_url,source_hash,creative,seo,status,last_error) VALUES($1,$2,'news',$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING RETURNING id`,[task.workspace_id,page.id,article.title,article.body,article.url,articleHash(article.url),{sourceImage:article.image,ratio:'4:5',style:'editorial'},{category:categoryFor(article),research},message?'review':'draft',message])).rows[0];
+  });
+ };
+ let inserted;
+ if(latest){
+  const chosen=await researchLatestEligible(shortlist,{
+   research:selection=>researchStory(selection,{read:a=>articleDetails(a,{timeout:8000}),onProgress:n=>updateTask(task,65+n*5,'Research · checking full source '+n+' for a recent candidate')}),
+   qualify:({article,research})=>{
+    if(page.creative_policy?.contentFormat!=='news_desk_v3')return null;
+    const sources=[{title:article.title,url:article.url,text:article.body,extraction:article.extraction||'feed_only'},...research.sources.filter(r=>r.url!==article.url).map(r=>({...r,text:r.excerpt}))];
+    const scope=prepareBriefEvidence({title:article.title,body:article.body,source_url:article.url,seo:{research,reportEvidence:{sources}}});return scope.hold?scope.message:null;
+   },
+   retain:async result=>{if(await saveResearched(result))held++;},
+   accept:async result=>await saveResearched(result)||false
+  });inserted=chosen?.accepted;
+ }else{
+  const selection=shortlist.some(s=>crisisMatches(s.primary.title+' '+s.primary.body,page.creative_policy?.sensitiveKeywords).length)?{story:shortlist[0],method:'balanced_safety',reason:'Keyword safety pre-pass kept sensitive research out of model ranking.'}:await rankStories(shortlist,{page,connection,onMetrics:m=>metrics.push(m)});
+  inserted=await saveResearched({selection,...await researchStory(selection,{onProgress:n=>updateTask(task,65+n*5,'Research · reading related report '+n+' (up to two)')})});
+ }
+ return {postId:inserted?.id,draftsCreated:inserted?1:0,sourcesHeld:held,feedsFailed:scan.failed,message:inserted?'Latest eligible story selected; research evidence saved privately with this draft.':'Recent candidates lack sufficient source material or were already selected; checking the next unseen candidates shortly.'};
 }
 async function analyzePageReferences(task){
  const page=await transaction(task.workspace_id,db=>row(db,'pages',task.workspace_id,task.page_id)),connection=await connectionFor(task.workspace_id,page.text_connection_id);

@@ -42,7 +42,7 @@ test('compact decoding constrains script/numerals while static checks enforce th
 test('automatic brief uses one writer and one whole-report reviewer, then passes the publishing gate',async()=>{
  assert(newsWords(paragraphs.join(' '))>=100&&newsWords(paragraphs.join(' '))<=150);
  const purposes=[];
- const result=await generateNewsReport({page,post,connection},{complete:async(c,_s,p,o)=>{purposes.push(o.purpose);assert.equal(c.config.contextTokens,6144);assert(!p.includes('Rewrite EVERY'));assert.equal(c.config.maxOutputTokens,o.purpose==='news_article'?4096:1024);return o.purpose==='news_article'?write:accepted;}});
+ const result=await generateNewsReport({page,post,connection},{complete:async(c,_s,p,o)=>{purposes.push(o.purpose);assert.equal(c.config.contextTokens,4096);assert(!p.includes('Rewrite EVERY'));assert.equal(c.config.maxOutputTokens,o.purpose==='news_article'?1400:256);assert(o.deadlineMs>0&&o.deadlineMs<=(o.purpose==='news_article'?150000:180000));return o.purpose==='news_article'?write:accepted;}});
  assert(!result.hold,result.message);assert.deepEqual(purposes,['news_article','news_review']);assert.equal(result.article.reviewedSections,1);assert.equal(result.article.briefMode,CONTEXT_BRIEF_LIMITS.version);assert.equal(result.article.paragraphCount,2);assert.equal(result.article.needsReview,false);
  const prepared={...post,title:result.title,seo:{article:result.article}};
  assert.equal(newsReportProblem(prepared,page,{social:false}),null);assert.match(newsReportProblem(prepared,page),/website/);
@@ -55,6 +55,17 @@ test('a corrupted-script draft is repaired before spending a reviewer call',asyn
  let writes=0,reviews=0;
  const result=await generateNewsReport({page,post,connection},{complete:async(_c,_s,p,{purpose})=>{if(purpose==='news_review'){reviews++;return accepted;}writes++;if(writes===1)return JSON.stringify({paragraphs:[paragraphs[0].replace('নাগরিকদের','না윅রিকদের'),paragraphs[1]]});assert(p.includes('corrupted'));return write;}});
  assert(!result.hold,result.message);assert.equal(writes,2);assert.equal(reviews,1);
+});
+
+test('repair and review share a finite attempt budget instead of each restarting a long timer',async()=>{
+ const originalNow=Date.now;let elapsed=0,writes=0;const start=originalNow();Date.now=()=>start+elapsed;
+ try{
+  const result=await generateNewsReport({page,post,connection},{complete:async(_c,_s,_p,options)=>{
+   if(options.purpose==='news_review'){assert.equal(options.deadlineMs,75000);return accepted;}
+   if(++writes===1){elapsed+=140000;return JSON.stringify({paragraphs:[paragraphs[0].replace('নাগরিকদের','না윅রিকদের'),paragraphs[1]]});}
+   elapsed+=145000;return write;
+  }});assert(!result.hold,result.message);assert.equal(writes,2);
+ }finally{Date.now=originalNow;}
 });
 test('copying source sentences triggers a targeted rewrite, not approval',async()=>{
  let writes=0,reviews=0;

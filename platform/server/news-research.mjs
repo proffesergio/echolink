@@ -52,6 +52,16 @@ export async function rankStories(stories,{page,connection,complete=textCompleti
 }
 export async function researchStory(selection,{read=articleDetails,onProgress=async()=>{}}={}){
  const sources=[];for(const item of selection.story.articles.slice(0,2)){let article=item,readStatus='feed_only';await onProgress(sources.length+1);try{article=await read(item);readStatus=article.extraction&&article.extraction!=='feed_only'?'article_read':'feed_only';}catch{}sources.push({...article,readStatus});}
- const primary=sources[0],evidence=sources.map(a=>({title:a.title,url:a.url,feedId:a.feedId,feedName:a.feedName,publishedAt:a.date,excerpt:String(a.body||'').slice(0,6000),readStatus:a.readStatus,extraction:a.extraction||'feed_only',completeBody:String(a.body||'').length<=6000,fetchedAt:new Date().toISOString()}));
+ const primary=sources[0],evidence=sources.map(a=>({title:a.title,url:a.url,feedId:a.feedId,feedName:a.feedName,publishedAt:a.date,excerpt:String(a.body||'').slice(0,24000),readStatus:a.readStatus,extraction:a.extraction||'feed_only',completeBody:String(a.body||'').length<=24000,fetchedAt:new Date().toISOString()}));
  return {article:primary,research:{version:'research-v1',researchedAt:new Date().toISOString(),method:selection.method,reason:selection.reason,coverageCount:selection.story.sourceCount,sources:evidence,note:'Related reports may repeat one wire story. Coverage is not independent verification; preserve uncertainty and conflicting claims.'}};
+}
+export async function researchLatestEligible(stories,{research=researchStory,qualify=()=>null,retain=async()=>{},accept=async()=>true,maxCandidates=3}={}){
+ for(const story of stories.slice(0,maxCandidates)){
+  const selection={story,method:'latest',reason:'Newest eligible unseen source publication first; factual and crisis checks remain mandatory.'};
+  const result=await research(selection),problem=qualify(result);
+  if(problem){await retain({selection,...result,message:problem});continue;}
+  const accepted=await accept({selection,...result});
+  if(accepted!==false)return {selection,...result,accepted};
+ }
+ return null;
 }

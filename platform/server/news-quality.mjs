@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 export const reviewedNewsHash=(title,text)=>createHash('sha256').update(title+'\n'+text).digest('hex');
 // Temporary brief-report floor for the local 4B worker; never pad scarce evidence.
 export const NEWS_REPORT_LIMITS=Object.freeze({sourceWords:180,reportWords:150,paragraphs:3,briefSourceWords:260});
-export const CONTEXT_BRIEF_LIMITS=Object.freeze({version:'context-brief-v1',minWords:80,targetMinWords:100,maxWords:500,sourceWords:100,feedWords:120,paragraphs:2,writerTokens:4096,reviewTokens:1024,contextTokens:6144});
+export const CONTEXT_BRIEF_LIMITS=Object.freeze({version:'context-brief-v1',minWords:80,targetMinWords:100,maxWords:500,sourceWords:100,feedWords:120,paragraphs:2,writerTokens:1400,reviewTokens:256,contextTokens:4096});
 export function briefEvidence(facts){
  let words=0;const selected=new Set();
  for(const fact of facts){if(words>=NEWS_REPORT_LIMITS.briefSourceWords)break;selected.add(fact.id);words+=newsWords(fact.text);}

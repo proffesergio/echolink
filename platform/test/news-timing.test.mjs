@@ -24,10 +24,12 @@ test('news gets the earliest seven-minute slot even under a legacy spread settin
  assert.equal(usableBookings(page,reservations).length,1);
  assert.equal(usableBookings({...page,kind:'ecommerce'},reservations).length,2);
 });
-test('a newsroom keeps one upcoming story rather than building a stale multi-item buffer',()=>{
+test('a newsroom fills the next two bookings while one prepared story waits to publish',()=>{
  assert.equal(generationBuffer(rule,page,[],{now}).count,1);
  const pending=[{status:'scheduled',at:new Date(+now+7*60000)}];
- assert.equal(liveNewsRefill(rule,page,pending,{now}).count,0);
+ assert.equal(liveNewsRefill(rule,page,pending,{now}).count,1);
+ assert.equal(liveNewsRefill(rule,page,[...pending,{status:'scheduled',at:new Date(+now+14*60000)}],{now}).count,0);
+ assert.equal(liveNewsRefill(rule,page,[{status:'scheduled',at:new Date(+now+24*3600000)},{status:'scheduled',at:new Date(+now+25*3600000)}],{now}).count,1,'distant bookings cannot hide an empty near-term queue');
  assert.equal(liveNewsRefill(rule,page,pending,{now:new Date(+now+8*60000)}).count,1);
  assert.equal(liveNewsRefill(rule,page,[{status:'review',at:new Date(+now+60000)}],{now}).count,1);
  const full=Array.from({length:70},()=>({status:'published',at:new Date(+now-60000)}));

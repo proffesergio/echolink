@@ -284,6 +284,45 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   Do not overlap broad local test suites with live inference on this small PC.
   No submitted/uncertain delivery was killed or reset by the refresh.
 
+## Newsroom latency and successor buffer — November12, afternoon
+
+- User reported writing remained too slow and nothing was booked ahead after a
+  publication. Live audit confirmed a20+ minute output-limit failure and source
+  inputs of6560/7000 tokens overflowing6144 context. The earlier single-upcoming
+  booking policy also suppressed preparing the next story while a post waited.
+- Supersedes the single-item policy above: keep the next TWO near-term bookings
+  supplied, preparing only one task/model at a time. A single scheduled story no
+  longer blocks its successor. Distant future bookings do not falsely fill this
+  buffer.7-minute actual gap, cap70,24-hour source age, latest-first and all
+  publication/approval/crisis/tenant checks remain.
+- Local brief target100–150 words; accepted range remains80–500. Select whole
+  evidence sentences within200 words/2000 source characters, retaining the lead,
+  explicit qualifications/denials and BOTH sides of detected conflicts. If those
+  cannot fit, retain the source for review and select another candidate. Full
+  source facts still participate in static factual/originality/modality checks;
+  the independent reviewer checks the entire output against the selected facts.
+  Omitted fact IDs stay in private audit; never truncate a qualification to fit.
+- Model context4096, writer output1400, reviewer output256 tokens. Writer native
+  request deadline150s; independent review180s; shared attempt deadline360s, so
+  repair does not reset the clock. HTTP requests actually cancel at deadline;
+  timeout becomes a held-source422, not repeated inference-host retries. Memory
+  waits/emergency abort and one-model serialization remain unchanged. The global
+  host ceilings are not raised or disabled by these narrower newsroom limits.
+- Aggregation checks up to three latest candidates, with8s article reads; it
+  retains inadequate teasers privately and tries the next recent report in the
+  same scan before starting inference. Exact URL/history checks remain inside
+  workspace transactions, including when a candidate was already saved. Full
+  research caches up to24k characters rather than clipping at6k and rereading.
+- Task copy now says writing/correcting report, rather than evidence section1of1.
+ 29 focused checks plus a shared-deadline check (14 brief checks) and30 isolated
+  API/integration checks pass. Tests use fixture HTTP and submit no model, website
+  or social publication. CI will run the full portable/root suite after commit.
+- Graceful worker updates applied without clearing delivery receipts. Real normal
+  automation: a116-word dairy report published16:31:17 Dhaka; the next106-word
+  education report generated/reviewed from16:32:52 to16:34:52 and booked16:39.
+  These are measured cycles, not guarantees of every report's speed or70/day.
+  Final successor calendar/receipts and deployment are being verified.
+
 ## Current inference and newsroom work
 
 - PC: i5-6500 / 4 logical threads / ~12 GiB RAM / GT730; CPU inference.
@@ -291,9 +330,9 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   batch 128, 30-minute call deadline, 768 MiB admission headroom and 512 MiB
   emergency abort. One model/request at a time. No useful GPU acceleration assumed.
 - Current automatic mode: `brief`, implemented in `news-brief-writer.mjs`.
-  Writer `gemma3:4b-it-q4_K_M` uses context 6144, output allowance 4096,
-  temperature 0.6 (repair 0.3). Reviewer `echotent:qwen3-4b` uses context 6144,
-  output 1024, temperature 0. One whole-report review replaces per-section
+  Writer `gemma3:4b-it-q4_K_M` uses context4096, output allowance1400,
+  temperature 0.6 (repair 0.3). Reviewer `echotent:qwen3-4b` uses context4096,
+  output256, temperature 0. One whole-report review replaces per-section
   reviews. Facebook uses the accepted lead without another inference call.
   Keep one local request/model at a time, reserve 768 MiB and abort at 512 MiB.
 - Reports accept 80–500 words in two to six paragraphs. Short sources target

@@ -21,9 +21,10 @@ export function liveNewsRefill(rule,page,reservations,{now=new Date(),periodEnd}
  const format=new Intl.DateTimeFormat('en-CA',{timeZone:page.timezone}),dayOf=at=>format.format(new Date(at));
  const delivered=reservations.filter(r=>r.at&&['published','publishing','unknown','scheduled','ready_manual'].includes(r.status));
  const full=delivered.filter(r=>dayOf(r.at)===date).length>=Math.min(rule.daily_target,page.daily_cap);
- // One prepared upcoming item is enough on this serialized local worker. Fetch
- // again just before that slot, rather than accumulating tomorrow's stale stories.
- const upcoming=delivered.filter(r=>r.at&&+new Date(r.at)>+now).sort((a,b)=>+new Date(a.at)-+new Date(b.at));
- const count=!full&&!upcoming.length&&(!periodEnd||+new Date(periodEnd)>+now)?1:0;
- return {count,refillUntil:null,nextCheck:new Date(+now+60000),message:full?'News daily capacity is filled. Checking again shortly.':count?'Collecting the latest unseen news for the earliest available slot.':'Fresh news is prepared for the next slot. Checking again in one minute.'};
+ // Keep the next two bookings supplied while their publisher waits. Preparation
+ // remains one task/model at a time; this is a queue buffer, not parallel inference.
+ const horizon=+now+Math.min(120,Math.max(30,3*page.gap_minutes))*60000;
+ const upcoming=delivered.filter(r=>r.at&&+new Date(r.at)>+now&&+new Date(r.at)<=horizon).sort((a,b)=>+new Date(a.at)-+new Date(b.at));
+ const count=!full&&upcoming.length<2&&(!periodEnd||+new Date(periodEnd)>+now)?1:0;
+ return {count,refillUntil:null,nextCheck:new Date(+now+60000),message:full?'News daily capacity is filled. Checking again shortly.':count?'Preparing the next fresh story while booked publishing continues.':'The next two news slots are supplied. Checking again in one minute.'};
 }

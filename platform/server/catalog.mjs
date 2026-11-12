@@ -45,7 +45,7 @@ export async function readFeed(feed){
  const parsed=await new Parser({customFields:{item:[['media:content','mediaContent'],['media:thumbnail','mediaThumbnail']]}}).parseString(response.bytes.toString());
  return (parsed.items||[]).slice(0,40).filter(x=>x.link).flatMap(item=>{try{return[{title:clean(item.title).slice(0,140),url:canonicalArticleURL(item.link),body:clean(item['content:encoded']||item.content||item.contentSnippet).slice(0,16000),date:item.isoDate||item.pubDate,category:item.categories?.join(' ')||'',image:item.mediaContent?.$?.url||item.mediaThumbnail?.$?.url||(/image/i.test(item.enclosure?.type||'')?item.enclosure.url:null)||load(item['content:encoded']||item.content||'')('img').first().attr('src')||null}];}catch{return[];}}).sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
 }
-export async function articleDetails(article){
- const response=await outbound(article.url);if(!response.ok)return article;const report=extractNewsHTML(response.bytes.toString());
+export async function articleDetails(article,{timeout=30000}={}){
+ const response=await outbound(article.url,{timeout});if(!response.ok)return article;const report=extractNewsHTML(response.bytes.toString());
  return {...article,category:report.category||article.category,body:(report.body||article.body||'').slice(0,30000),extraction:report.extraction,publishedAt:report.publishedAt||article.date,image:report.image?publicURL(new URL(report.image,article.url).href).href:article.image};
 }

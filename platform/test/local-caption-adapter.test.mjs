@@ -26,6 +26,27 @@ test('compact prompts bound source size without inventing facts; Instagram adapt
  const prompt=captionPrompt(page,post,null,null,'facebook',{compact:true});assert(prompt.facts.text.length<=2000);assert(prompt.prompt.length<5000);
  const caption='এটি একটি তথ্যভিত্তিক প্রতিবেদন। আরও তথ্য এখনও নিশ্চিত হয়নি।\n\n#সংবাদ';const adapted=formatInstagramCaption(caption,page);assert.equal(adapted.replace(/\s/g,''),caption.replace(/\s/g,''));
 });
+
+test('a news stage deadline cancels the real HTTP request and cannot become an endless host retry',async()=>{
+ const originalURL=process.env.PLATFORM_OLLAMA_URL,originalRun=localInferenceGate.run;let chatCalls=0,closed;
+ const disconnected=new Promise(resolve=>closed=resolve);
+ const server=createServer(async(req,res)=>{
+  res.setHeader('content-type','application/json');
+  if(req.url==='/api/tags')return res.end(JSON.stringify({models:[{name:'deadline-fixture',size:2e9}]}));
+  if(req.url==='/api/ps')return res.end(JSON.stringify({models:[{name:'deadline-fixture'}]}));
+  if(req.url==='/api/show'){for await(const _chunk of req){}return res.end('{}');}
+  if(req.url==='/api/chat'){chatCalls++;res.once('close',closed);res.write('{"message":');return;}
+  res.end('{}');
+ });await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ process.env.PLATFORM_OLLAMA_URL='http://127.0.0.1:'+server.address().port;localInferenceGate.run=createLocalInferenceGate({memory:()=>8*1024**3}).run;
+ try{
+  await assert.rejects(()=>textCompletion({provider:'ollama',config:{model:'deadline-fixture'}},{},'Isolated deadline fixture',{purpose:'news_article',deadlineMs:500}),e=>e.status===422&&e.code==='news_stage_timeout');
+  assert.equal(chatCalls,1);let timer;try{await Promise.race([disconnected,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('The timed-out fixture socket remained open.')),2000);})]);}finally{clearTimeout(timer);}
+ }finally{
+  localInferenceGate.run=originalRun;if(originalURL===undefined)delete process.env.PLATFORM_OLLAMA_URL;else process.env.PLATFORM_OLLAMA_URL=originalURL;
+  server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
+ }
+});
 test('price changes do not invalidate a price-free product creative; changed facts and photos do',()=>{
  const p={title:'Fan',description:'Verified specification',image_url:'https://example.com/fan.jpg',attributes:{battery:'3000mAh'},price:100};
  assert.equal(productFingerprint(p),productFingerprint({...p,price:200}));assert.notEqual(productFingerprint(p),productFingerprint({...p,description:'Different specification'}));assert.notEqual(productFingerprint(p),productFingerprint({...p,image_url:'https://example.com/other.jpg'}));
