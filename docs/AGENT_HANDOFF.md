@@ -314,20 +314,32 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   workspace transactions, including when a candidate was already saved. Full
   research caches up to24k characters rather than clipping at6k and rereading.
 - Task copy now says writing/correcting report, rather than evidence section1of1.
- 29 focused checks plus a shared-deadline check (14 brief checks) and30 isolated
-  API/integration checks pass. Tests use fixture HTTP and submit no model, website
-  or social publication. CI will run the full portable/root suite after commit.
+  The focused checks (including14 brief checks) and30 isolated API/integration
+  checks pass. Tests use fixture HTTP and submit no model, website or social
+  publication. Final CI43204576029 passed test AND deploy:222 portable checks,
+  63 root checks and both builds. The30 API checks also pass locally in isolation.
 - Graceful worker updates applied without clearing delivery receipts. Real normal
   automation: a116-word dairy report published16:31:17 Dhaka; the next106-word
   education report generated/reviewed from16:32:52 to16:34:52 and booked16:39.
   These are measured cycles, not guarantees of every report's speed or70/day.
   Follow-up publication16:39:16 confirmed, another106-word report published
-  16:47:07; a105-word report was booked16:54 while its successor was already
-  writing16:48. Immediate successor enqueue now runs inside successful booking,
+  16:47:07; a105-word report published16:54:18, with the next123-word report
+  booked17:02 and further preparation continuing. Immediate successor enqueue
+  now runs inside successful booking,
   before evergreen work can occupy the preparation lane; no extra inference runs
   concurrently. The isolated integration check verifies that booking queues its
   successor immediately, repeated planning does not duplicate it and two bookings
-  stop the chain. Final deployment/calendar checks follow.
+  stop the chain. Writer/reviewer native measurements for the106-word report
+  were39.8s and78.9s. This is one measured result; unsupported reports remain
+  held rather than being approved solely to fill the calendar.
+- Current runtime source8ae216c23afc009b1662839470d681a7889079ec is applied by
+  graceful restart. Native Git production deployment
+  dpl_262hjidmgFKqfXjtmHoMEW4rTsoC and Actions deployment
+  dpl_7h39PToDJQ1SL9AdqAbUxdiBdqSA are READY; final deployment:
+  https://echolink-jihctnadi-omniteam1.vercel.app. The public alias remains
+  https://echolinkbd.vercel.app. Homepage/entry/app/health200; anonymous owner
+  Operations401. All seven services healthy16:55 Dhaka; database pool waiters0,
+  workerRSS337MiB, host free2087MiB. These are point-in-time observations.
 
 ## Current inference and newsroom work
 
