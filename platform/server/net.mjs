@@ -3,13 +3,17 @@ import {BlockList,isIP} from 'node:net';
 import {request as httpRequest} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 import {AppError} from './errors.mjs';
+import {operationsTelemetry,upstreamGroup} from './operations-telemetry.mjs';
 const blocked=new BlockList();
 const globalIPv6=new BlockList();globalIPv6.addSubnet('2000::',3,'ipv6');
 for(const [ip,prefix]of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.168.0.0',16],['192.0.0.0',24],['192.0.2.0',24],['198.18.0.0',15],['198.51.100.0',24],['203.0.113.0',24],['224.0.0.0',4],['240.0.0.0',4]])blocked.addSubnet(ip,prefix,'ipv4');
 for(const [ip,prefix]of [['::',128],['::1',128],['fc00::',7],['fe80::',10],['ff00::',8],['2001:db8::',32],['2001::',32],['2002::',16]])blocked.addSubnet(ip,prefix,'ipv6');
 export function privateAddress(address){const value=address.replace(/^\[|\]$/g,'');if(value.toLowerCase().startsWith('::ffff:'))return true;const family=isIP(value);return !family||family===6&&!globalIPv6.check(value,'ipv6')||blocked.check(value,family===6?'ipv6':'ipv4');}
 export function publicURL(value){let url;try{url=new URL(value);}catch{throw new AppError(400,'Enter a complete HTTPS URL.');}if(url.protocol!=='https:'||url.username||url.password||url.hash||['localhost','metadata.google.internal'].includes(url.hostname)||isIP(url.hostname.replace(/^\[|\]$/g,''))&&privateAddress(url.hostname))throw new AppError(400,'Use a public HTTPS URL without embedded credentials.');return url;}
-export async function outbound(value,{method='GET',headers={},body,localOrigin,maxBytes=2_000_000,timeout=30000,signal}={}){
+export async function outbound(value,options={}){
+ const start=performance.now();try{const response=await performOutbound(value,options);operationsTelemetry.upstream({group:upstreamGroup(value,!!options.localOrigin),status:response.status,bytes:response.bytes.length,ms:performance.now()-start});return response;}catch(error){operationsTelemetry.upstream({group:upstreamGroup(value,!!options.localOrigin),error:true,ms:performance.now()-start});throw error;}
+}
+async function performOutbound(value,{method='GET',headers={},body,localOrigin,maxBytes=2_000_000,timeout=30000,signal}={}){
   const deadline=AbortSignal.timeout(timeout);signal=signal?AbortSignal.any([signal,deadline]):deadline;
   const failure=error=>error instanceof AppError?error:signal?.aborted&&signal.reason instanceof AppError?signal.reason:signal?.reason?.name==='TimeoutError'?new AppError(504,'The connected service exceeded its response time budget.'):new AppError(502,'The remote service could not be reached. Check the connection and try again.');
   const url=localOrigin?new URL(value):publicURL(value);

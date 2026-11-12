@@ -20,3 +20,4 @@ export const tenantQuery=(workspaceId,sql,args=[])=>transaction(workspaceId,clie
 export const workspaceLock=(client,id)=>client.query("SELECT pg_advisory_xact_lock(hashtextextended('creator:'||$1,0))",[id]);
 export const audit=(client,workspaceId,actor,action,type,id,detail={})=>client.query('INSERT INTO creator.activity(workspace_id,actor_id,action,resource_type,resource_id,detail) VALUES($1,$2,$3,$4,$5,$6)',[workspaceId,actor?.id||null,action,type,id?String(id):null,JSON.stringify(detail)]);
 export async function closeDatabase(){await pool?.end();pool=undefined;}
+export function databasePoolStatus(){return {configuredMax:Math.max(1,Math.min(6,Number(process.env.DATABASE_POOL_MAX)||2)),total:pool?.totalCount??0,idle:pool?.idleCount??0,waiting:pool?.waitingCount??0};}

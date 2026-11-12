@@ -1,4 +1,5 @@
 import {nichePresets} from './niches.mjs';
+import {contentListQuery} from './content-list.mjs';
 import {pageCatalogue,catalogueFeedURL,newCataloguePolicy} from './meta-catalogue.mjs';
 import {queueApprovalNotification} from './notifications.mjs';
 import {inferenceHost,inspectInferenceHost,saveInferenceHost} from './inference-host.mjs';
@@ -6,6 +7,7 @@ import {listFonts,uploadFont} from './fonts.mjs';
 import {postListColumns,productListColumns,taskListColumns} from './read-model.mjs';
 import {databaseProfileSchema,parseDatabaseSecret,sealDatabaseSecret,openDatabaseSecret,safeDatabaseProfile,probeDatabase} from './database-profiles.mjs';
 import {databaseTelemetry} from './database-telemetry.mjs';
+import {operationsSnapshot} from './operations-monitor.mjs';
 import {preserveEditorialState,addEditorialFeedback} from './editorial-memory.mjs';
 import {analyzeProduct} from './product-analysis.mjs';
 import {PRODUCT_DESIGN_VERSION} from './product-design.mjs';
@@ -84,7 +86,8 @@ export async function api(request,path,body={},identityVerifier){
  if(path==='/api/state'&&method==='GET'){const requestStarted=performance.now();return transaction(w,async db=>{
   const contentRevision=(await db.query('SELECT revision::text FROM creator.workspace_revisions WHERE workspace_id=$1',[w])).rows[0]?.revision||'0';
   const data={actor:{id:actor.id,name:actor.name,email:actor.email,role:actor.role,email_verified:actor.email_verified},workspace:actor.workspace,workspaces:actor.workspaces,entitlements:await entitlements(db,w,{allowExpired:true}),providers:connectionTypes.filter(p=>!p.ownerOnly||actor.role==='super_admin'),publishingEnabled:env().publishing,environment:env().production?'production':'development'};
-  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules','social_destinations','social_deliveries'])data[table]=(await db.query(`SELECT ${table==='posts'?postListColumns:table==='products'?productListColumns:table==='tasks'?taskListColumns:'*'} FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':table==='social_destinations'?'verified_at':'created_at'} DESC LIMIT 300`,[w])).rows;
+  for(const table of ['pages','websites','feeds','products','posts','tasks','campaigns','ad_drafts','payments','automation_rules','social_destinations','social_deliveries'])data[table]=(await db.query(`SELECT ${table==='posts'?postListColumns:table==='products'?productListColumns+",ARRAY(SELECT DISTINCT s.page_id FROM creator.posts s WHERE s.workspace_id=creator.products.workspace_id AND s.product_id=creator.products.id AND (s.status='published' OR s.fb_post_id IS NOT NULL OR s.published_at IS NOT NULL)) AS published_page_ids":table==='tasks'?taskListColumns:'*'} FROM creator.${table} WHERE workspace_id=$1 ${table==='posts'?'AND archived_at IS NULL AND deleted_at IS NULL':''} ORDER BY ${table==='feeds'?'name':table==='products'?'fetched_at':table==='social_destinations'?'verified_at':table==='posts'?'updated_at':'created_at'} DESC${table==='posts'?', id DESC':''} LIMIT 300`,[w])).rows;
+  data.catalogHistory=(await db.query("SELECT g.id AS page_id,count(p.id)::int AS fetched,count(p.id) FILTER(WHERE EXISTS(SELECT 1 FROM creator.posts s WHERE s.workspace_id=p.workspace_id AND s.page_id=g.id AND s.product_id=p.id AND (s.status='published' OR s.fb_post_id IS NOT NULL OR s.published_at IS NOT NULL)))::int AS published FROM creator.pages g LEFT JOIN creator.products p ON p.workspace_id=g.workspace_id AND p.website_id=g.website_id WHERE g.workspace_id=$1 AND g.kind='ecommerce' GROUP BY g.id",[w])).rows;
   data.connections=(await db.query(`SELECT ${safeConnections} FROM creator.connections WHERE workspace_id=$1 ORDER BY created_at DESC`,[w])).rows;
   data.creativeTools={localCutout:cutoutAvailable()};if(actor.role==='super_admin')data.inference=localInferenceGate.status();
   data.metaApps=actor.role==='super_admin'?await metaAppProfiles():[];
@@ -116,7 +119,11 @@ export async function api(request,path,body={},identityVerifier){
   return (await db.query("SELECT id,page_id,type,title,status,version,approved_version,planned_at,scheduled_at,published_at,jsonb_build_object('assetId',creative->'assetId') AS creative FROM creator.posts WHERE workspace_id=$1 AND ($2::uuid IS NULL OR page_id=$2) AND deleted_at IS NULL AND archived_at IS NULL AND COALESCE(published_at,scheduled_at,planned_at) BETWEEN $3::date-interval '1 day' AND $4::date+interval '2 days' ORDER BY COALESCE(published_at,scheduled_at,planned_at) LIMIT 10000",[w,page||null,from,to])).rows;
  });
  if(path==='/api/posts'&&method==='GET'){
-  const params=new URL(request.url).searchParams,offset=Math.max(0,Math.min(100000,Number(params.get('offset'))||0)),limit=Math.max(1,Math.min(300,Number(params.get('limit'))||100)),bucket=params.get('bucket'),page=params.get('page');if(page&&!uuid(page))throw new AppError(400,'Invalid Page.');const filter=bucket==='trash'?'deleted_at IS NOT NULL':bucket==='archive'?'archived_at IS NOT NULL AND deleted_at IS NULL':'archived_at IS NULL AND deleted_at IS NULL';return transaction(w,async db=>({posts:(await db.query(`SELECT ${postListColumns} FROM creator.posts WHERE workspace_id=$1 AND ${filter} AND ($4::uuid IS NULL OR page_id=$4) ORDER BY created_at DESC LIMIT $2 OFFSET $3`,[w,Math.floor(limit),Math.floor(offset),page])).rows}));
+  const list=contentListQuery(new URL(request.url).searchParams);return transaction(w,async db=>{
+   const values=[w,...list.values],total=(await db.query(`SELECT count(*)::int AS total FROM creator.posts WHERE ${list.where}`,values)).rows[0].total;
+   const posts=(await db.query(`SELECT ${postListColumns} FROM creator.posts WHERE ${list.where} ORDER BY ${list.order} LIMIT $${values.length+1} OFFSET $${values.length+2}`,[...values,list.limit,list.offset])).rows;
+   return {posts,total,offset:list.offset,hasMore:list.offset+posts.length<total};
+  });
  }
  if(path==='/api/onboarding'&&method==='POST'){
   const data=validate('onboarding',body);return transaction(w,async db=>{await db.query('UPDATE creator.workspaces SET name=$2,niche=$3,language=$4,desired_pages=$5,onboarded=true WHERE id=$1',[w,data.name,data.niche,data.language,data.desired_pages]);await audit(db,w,actor,'workspace.onboarded','workspace',w);return {ok:true};});
@@ -194,7 +201,7 @@ export async function api(request,path,body={},identityVerifier){
   await workspaceLock(db,w);const product=await row(db,'products',w,match[1]),page=await row(db,'pages',w,body.page_id);
   if(page.kind!=='ecommerce'||page.website_id!==product.website_id)throw new AppError(400,'Choose a product from this ecommerce Page’s connected catalog.');
   if(!product.available)throw new AppError(409,'This product is out of stock. Refresh the catalog or choose an available item.');
-  if(Date.now()-new Date(product.fetched_at)>86400000)throw new AppError(409,'Refresh this catalog before preparing a product post.');
+
   if(!page.text_connection_id)throw new AppError(400,'Connect a caption model for this Page first.');
   const existing=(await db.query("SELECT id,status FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND product_id=$3 AND deleted_at IS NULL AND archived_at IS NULL AND status IN ('draft','review','approved','scheduled') ORDER BY created_at DESC LIMIT 1",[w,page.id,product.id])).rows[0];
   if(existing)return {ok:true,postId:existing.id,message:'This product already has a '+existing.status+' post. Open Content to manage it.'};
@@ -361,6 +368,7 @@ export async function api(request,path,body={},identityVerifier){
  throw new AppError(404,'This operation was not found.');
 }
 async function ownerAPI(actor,request,path,body){
+ if(path==='/api/owner/operations'&&request.method==='GET')return operationsSnapshot();
  if(path==='/api/owner/inference'&&request.method==='GET')return inferenceHost();
  if(path==='/api/owner/inference/report'&&request.method==='GET'){let report;try{report=JSON.parse(await readFile(new URL('../../.local/verification/model-comparison.json',import.meta.url),'utf8'));}catch{return {results:[]};}return {at:report.at,results:report.results.map(r=>({model:r.model,task:r.task,passed:r.passed,seconds:r.seconds,warnings:r.warnings,tokensPerSecond:r.metrics?.[0]?.tokensPerSecond,requiredMB:r.admission?.requiredMB}))};}
  if(path==='/api/owner/inference/test'&&request.method==='POST')return inspectInferenceHost(body);

@@ -4,6 +4,9 @@ import {generationAvailability,startsGeneration} from '../server/generation-wind
 import {generationBuffer} from '../server/generation-buffer.mjs';
 import {findSlot} from '../server/scheduling.mjs';
 const page={kind:'ecommerce',timezone:'Asia/Dhaka',daily_cap:50,gap_minutes:10,window_start:'00:00',window_end:'00:00',creative_policy:{scheduleMode:'interval'}},rule={daily_target:50,buffer_hours:168,refill_minutes:60,batch_size:2,generation_window:{enabled:true,start:'22:00',end:'07:00',emergency_refill:false}};
+test('explicit urgent preparation starts during the day but cannot override paused automation',()=>{
+ const now=new Date('2026-11-08T06:00:00Z');assert.equal(generationAvailability(rule,page,[],{now,urgent:true}).allowed,true);assert.equal(generationAvailability({...rule,enabled:false},page,[],{now,urgent:true}).allowed,false);
+});
 test('generation hours gate new work rather than holding completion, calendar delivery or insights',()=>{
  for(const kind of ['aggregate','generate','import_products'])assert(startsGeneration(kind));
  for(const kind of ['creative','write_article','publish','publish_instagram','sync_insights'])assert(!startsGeneration(kind));
@@ -22,6 +25,11 @@ test('overnight refills cover gaps before the next night rather than waiting for
  const now=new Date('2026-11-08T17:00:00Z'),reservations=Array.from({length:30},(_,i)=>({at:new Date(+now+(1+i*10)*60000),status:'scheduled'}));
  assert.equal(generationBuffer(rule,page,reservations,{now}).count,0);
  const night=generationAvailability(rule,page,reservations,{now});assert.equal(generationBuffer(rule,page,reservations,{now,leadMinutes:night.leadMinutes}).count,2);
+});
+test('held automatic newsroom drafts do not suppress daytime rescue',()=>{
+ const now=new Date('2026-11-08T06:00:00Z'),rescue={...rule,generation_window:{...rule.generation_window,emergency_refill:true}},held=Array.from({length:6},(_,i)=>({at:new Date(+now+(1+i*10)*60000),status:'review'}));
+ assert.equal(generationAvailability(rescue,{...page,kind:'news',require_review:false},held,{now}).emergency,true);
+ assert.equal(generationAvailability(rescue,{...page,kind:'news',require_review:true},held,{now}).allowed,false);
 });
 test('news horizons remain short while evergreen reservations can extend beyond a month',()=>{
  const now=new Date('2026-11-08T00:00:00Z');const news=generationBuffer({...rule,buffer_hours:2160},{...page,kind:'news'},[],{now});assert.equal(+news.refillUntil,+now+86400000);

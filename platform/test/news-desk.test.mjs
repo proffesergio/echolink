@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generateNewsReport,newsSocialCaption,NEWS_COMMENT_CTA} from '../server/news-desk.mjs';
+import {newsSocialCaption,NEWS_COMMENT_CTA} from '../server/news-desk.mjs';
+import {generateSectionedNewsReport as generateNewsReport} from '../server/news-report-writer.mjs';
 import {parseSectionReview,parseWrittenFacts} from '../server/news-report-writer.mjs';
-import {reportQuality,evidenceConflicts} from '../server/news-quality.mjs';
+import {reportQuality,evidenceConflicts,briefEvidence} from '../server/news-quality.mjs';
 import {factModalityWarnings} from '../server/news-quality.mjs';
 import {evidenceLedger,reportGroups,newsWords,sectionWarnings,newsReportProblem,reviewedNewsHash} from '../server/news-quality.mjs';
 import {captionLanguageWarnings} from '../server/caption-generation.mjs';
@@ -18,10 +19,28 @@ async function complete(_c,_s,prompt,{purpose}){
  const group=groupFrom(prompt),texts=group.map(f=>f.text.replace('বিষয়ে কর্তৃপক্ষ','নিয়ে সংশ্লিষ্ট কর্তৃপক্ষ').replace('নির্দিষ্ট কার্যক্রম','নির্ধারিত কার্যক্রম').replace('প্রকল্পের নথিতে','প্রকাশিত নথিতে').replace('দায়িত্ব পালনের পরিকল্পনা','দায়িত্ব বাস্তবায়নের পরিকল্পনা').replace('বিস্তারিত বিবরণ জানিয়েছে','বিস্তারিত তথ্য দিয়েছে'));return JSON.stringify({sentences:group.map((f,i)=>({id:f.id,text:texts[i]}))});
 }
 test('news captions contain a first-comment invitation and three hashtags',()=>{const caption=newsSocialCaption('পরিকল্পনার বিষয়ে নির্দেশনা এসেছে। #ঢাকা',page);assert(caption.includes(NEWS_COMMENT_CTA));assert.equal((caption.match(/#/g)||[]).length,3);});
+test('captions drop forced engagement questions and keep final hashtags',()=>{const caption=newsSocialCaption('পরিকল্পনার বিষয়ে নির্দেশনা এসেছে। আপনার মত কী? #ঢাকা',page);assert(!caption.includes('?'));assert.equal((caption.match(/#/g)||[]).length,3);assert.match(caption,/\n\n(?:#[\p{L}\p{M}\p{N}_]+\s*){3}$/u);});
+test('additional context numbers do not create a quantity conflict',()=>{
+ assert.deepEqual(evidenceConflicts([{id:'F1',source:0,text:'নগরের নতুন প্রকল্পে কাজের দায়িত্বে ৫ জন কর্মকর্তাকে নিয়োগ দিয়েছে কর্তৃপক্ষ।'},{id:'F2',source:1,text:'নগরের নতুন প্রকল্পে কাজের দায়িত্বে ৫ জন কর্মকর্তাকে ২০২৬ সালে নিয়োগ দিয়েছে কর্তৃপক্ষ।'}]),[]);
+});
+test('brief selection keeps later denials and caveats and section copying triggers repair',()=>{
+ const facts=evidenceLedger(post),denial={id:'F999',source:0,text:'তবে সংশ্লিষ্ট কর্মকর্তা অভিযোগটি অস্বীকার করেছেন।'},selected=briefEvidence([...facts,denial]);
+ assert(selected.length<facts.length);assert(selected.includes(denial));
+ assert(sectionWarnings(facts[0].text,[facts[0]],page).some(w=>w.includes('unquoted source wording')));
+});
+test('brief reports below the old 450 word floor can pass writing and publishing',async()=>{
+ const brief={...post,body:post.body.split('\n\n').slice(0,8).join('\n\n')};
+ const result=await generateNewsReport({page,post:brief,connection},{complete});assert(!result.hold);assert(!result.article.needsReview);assert(result.article.wordCount>=150&&result.article.wordCount<450);
+ assert.equal(newsReportProblem({...brief,title:result.title,seo:{article:{...result.article,socialPending:false}}},page),null);
+});
+test('a long RSS-only dossier cannot pass the lower brief floor',async()=>{
+ const rss={...post,seo:{reportEvidence:{sources:[{url:post.source_url,text:post.body,extraction:'feed_only'}]}}};
+ const result=await generateNewsReport({page,post:rss,connection},{complete:()=>{throw Error('must not infer');}});assert(result.hold);assert.match(result.message,/extracted full article/);
+});
 test('complete evidence, independent review and checkpoints precede any social caption',async()=>{
  let saved,writes=0;await assert.rejects(()=>generateNewsReport({page,post,connection},{complete:async(...args)=>{if(args[3].purpose==='news_article'&&++writes===2)throw Error('timeout');return complete(...args);},onSection:async d=>{saved=structuredClone(d);}}),/timeout/);assert.equal(saved.reportSections.length,1);
  let resumed=0;const result=await generateNewsReport({page,post,connection},{savedDraft:saved,complete:async(...args)=>{if(args[3].purpose==='news_article')resumed++;return complete(...args);}});
- assert.equal(resumed,reportGroups(evidenceLedger(post),{budget:Math.floor(4096*.28)}).length-1);assert(result.article.wordCount>=450);assert(result.article.paragraphCount>=6);assert.equal(result.caption,'');assert.equal(result.article.socialPending,true);assert.equal(result.article.generationVersion,'newsroom-v4');assert.equal(result.article.evidenceCoverage,1);assert.deepEqual(result.warnings,[]);
+ assert.equal(resumed,reportGroups(briefEvidence(evidenceLedger(post)),{budget:Math.floor(4096*.28)}).length-1);assert(result.article.wordCount>=150);assert(result.article.paragraphCount>=3);assert.equal(result.caption,'');assert.equal(result.article.socialPending,true);assert.equal(result.article.generationVersion,'newsroom-v4');assert.equal(result.article.evidenceCoverage,1);assert.deepEqual(result.warnings,[]);
 });
 test('thin, repeated RSS evidence is held before inference instead of padded',async()=>{const result=await generateNewsReport({page,post:{...post,body:'পরিকল্পনা প্রকাশ করেছে সংশ্লিষ্ট কর্তৃপক্ষ।'.repeat(200)},connection},{complete:async()=>{throw Error('must not run');}});assert(result.hold);assert.match(result.message,/unique source words/);});
 test('reviewer cannot approve missing facts, and evidence windows preserve complete sentences',()=>{assert.equal(parseSectionReview('{"supported":true,"issues":[],"coveredIds":[]}',[{id:'F1'}]).supported,false);const facts=evidenceLedger(post),groups=reportGroups(facts,{budget:700});assert.equal(groups.flat().length,facts.length);assert(groups.flat().every(f=>f.text.endsWith('।')));assert(newsWords(facts.map(f=>f.text).join(' '))>=450);});

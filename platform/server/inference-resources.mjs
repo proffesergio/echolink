@@ -7,7 +7,7 @@ import {inferenceIdle,ollamaCloudModel} from './inference-idle.mjs';
 
 const MiB=1024*1024;
 export const inferenceProfiles={
- windows_quality:{contextTokens:8192,maxOutputTokens:3072,threads:4,batch:128,reserveMB:768,abortMB:512,maxModelGB:4.5,timeoutSeconds:1800,gpuLayers:0},
+ windows_quality:{contextTokens:8192,maxOutputTokens:4096,threads:4,batch:128,reserveMB:768,abortMB:512,maxModelGB:4.5,timeoutSeconds:1800,gpuLayers:0},
  windows_safe:{contextTokens:4096,maxOutputTokens:1800,threads:2,batch:64,reserveMB:1536,abortMB:700,maxModelGB:4,timeoutSeconds:1200,gpuLayers:0},
  larger_host:{contextTokens:8192,maxOutputTokens:2048,threads:6,batch:128,reserveMB:4096,abortMB:1024,maxModelGB:24,timeoutSeconds:900,gpuLayers:-1},
  ubuntu_amd8gb:{contextTokens:8192,maxOutputTokens:2048,threads:4,batch:128,reserveMB:3072,abortMB:1024,maxModelGB:7,timeoutSeconds:600,gpuLayers:-1},

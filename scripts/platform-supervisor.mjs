@@ -11,6 +11,8 @@ const root=fileURLToPath(new URL('../',import.meta.url)),logs=resolve(root,'.cod
 const inferenceEnvironment=parseEnv(await readFile(resolve(root,'platform/.env.local'),'utf8').catch(()=>''));
 const ollamaEnvironment={...process.env,...Object.fromEntries(Object.entries(inferenceEnvironment).filter(([key])=>key.startsWith('OLLAMA_')))};
 const children=new Map();let shuttingDown=false,tunnelRecovering=false,lastRepair=0;
+async function heartbeat(){try{await mkdir(resolve(root,'platform/.local'),{recursive:true});await writeFile(resolve(root,'platform/.local/supervisor-status.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid}));}catch{}}
+await heartbeat();const heartbeatTimer=setInterval(heartbeat,30000);heartbeatTimer.unref();
 function keepAlive(name,args,cwd=root){
  const child=spawn(process.execPath,args,{cwd,env:process.env,windowsHide:true,stdio:['ignore','pipe','pipe']});children.set(name,child);
  child.stdout.pipe(createWriteStream(resolve(logs,name+'.stdout.log'),{flags:'a'}));child.stderr.pipe(createWriteStream(resolve(logs,name+'.stderr.log'),{flags:'a'}));
@@ -49,5 +51,5 @@ async function repairTunnel(){
  }catch{console.error(new Date().toISOString()+' Public worker reconnect failed; retrying shortly.');}finally{tunnelRecovering=false;}
 }
 setTimeout(repairTunnel,3000);ensureOllama();const modelTimer=setInterval(ensureOllama,30000);const timer=setInterval(repairTunnel,30000);
-const stop=()=>{shuttingDown=true;clearInterval(timer);clearInterval(modelTimer);for(const child of children.values())child.kill();process.exit(0);};process.on('SIGINT',stop);process.on('SIGTERM',stop);
+const stop=()=>{shuttingDown=true;clearInterval(timer);clearInterval(modelTimer);clearInterval(heartbeatTimer);for(const child of children.values())child.kill();process.exit(0);};process.on('SIGINT',stop);process.on('SIGTERM',stop);
 console.log('Creator worker and bridge supervision active. Public tunnel checks run every 30 seconds.');

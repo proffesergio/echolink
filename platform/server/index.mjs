@@ -13,17 +13,25 @@ import {closeDatabase} from './db.mjs';
 import {guardedDispatch} from './dispatch.mjs';
 import {publicMedia} from './public-media.mjs';
 import {publicCatalogueFeed} from './meta-catalogue.mjs';
+import {operationsTelemetry,metricRoute,startOperationsPersistence} from './operations-telemetry.mjs';
+import {operationsSnapshot} from './operations-monitor.mjs';
 const root=fileURLToPath(new URL('../dist/',import.meta.url)),mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
 const security={'x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY','cache-control':'no-store','content-security-policy':"default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com"};
 async function readBody(req,limit=1_000_000){const chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>limit)throw new AppError(413,'This request is too large.');chunks.push(chunk);}return Buffer.concat(chunks);}
 export function createApp(){return createServer(async(req,res)=>{
+ const measuredRoute=metricRoute(req.url),started=performance.now();let responseBytes=0,recorded=false;
+ if(measuredRoute){operationsTelemetry.requestStarted();const record=()=>{if(recorded)return;recorded=true;operationsTelemetry.requestFinished({route:measuredRoute,method:req.method,status:res.statusCode,ms:performance.now()-started,bytes:responseBytes,aborted:!res.writableFinished});};res.once('finish',record);res.once('close',record);}
  try{
   const expected=new URL(env().origin),host=req.headers.host;if(env().production&&host==='localhost:'+env().port){res.writeHead(302,{location:env().origin+req.url,'cache-control':'no-store'});res.end();return;}if(![expected.host,'127.0.0.1:'+env().port].includes(host))throw new AppError(400,'Unrecognized application host.');
   const url=new URL(req.url,env().origin),method=req.method;let response;
   if(url.pathname==='/api/health'&&method==='GET')response=Response.json({ok:true,app:'EchoLink',version:2,publishingEnabled:env().publishing});
   else if(/^\/api\/public-media\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicMedia(url);
   else if(/^\/api\/catalogue-feed\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicCatalogueFeed(url);
-  else if(url.pathname==='/internal/platform/tick'&&method==='POST'){
+  else if(url.pathname==='/internal/platform/operations'&&method==='GET'){
+   const expected=process.env.PLATFORM_WORKER_TOKEN||'',actual=String(req.headers['x-echolink-worker-key']||'');
+   if(expected.length<32||actual.length!==expected.length||!timingSafeEqual(Buffer.from(actual),Buffer.from(expected)))throw new AppError(401,'Worker authentication required.');
+   response=Response.json(await operationsSnapshot());
+  }else if(url.pathname==='/internal/platform/tick'&&method==='POST'){
    const expected=process.env.PLATFORM_WORKER_TOKEN||'',actual=String(req.headers['x-echolink-worker-key']||'');
    if(expected.length<32||actual.length!==expected.length||!timingSafeEqual(Buffer.from(actual),Buffer.from(expected)))throw new AppError(401,'Worker authentication required.');
    await readBody(req);if(process.env.PLATFORM_WORKER_ENABLED==='false')throw new AppError(503,'Queue dispatch is paused for recovery.','worker_paused');response=Response.json(await guardedDispatch());
@@ -43,13 +51,14 @@ export function createApp(){return createServer(async(req,res)=>{
    try{if(!(await stat(file)).isFile())file=resolve(root,'index.html');}catch{file=resolve(root,'index.html');}
    response=new Response(await readFile(file),{headers:{'content-type':mime[extname(file)]||'application/octet-stream'}});
   }
-  res.writeHead(response.status,{...security,...Object.fromEntries(response.headers),...(response.headers.getSetCookie().length?{'set-cookie':response.headers.getSetCookie()}:{})});res.end(method==='HEAD'?undefined:Buffer.from(await response.arrayBuffer()));
+  res.writeHead(response.status,{...security,...Object.fromEntries(response.headers),...(response.headers.getSetCookie().length?{'set-cookie':response.headers.getSetCookie()}:{})});const bytes=method==='HEAD'?undefined:Buffer.from(await response.arrayBuffer());responseBytes=bytes?.length||0;res.end(bytes);
  }catch(error){const storageUnavailable=['53000','53300','57P03','ECONNREFUSED','ETIMEDOUT'].includes(error.code),status=error instanceof AppError?error.status:storageUnavailable?503:error.code==='23505'?409:error.code==='23503'?404:500;const message=error instanceof AppError?error.message:storageUnavailable?'Workspace storage is temporarily unavailable. Your existing workspace has not been replaced. Please try again later or contact support.':error.code==='23505'?'This item or reference already exists.':error.code==='23503'?'The related item was not found in your workspace.':'The operation could not be completed. Please retry or contact the owner.';
   if(status===500)console.error('Platform request failed:',error.code||error.name);
-  res.writeHead(status,{...security,'content-type':'application/json'});res.end(JSON.stringify({error:message,code:error instanceof AppError?error.code:storageUnavailable?'storage_unavailable':undefined}));
+  const bytes=JSON.stringify({error:message,code:error instanceof AppError?error.code:storageUnavailable?'storage_unavailable':undefined});responseBytes=Buffer.byteLength(bytes);res.writeHead(status,{...security,'content-type':'application/json'});res.end(bytes);
  }
 });}
 if(process.argv[1]===fileURLToPath(import.meta.url)){
+ await startOperationsPersistence();
  // Bind the health/API listener even during a provider outage. Recovery must
  // succeed before either queue starts, and retries use the same bounded backoff.
  const server=createApp();let stop=()=>{},recoveryTimer,closing=false,recoveryFailures=0;

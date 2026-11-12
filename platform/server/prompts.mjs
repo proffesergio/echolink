@@ -54,15 +54,15 @@ export function prepareCaption(raw,page,product){
   const claims=[/saniti[sz]er|স্যানিটাইজার/iu,/disinfectant|জীবাণুনাশক/iu,/cures?\b|রোগ সারায়/iu,/kills?\s+(?:all\s+)?germs|জীবাণু ধ্বংস/iu];
   const unsupported=claims.some(pattern=>pattern.test(caption)&&!pattern.test(source));
   const segments=caption.split(/\n+|(?<=[।!?])\s*/u).filter(Boolean),kept=segments.filter(line=>!/(?:৳|[$€£]|\b(?:BDT|USD|EUR|GBP|TK|taka)\b)\s*[০-৯\d]|[০-৯\d][০-৯\d,.]*\s*(?:BDT|USD|EUR|GBP|টাকা|টাকায়|টাকায়)|(?:মূল্য|দাম|price|cost)\s*[:=]?\s*(?:মাত্র\s*)?[০-৯\d]/iu.test(line));
-  if(page.creative_policy?.commerce?.includePrice!==true&&kept.length<segments.length){caption=kept.join('\n\n');notes.push('Product price copy removed according to the Page commerce policy.');}
+  if(kept.length<segments.length){caption=kept.join('\n\n');notes.push('Product price copy removed; readers check the website for updated prices.');}
   if(unsupported||caption.length<60){
    caption=[product.title,['Bangla','Bilingual-Mix'].includes(page.language)?'পণ্যটির বিস্তারিত জানতে ইনবক্সে যোগাযোগ করুন।':'Message us for product details.'].join('\n\n');
    if(unsupported)notes.push('Model added an unsupported product-category or health claim; a caption using catalog title and product-details CTA replaced it.');
   }
-  if(page.creative_policy?.commerce?.includePrice===true&&product.price!=null){const value=String(Number(product.price)),plain=caption.replace(/[০-৯]/g,c=>String('০১২৩৪৫৬৭৮৯'.indexOf(c))).replaceAll(',','');if(!plain.includes(value)){caption+='\n\n'+(page.language==='English'?'Price: ':'মূল্য: ')+value+' '+(product.currency||'');notes.push('Current catalogue price appended from verified product data.');}}
   if(page.language==='Bilingual-Mix'&&page.creative_policy?.contentFormat!=='commerce_v2'&&!/[\u0980-\u09ff]/u.test(caption)){caption='পণ্যের বিস্তারিত জানতে ইনবক্সে যোগাযোগ করুন।\n\n'+caption;notes.push('A Bangla message invitation was added to the English product caption for this bilingual Page.');}
   if(page.language==='Bilingual-Mix'&&page.creative_policy?.contentFormat!=='commerce_v2'&&!/(?:^|\n|[.!?]\s+)[A-Za-z][A-Za-z0-9 ,’'–—()%/:.-]{15,}[.!?](?:\s|$)/u.test(caption))caption+='\n\nMessage us for product details.';
   if(!/#[\p{L}\p{M}\p{N}_]+/u.test(caption)){const brand=String(page.name||'').replace(/[^\p{L}\p{M}\p{N}_]/gu,'');caption+='\n\n'+(brand?'#'+brand+' ':'')+'#ProductDetails';}
  }
+ if(product){const priceNotice=page.language==='English'?'Please check our website for the updated price.':'আপডেটেড মূল্য জানতে আমাদের ওয়েবসাইট দেখুন।';if(!caption.includes(priceNotice)){const finalTags=caption.match(/\s*((?:#[\p{L}\p{M}\p{N}_]+\s*)+)$/u);caption=finalTags?caption.slice(0,finalTags.index).trim()+'\n\n'+priceNotice+'\n\n'+finalTags[1].trim():caption+'\n\n'+priceNotice;}}
  return {caption,notes};
 }

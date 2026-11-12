@@ -21,9 +21,9 @@ export function parseProductHTML(html,website){
  $('script[type="application/ld+json"]').each((_,el)=>{try{walk(JSON.parse($(el).text()));}catch(error){if(error instanceof AppError)throw error;}});
  return found.slice(0,100);
 }
-export async function fetchProducts(website,secret={},connection){
+export async function fetchProducts(website,secret={},connection,options={}){
  const base=publicURL(website.url);let products;
- if(website.connector==='fabrything_db')products=await readFabrythingCatalog(connection,secret,website);
+ if(website.connector==='fabrything_db')products=await readFabrythingCatalog(connection,secret,website,options);
  else if(website.connector==='shopify'){
   const version=website.config.apiVersion||'2026-10';const data=await remoteJSON(base.origin+'/api/'+version+'/graphql.json',{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':secret.apiKey||secret.token||''},body:{query:'{ shop { paymentSettings { currencyCode } } products(first: 100) { nodes { id title description productType vendor onlineStoreUrl availableForSale featuredImage { url } variants(first: 1) { nodes { price { amount currencyCode } compareAtPrice { amount } } } } } }'}});
   if(data.errors?.length)throw new AppError(502,'Shopify rejected the catalog query. Check the Storefront token and permissions.');
@@ -37,7 +37,8 @@ export async function fetchProducts(website,secret={},connection){
   const response=await outbound(base.href);if(!response.ok)throw new AppError(502,'The product page could not be read.');return parseProductHTML(response.bytes.toString(),website);
  }else throw new AppError(400,'Choose a product source connector for this website.');
  if(!Array.isArray(products))throw new AppError(400,'Expected a product array or {products: [...]}.');
- return products.slice(0,100).map(p=>normalizeProduct(p,website));
+ const normalized=products.map(p=>normalizeProduct(p,website)),excluded=new Set(options.excludeIds||[]);
+ return normalized.filter(p=>(!options.externalId||p.external_id===String(options.externalId))&&!excluded.has(p.external_id)).slice(0,100);
 }
 export async function readFeed(feed){
  let response;try{response=await outbound(feed.url);if(!response.ok)throw new Error('feed');}catch(error){if(!feed.fallback_url)throw error;response=await outbound(feed.fallback_url);if(!response.ok)throw new AppError(502,'Both feed URLs failed.');}

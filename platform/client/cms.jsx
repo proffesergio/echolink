@@ -1,0 +1,30 @@
+import React from 'react';
+import overviewIcon from './assets/cms/cutout-11-4edd6de1c7de.webp';
+
+const iconPaths={overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',posts:'M5 3h14v18H5zM8 7h8M8 11h8M8 15h5',attention:'m12 3 10 18H2ZM12 9v4m0 4h.01',calendar:'M4 5h16v16H4zM8 2v6m8-6v6M4 10h16',pipeline:'M3 6h6v6H3zm12 6h6v6h-6zM9 9h6v6',video:'m9 6 10 6-10 6zM3 3h18v18H3z',media:'M3 3h18v18H3zM3 17l6-6 5 5 3-3 4 4M16 7h.01',prompts:'M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5',studio:'m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z',insights:'M4 20V10m8 10V4m8 16v-7',branding:'m12 3 9 9-9 9-9-9Z',automations:'M4 17V7h11m-4-4 4 4-4 4m4 6h5m-4-4 4 4-4 4',newsroom:'M3 4h18v16H3zM7 8h5v5H7zm8 0h3m-3 4h3M7 16h11',feeds:'M4 4a16 16 0 0 1 16 16M4 11a9 9 0 0 1 9 9M4 19h.01',products:'m12 3 9 5v9l-9 5-9-5V8zm-9 5 9 5 9-5m-9 5v9',websites:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18',connections:'M9 15 6 18a4 4 0 0 1-5-5l5-5m9 1 3-3a4 4 0 0 1 5 5l-5 5M8 16l8-8',settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2',activity:'M3 12h4l3-8 4 16 3-8h4',pages:'M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z',billing:'M3 5h18v14H3zm0 5h18M6 15h3',support:'M5 14H3v-3a9 9 0 0 1 18 0v3h-2M5 10v8H3v-8zm14 0v8h2v-8zm0 8c0 3-4 3-7 3',owner:'m3 7 4 4 5-7 5 7 4-4-2 13H5Z'};
+export function CmsIcon({name}){if(name==='overview')return <img className="cms-icon-raster" src={overviewIcon} alt=""/>;return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={iconPaths[name]||iconPaths.connections}/></svg>;}
+
+export function ContentToolbar({query,setQuery,layout,setLayout,total,loaded,updatedAt,loading,refresh}){
+ return <div className="cms-toolbar"><label className="cms-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="Search loaded content" placeholder="Search titles and captions…" value={query} onChange={e=>setQuery(e.target.value)}/></label><span className="cms-result-count">{loaded} of {total} loaded{updatedAt&&<small>Updated {new Date(updatedAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</small>}</span><div className="cms-view-toggle" aria-label="Content layout"><button aria-pressed={layout==='list'} onClick={()=>setLayout('list')} title="List view" aria-label="List view">☷ <span>List</span></button><button aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')} title="Grid view" aria-label="Grid view">▦ <span>Grid</span></button></div><button className="small" disabled={loading} onClick={refresh}>↻ Update list</button></div>;
+}
+
+export function ContentRow({post,pageName,expanded,toggle}){
+ const image=post.creative?.assetId?'/api/assets/'+post.creative.assetId:post.creative?.sourceImage;
+ const when=post.published_at||post.scheduled_at||post.planned_at||post.updated_at;
+ return <button className="cms-content-row" onClick={toggle} aria-expanded={expanded} aria-label={(expanded?'Hide':'View')+' details: '+post.title}>
+  {image&&post.creative?.mime!=='video/mp4'?<img src={image} alt="" loading="lazy" referrerPolicy="no-referrer"/>:<span className="cms-content-placeholder" aria-hidden="true">{post.type==='reel'?'▷':'▤'}</span>}
+  <span className="cms-row-title"><h3>{post.title}</h3><small>{pageName} · {String(post.type||'Post').replaceAll('_',' ')}</small></span>
+  <span className={'status '+post.status}>{String(post.status).replaceAll('_',' ')}</span>
+  <span className="cms-row-date">{when?new Date(when).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Unscheduled'}<small>{post.published_at?'Published':post.scheduled_at?'Scheduled':post.planned_at?'Planned':'Updated'}</small></span><span className="cms-row-chevron" aria-hidden="true">{expanded?'−':'+'}</span>
+ </button>;
+}
+
+export function PromptLibrary({page,open}){
+ const policy=page?.creative_policy||{};
+ return <><section className="panel"><h2>{page.name} prompt library</h2><p className="muted">These are this Page’s saved writing and design instructions. Edit them together with its editorial and language settings.</p><button className="primary" onClick={()=>open('page',page)}>Edit Page prompts</button></section><div className="cards">{[['Caption instructions',policy.captionInstructions],['Image art direction',policy.imageInstructions],...Object.entries(policy.postTypePrompts||{}).map(([key,value])=>[key.replaceAll('_',' '),typeof value==='string'?value:[value?.caption&&'Caption instructions: '+value.caption,value?.image&&'Image instructions: '+value.image].filter(Boolean).join('\n\n')])].map(([name,value])=><section className="panel" key={name}><h3>{name}</h3><p className="muted" style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{value||'Default Page instructions apply. Add your own direction in Page prompts.'}</p></section>)}</div></>;
+}
+
+export function MediaLibrary({posts,open}){
+ const assets=[...new Map(posts.filter(p=>p.creative?.assetId).map(p=>[p.creative.assetId,p])).values()];
+ return <><p className="muted" style={{marginBottom:20}}>Designs from the recent workspace snapshot. Open Content for the complete publication history.</p>{assets.length?<div className="cards cms-media">{assets.map(p=><article className="panel" key={p.creative.assetId}>{p.creative.mime==='video/mp4'?<video controls preload="metadata" src={'/api/assets/'+p.creative.assetId}/>:<img loading="lazy" src={'/api/assets/'+p.creative.assetId} alt={p.title}/>}<h3>{p.title}</h3><span className={'status '+p.status}>{p.status}</span><div className="actions"><button onClick={()=>open('post',p)}>View content</button></div></article>)}</div>:<section className="empty"><h3>No saved media yet</h3><p>Prepared designs will appear here.</p></section>}</>;
+}

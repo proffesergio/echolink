@@ -1,7 +1,7 @@
 {
   "name": "echolink",
   "version": "1.0.0",
-  "description": "EchoLink Multi-Tenant News Aggregator & AI Pipeline",
+  "description": "EchoLink managed content operations platform for newsrooms, brands and creators",
   "type": "module",
   "main": "src/server.mjs",
   "scripts": {
@@ -27,8 +27,8 @@
     "verify:newsroom": "node scripts/check-newsroom-ui.mjs",
     "public:check": "node scripts/check-local-services.mjs",
     "public:repair": "powershell -NoProfile -File scripts/repair-public-dashboard.ps1",
-    "platform:start": "powershell -NoProfile -File scripts/start-platform.ps1",
-    "platform:repair": "powershell -NoProfile -File scripts/start-platform.ps1",
+    "platform:start": "node scripts/ensure-platform.mjs",
+    "platform:repair": "node scripts/ensure-platform.mjs",
     "verify:public": "node scripts/check-public-dashboard.mjs",
     "verify:cms": "node scripts/check-cms-ui.mjs",
     "verify:redesign": "node scripts/check-redesign-ui.mjs",
@@ -61,11 +61,13 @@
     "cloud:check": "node scripts/check-cloud-addons.mjs",
     "host:check": "node scripts/host-check.mjs",
     "platform:serve": "node scripts/platform-supervisor.mjs",
-    "media:relocate": "node scripts/rebase-assets.mjs"
+    "media:relocate": "node scripts/rebase-assets.mjs",
+    "platform:up": "node scripts/ensure-platform.mjs",
+    "platform:status": "node scripts/platform-status.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",
     "@neon/config": "latest",
@@ -79,5 +81,6 @@
   },
   "devDependencies": {
     "playwright": "^1.64.1"
-  }
+  },
+  "private": true
 }

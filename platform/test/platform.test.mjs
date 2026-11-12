@@ -45,6 +45,13 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    assert.equal((await call('/api/state')).status,401);a=await signup('Alpha creator','alpha-'+suffix+'@example.com');b=await signup('Beta creator','beta-'+suffix+'@example.com');o=await signup('Test platform owner',ownerEmail);assert.notEqual(a.workspace.id,b.workspace.id);assert.equal(a.actor.role,'admin');assert.equal(o.actor.role,'super_admin');assert.equal(o.actor.id,reserved.accountId);assert.equal(o.workspace.id,reserved.workspaceId);
   });
   if(!a||!b||!o)throw new Error('Account setup failed.');
+  await t.test('infrastructure monitoring rejects anonymous and tenant sessions',async()=>{
+   assert.equal((await call('/api/owner/operations')).status,401);
+   assert.equal((await call('/api/owner/operations',{cookie:a.cookie})).status,403);
+   const live=await call('/api/owner/operations',{cookie:o.cookie});assert.equal(live.status,200);assert.equal(live.data.capacity.loadBalancingEnabled,false);assert.equal(live.data.inference.concurrency,1);assert(Array.isArray(live.data.metrics.series));assert(live.data.services.some(s=>s.name==='Primary database'&&s.status==='healthy'));
+   const encoded=JSON.stringify(live.data);assert(!encoded.includes('connectionString'));assert(!encoded.includes('secret_cipher'));assert(!encoded.includes('DATABASE_URL='));
+   assert.equal((await call('/internal/platform/operations')).status,401);
+  });
   let pageA,pageB,connectionA,postA;
   await t.test('Page cap is atomic and workspace IDs cannot be selected across accounts',async()=>{
    const data={name:'Alpha Page',niche:'Education',kind:'education',language:'English'};
@@ -70,6 +77,24 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    assert.equal((await call('/api/pages/'+pageB.id,{method:'PUT',cookie:b.cookie,body:{...pageB,brand:{headlineFontAssetId:uploaded.data.id}}})).status,404);
    const page=await call('/api/pages/'+pageA.id,{method:'PUT',cookie:a.cookie,body:{...pageA,brand:{headlineFontAssetId:uploaded.data.id,bodyFontAssetId:uploaded.data.id}}});assert.equal(page.status,200);assert.equal(page.data.brand.headlineFontAssetId,uploaded.data.id);
    assert.equal((await call('/api/pages/'+pageA.id,{method:'PUT',cookie:a.cookie,body:{...pageA,brand:{logoAssetId:uploaded.data.id}}})).status,400);
+  });
+  await t.test('Content lists find recent publications beyond the overview window and isolate each Page/status before pagination',async()=>{
+   let fixtures=[],otherPage;
+   try{
+    await transaction(a.workspace.id,async db=>{
+     otherPage=(await db.query("INSERT INTO creator.pages(workspace_id,name,kind,niche,language) VALUES($1,'Content sibling fixture','education','Learning','English') RETURNING id",[a.workspace.id])).rows[0].id;
+     fixtures=(await db.query("INSERT INTO creator.posts(workspace_id,page_id,type,title,status,created_at,updated_at) SELECT $1,$2,'original','Content window fixture '||n,'draft',now()-n*interval '1 second',now()-n*interval '1 second' FROM generate_series(1,310) n RETURNING id",[a.workspace.id,pageA.id])).rows.map(p=>p.id);
+     const old=(await db.query("INSERT INTO creator.posts(workspace_id,page_id,type,title,status,created_at,updated_at,published_at) VALUES($1,$2,'original','Recently published oldest draft','published',now()-interval '90 days',now()-interval '90 days',now()-interval '1 minute'),($1,$2,'original','Earlier publication','published',now()-interval '80 days',now()-interval '80 days',now()-interval '2 days'),($1,$3,'original','Sibling publication','published',now()-interval '70 days',now()-interval '70 days',now()) RETURNING id",[a.workspace.id,pageA.id,otherPage])).rows.map(p=>p.id);fixtures.push(...old);
+    });
+    const overview=await call('/api/state',{cookie:a.cookie});assert.equal(overview.data.posts.length,300);assert(!overview.data.posts.some(p=>p.title==='Recently published oldest draft'));
+    const list=await call('/api/posts?page='+pageA.id+'&status=published&limit=1',{cookie:a.cookie});assert.equal(list.status,200);assert.equal(list.data.posts[0].title,'Recently published oldest draft');assert.equal(list.data.total,2);assert.equal(list.data.hasMore,true);
+    const next=await call('/api/posts?page='+pageA.id+'&status=published&limit=1&offset=1',{cookie:a.cookie});assert.equal(next.data.posts[0].title,'Earlier publication');assert.equal(next.data.hasMore,false);
+    const sibling=await call('/api/posts?page='+otherPage+'&status=published',{cookie:a.cookie});assert.equal(sibling.data.posts.length,1);assert.equal(sibling.data.posts[0].title,'Sibling publication');
+    const foreign=await call('/api/posts?page='+pageA.id+'&status=published',{cookie:b.cookie});assert.equal(foreign.data.total,0);assert.deepEqual(foreign.data.posts,[]);
+    assert.equal((await call('/api/posts?status=not-a-status',{cookie:a.cookie})).status,400);
+    const before=await call('/api/pulse',{cookie:a.cookie});await transaction(a.workspace.id,db=>db.query("UPDATE creator.posts SET status='draft',published_at=NULL WHERE workspace_id=$1 AND id=$2",[a.workspace.id,list.data.posts[0].id]));const after=await call('/api/pulse',{cookie:a.cookie});assert(BigInt(after.data.revision)>BigInt(before.data.revision));
+    const fresh=await call('/api/posts?page='+pageA.id+'&status=published',{cookie:a.cookie});assert.equal(fresh.data.total,1);assert.equal(fresh.data.posts[0].title,'Earlier publication');
+   }finally{await transaction(a.workspace.id,async db=>{if(fixtures.length)await db.query('DELETE FROM creator.posts WHERE workspace_id=$1 AND id=ANY($2::uuid[])',[a.workspace.id,fixtures]);if(otherPage)await db.query('DELETE FROM creator.pages WHERE workspace_id=$1 AND id=$2',[a.workspace.id,otherPage]);});}
   });
   await t.test('news captions enter a separate resumable website article stage before scheduling',async()=>{
    const sentence='স্থানীয় সড়কের বিষয়ে সংশ্লিষ্ট কর্তৃপক্ষ একটি নির্দেশনা দিয়েছে। সিদ্ধান্তের বিস্তারিত তথ্য প্রতিবেদনে তুলে ধরা হয়েছে।';let requests=0,fixtureConnection,fixturePost,fixtureWebsite;

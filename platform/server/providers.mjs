@@ -8,6 +8,7 @@ import {readFile} from 'node:fs/promises';
 import {EDITOR_SYSTEM} from './prompts.mjs';
 import {inferenceIdle,ollamaCloudModel} from './inference-idle.mjs';
 import {localInferenceGate} from './inference-resources.mjs';
+import {operationsTelemetry} from './operations-telemetry.mjs';
 export const providers=[
  {id:'pollinations',name:'Pollinations · image / speech',capabilities:['image','audio'],defaultURL:'https://gen.pollinations.ai',style:'pollinations'},
  {id:'huggingface',name:'Hugging Face Inference',capabilities:['image'],defaultURL:'https://router.huggingface.co',style:'huggingface'},
@@ -39,14 +40,17 @@ export async function checkTextCapacity(connection,{purpose='general'}={}){
  const provider=providerConfig(connection),model=modelOf(connection);
  if(provider.id==='ollama'&&!ollamaCloudModel(model))await localInferenceGate.check(provider,model,connection.config);
 }
-export async function textCompletion(connection,secret,prompt,{systemPrompt=EDITOR_SYSTEM,onMetrics=()=>{},purpose='general',responseSchema}={}){
+export async function textCompletion(connection,secret,prompt,options={}){
+ const start=performance.now();let metrics,error;try{return await performTextCompletion(connection,secret,prompt,{...options,onMetrics:m=>{metrics=m;options.onMetrics?.(m);}});}catch(e){error=e;throw e;}finally{operationsTelemetry.inference({model:metrics?.model||connection.config?.model,purpose:options.purpose||'general',metrics,error,ms:performance.now()-start});}
+}
+async function performTextCompletion(connection,secret,prompt,{systemPrompt=EDITOR_SYSTEM,onMetrics=()=>{},purpose='general',responseSchema}={}){
  const routing=modelRoute(connection,purpose,prompt);connection=routing.connection;assertModelUse(connection);
  const provider=providerConfig(connection),model=modelOf(connection);
  if(provider.id==='ollama'&&!ollamaCloudModel(model))return localInferenceGate.run(provider,model,connection.config,({settings,signal})=>{const selectedModel=settings.selectedModel||model;return inferenceIdle.run(provider,selectedModel,async()=>{
   const data=await remoteJSON(provider.base+'/api/chat',{method:'POST',headers:{'content-type':'application/json',...(secret.apiKey?{authorization:'Bearer '+secret.apiKey}:{})},localOrigin:provider.localOrigin,timeout:settings.timeoutSeconds*1000,maxBytes:2_000_000,signal,body:{model:selectedModel,stream:false,think:false,...(responseSchema?{format:responseSchema}:{}),keep_alive:'30s',messages:[{role:'system',content:systemPrompt},{role:'user',content:prompt}],options:{temperature:Number(connection.config.temperature??0.6),top_p:0.8,top_k:20,num_ctx:settings.contextTokens,num_predict:settings.maxOutputTokens,num_thread:settings.threads,num_batch:settings.batch,num_gpu:settings.gpuLayers}}});
+  onMetrics({model:selectedModel,requestedModel:model,purpose,complexity:routing.complexity,routedFrom:routing.routedFrom||null,fallbackFrom:settings.fallbackFrom||null,profile:settings.name,threads:settings.threads,contextTokens:settings.contextTokens,thinking:false,inputTokens:data.prompt_eval_count,outputTokens:data.eval_count,seconds:Math.round((data.total_duration||0)/1e8)/10,tokensPerSecond:data.eval_duration?Math.round(data.eval_count/(data.eval_duration/1e9)*10)/10:null});
   if(data.done_reason==='length')throw new AppError(422,'The caption reached the local output limit. Shorten the brief or raise the limit on a larger inference host.');
   if(!data.message?.content?.trim())throw new AppError(422,'The model returned no final caption. Verify its non-thinking template before using it for this Page.');
-  onMetrics({model:selectedModel,requestedModel:model,purpose,complexity:routing.complexity,routedFrom:routing.routedFrom||null,fallbackFrom:settings.fallbackFrom||null,profile:settings.name,threads:settings.threads,contextTokens:settings.contextTokens,thinking:false,inputTokens:data.prompt_eval_count,outputTokens:data.eval_count,seconds:Math.round((data.total_duration||0)/1e8)/10,tokensPerSecond:data.eval_duration?Math.round(data.eval_count/(data.eval_duration/1e9)*10)/10:null});
   return String(data.message?.content||'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
  });});
  if(provider.id==='ollama'&&process.env.PLATFORM_OLLAMA_LOCAL_ONLY!=='false')throw new AppError(400,'This worker uses local Ollama models only. Select a downloaded model.');

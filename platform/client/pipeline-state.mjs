@@ -1,4 +1,5 @@
 import {isPreparationWait,retrySeconds} from './task-state.mjs';
+import {nextDelivery} from './next-delivery.mjs';
 const deliveryKinds=['publish','publish_instagram','post_link_comment'];
 const failed=s=>['failed','unknown','blocked'].includes(s);
 const time=t=>+new Date(t.started_at||t.created_at||0);
@@ -36,6 +37,6 @@ export function pipelineForPage(state,page,{postId=null,now=Date.now()}={}){
   const index=stages.indexOf(web);stages.splice(index,1);stages.splice(2,0,web);const social=stage('social','Facebook summary',[],!!chosen?.caption&&!chosen?.seo?.article?.socialPending);if(creating&&/^Facebook/.test(creating.phase||'')){social.status='running';social.task=creating;social.note=creating.phase;social.progress=creating.progress;design.status='pending';design.progress=0;design.note='Waiting for the checked Facebook summary';}else if(!chosen?.caption){social.status='pending';social.progress=0;social.note='Waiting for the confirmed website report';}stages.splice(3,0,social);
  }
  const active=tasks.filter(t=>t.status==='running'),waiting=tasks.filter(t=>t.status==='queued');
- return {page,post:chosen,posts,stages,tasks:chain,active,waiting,retry:chain.filter(isPreparationWait).sort((a,b)=>new Date(a.not_before)-new Date(b.not_before))[0],next:posts.filter(p=>p.status==='scheduled'&&p.scheduled_at).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at))[0],events:chain.flatMap(t=>(t.events||[]).map(e=>({...e,taskId:t.id,kind:t.kind,status:t.status}))).sort((a,b)=>new Date(a.at)-new Date(b.at)).slice(-70),now};
+ return {page,post:chosen,posts,stages,tasks:chain,active,waiting,retry:chain.filter(isPreparationWait).sort((a,b)=>new Date(a.not_before)-new Date(b.not_before))[0],next:nextDelivery(state,page.id,now),events:chain.flatMap(t=>(t.events||[]).map(e=>({...e,taskId:t.id,kind:t.kind,status:t.status}))).sort((a,b)=>new Date(a.at)-new Date(b.at)).slice(-70),now};
 }
 export const pipelineDeliveryKinds=deliveryKinds;

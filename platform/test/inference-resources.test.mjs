@@ -68,8 +68,8 @@ test('thinking-only checkpoints are rejected before spending the caption token b
 });
 
 test('quality profile uses full available CPU and more context without removing the emergency RAM guard',()=>{
- const settings=inferenceSettings({contextTokens:8192,maxOutputTokens:3072},{PLATFORM_INFERENCE_PROFILE:'windows_quality',PLATFORM_INFERENCE_THREADS:'999'});
- assert.equal(settings.contextTokens,8192);assert.equal(settings.maxOutputTokens,3072);assert(settings.threads>=1);assert.equal(settings.reserveMB,768);assert.equal(settings.abortMB,512);assert.equal(settings.gpuLayers,0);
+ const settings=inferenceSettings({contextTokens:8192,maxOutputTokens:99999},{PLATFORM_INFERENCE_PROFILE:'windows_quality',PLATFORM_INFERENCE_THREADS:'999'});
+ assert.equal(settings.contextTokens,8192);assert.equal(settings.maxOutputTokens,4096);assert(settings.threads>=1);assert.equal(settings.reserveMB,768);assert.equal(settings.abortMB,512);assert.equal(settings.gpuLayers,0);
  assert.equal(memoryAdmission({freeBytes:7*GiB,modelBytes:3.4e9,settings}).ok,true);
  assert.equal(memoryAdmission({freeBytes:500*1024**2,modelBytes:3.4e9,resident:true,settings}).ok,false);
 });

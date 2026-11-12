@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-10",
+  "updated": "2026-11-12",
   "entry": "docs/AGENT_HANDOFF.md",
   "runtime": "platform Node worker + React/Vite; n8n optional",
   "nodes": [
@@ -41,7 +41,12 @@
     {
       "id": "writer",
       "file": "platform/server/news-report-writer.mjs",
-      "role": "Resumable writing and separate strict review"
+      "role": "Brief/legacy mode routing and retained section writer"
+    },
+    {
+      "id": "brief",
+      "file": "platform/server/news-brief-writer.mjs",
+      "role": "Current concise report generation, one essential-context review and resumable draft"
     },
     {
       "id": "composition",
@@ -97,6 +102,61 @@
       "id": "handoff",
       "file": "docs/AGENT_HANDOFF.md",
       "role": "Current state and verified results; start here"
+    },
+    {
+      "id": "content-list-server",
+      "file": "platform/server/content-list.mjs",
+      "role": "Tenant/Page/status pagination and actual-publication ordering"
+    },
+    {
+      "id": "content-list-client",
+      "file": "platform/client/use-content-posts.jsx",
+      "role": "Revision-aware scoped list refresh; stale-response guard and retained loaded window"
+    },
+    {
+      "id": "cms",
+      "file": "platform/client/cms.jsx",
+      "role": "Approved modern Content rows/search/layout; prompt/media views; cms.css shared theme"
+    },
+    {
+      "id": "video-preview",
+      "file": "platform/client/video-studio.jsx",
+      "role": "Browser-local Page/workspace-scoped video planning UI only; no video API mutations"
+    },
+    {
+      "id": "cms-research",
+      "file": "docs/CMS_DESIGN_RESEARCH.md",
+      "role": "Primary references, approved direction and implemented/planned boundaries"
+    },
+    {
+      "id": "operations-telemetry",
+      "file": "platform/server/operations-telemetry.mjs",
+      "role": "Bounded redacted HTTP/provider/native-token rollups and machine sampling; private24h checkpoints"
+    },
+    {
+      "id": "operations-monitor",
+      "file": "platform/server/operations-monitor.mjs",
+      "role": "Read-only cached infrastructure health, queue, database pool and single-host capacity snapshot"
+    },
+    {
+      "id": "operations-start",
+      "file": "scripts/ensure-platform.mjs",
+      "role": "Idempotent Windows startup; healthy services retained; otherwise graceful drain/restart"
+    },
+    {
+      "id": "operations-status",
+      "file": "scripts/platform-status.mjs",
+      "role": "Local operator status/watch/JSON, including dashboard-route outage fallback"
+    },
+    {
+      "id": "operations-runbook",
+      "file": "docs/LOCAL_OPERATIONS.md",
+      "role": "Local startup, warning interpretation, monitoring scope and scaling limits"
+    },
+    {
+      "id": "operations-ui",
+      "file": "platform/client/operations-monitor.jsx",
+      "role": "Owner-only measured service/traffic/native token/capacity dashboard;30s refresh"
     }
   ],
   "edges": [
@@ -197,11 +257,42 @@
     }
   ],
   "decisions": {
-    "newsDelivery": "checked complete website report -> exact verification -> social copy/design -> calendar -> Facebook -> delayed comment",
-    "sampling": "production anchored writer 0.7; reviewer 0; free composition experimental/held; no accuracy claims from temperature",
-    "resources": "windows_quality; CPU4; writer4096; context ceiling8192; output ceiling3072; reserve768MiB; abort512MiB",
-    "tests": "update handoff with final measured results; do not infer success from passing mocks",
+    "newsDelivery": "reviewed context brief -> exact website verification -> lead-based social copy/design -> auto approval/calendar -> Facebook -> delayed comment; reconcile actual receipts before claiming publication",
+    "newsBrief": "80–500 supported words; 2–6 paragraphs; one whole-report factual/context review; source100 article or120 substantive feed words/3 sentences; factual, crisis, chronology, language and40% originality guards retained.",
+    "commercePrice": "never publish product prices; website updated-price notice in both channel captions; owner Page includePrice=false and 33 eligible pending captions updated Nov11",
+    "recovery": "Nov11:16 automated drafts backed up/reset, one saved manual draft retained. First ministry story source-corrected to107 words, independently re-reviewed, updated existing website URL and exact text verified; auto approved/scheduled17:16 Dhaka Nov11. Temporary preparation hold restored; unknown receipts retained; no QA text promoted.",
+    "sampling": "brief writer0.6/repair0.3, reviewer0; legacy modes retained; no accuracy claims from temperature or word count",
+    "resources": "windows_quality; CPU4; brief writer/reviewer context6144; context ceiling8192; output ceiling4096; review output1024; reserve768MiB; abort512MiB",
+    "tests": "205 portable tests,63 root tests and29 isolated API integration tests pass; platform/root builds pass. Full browser suite passes Operations refresh/stale/read-only/mobile, Content/video/actions and zero JS errors. Final mobile shadow fix verified with navigation/overflow checks; no real test publication.",
     "secrets": "ignored env files and .codex; never print or commit",
-    "historical": "docs/status.md is historical; do not use as current deployment state"
+    "historical": "docs/status.md is historical; do not use as current deployment state",
+    "modelRouting": "Gemma3 4B Q4 writing/design; Qwen3 4B independent review/complex structured tasks; free local serialized. DeepSeek official paid cloud API assessed, not called.",
+    "commerceFlow": "Two resumable writing/design calls; Instagram reuses checked claims; optional ranking uses catalogue order. Invalid local copy becomes checked catalogue copy with failure reasons retained.",
+    "catalogRotation": "Fabrything next100 excludes durable fetched IDs; auto import on exhaustion; Page-scoped published/unknown/active posts excluded from reuse; direct externalId refresh before writing/delivery. Published history retained and hidden from active catalogue.",
+    "countdown": "Full Page calendar; overdue booking uses queued retry; visible while preparing; polling preserves database-time anchor.",
+    "contentFreshness": "Dedicated tenant/Page/status/bucket queries; Published by delivery time; stable pagination beyond overview sample; revision refresh preserves focus/scroll; only navigation resets scroll; workflow log follows within its own viewport.",
+    "cms": "User approved modern light canvas/charcoal sidebar/coral UI; real data/search/list-grid/row details, prompt/media/newsroom entries. SuperDesign + 12ui conversions/target alignment; no unsafe bulk low-overlap selector patch.",
+    "videoUI": "UI only. Research/brief, scene script/visual prompts, voice/caption plan, timeline and review/export profiles for YouTube/Facebook/Instagram/TikTok. Browser-local drafts keyed by workspace/Page. Render/export/schedule disabled; future open-source tools marked Planned. No new model or video backend.",
+    "deployment": {
+      "id": "dpl_7y2U6ZPKiLhmtG1yCXrpVGbSeHJv",
+      "url": "https://echolink-n86iba907-omniteam1.vercel.app",
+      "productionUrl": "https://echolinkbd.vercel.app",
+      "status": "READY",
+      "frontendBundle": "index-Bf6ByUy9.js",
+      "operationsBundle": "app-CsVyjIjY.js",
+      "workerRestart": "Not needed for frontend integration; monitoring backend already live.",
+      "liveVerification": "Homepage/entry/Operations chunk/health200; unauthenticated Operations401.",
+      "pendingMobilePolish": {
+        "id": "dpl_BwWkoiDQjkyVp7x9ESyA1Nwbqqc8",
+        "status": "BLOCKED",
+        "reason": "TEAM_ACCESS_REQUIRED: private repo Git author not verified as Hobby project owner. User asked to link GitHub proffesergio in Vercel owner Login Connections.",
+        "frontendBundle": "index-D342ZObb.js",
+        "operationsBundle": "app-n02bVhhs.js"
+      }
+    },
+    "operations": "Nov12 local backend monitoring active: owner-only API and operator-token loopback route; cached health, HTTP/upstream/DB/pool/queue/process/native-token metrics, redacted bounded counters, private24h aggregates/30s checkpoints. Not whole-PC packet capture, provider billing or remote VRAM. One host; no load balancer or auto failover.",
+    "startup": "npm run platform:up preserves healthy worker/bridge, starts prepared selected local PostgreSQL, otherwise uses graceful restart. platform:start/repair aliases now safe. platform:status supports --watch/--json; keep local PC awake.",
+    "operationsUI": "User approved Nov12; implemented Owner Operations with real read-only API,30s refresh/stale recovery, live count charts, infrastructure/queue/connector/query/model details. SuperDesign target e6ab4822-d1b9-4a3e-b949-da5f0f8e6f48 + completed 12ui target alignment. No fake raster charts or load-balancer claims.",
+    "repository": "GitHub proffesergio/echolink visibility changed PUBLIC -> PRIVATE by owner request Nov12; ADMIN access verified. Root private:true/UNLICENSED, README client-facing SaaS only/no setup, models/host configuration excluded from overview. Prior public copies cannot be recalled."
   }
 }

@@ -4,13 +4,14 @@ import {databaseDriver} from './database-driver.mjs';
 import {AppError} from './errors.mjs';
 import {publicURL,remoteJSON} from './net.mjs';
 import {definiteDatabaseRejection} from './publication-state.mjs';
+import {databaseSession} from './database-deadline.mjs';
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
 export function nobleConfig(connection,secret){
  let url;try{url=new URL(secret.databaseURL);}catch{throw new AppError(400,'The website database connection is invalid.');}
  if(!['postgres:','postgresql:'].includes(url.protocol)||url.hostname!==process.env.PLATFORM_NOBLESEEK_DB_HOST||!url.hostname.endsWith('.neon.tech')||url.port&&url.port!=='5432')throw new AppError(400,'This owner connector must use the operator-configured NobleSeek Neon host.');
  url.searchParams.set('sslmode','verify-full');const schema=connection.config.schema||'public';if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema))throw new AppError(400,'Invalid database schema.');return {url:url.href,schema};
 }
-export async function withNobleDatabase(c,secret,fn){const config=nobleConfig(c,secret),driver=databaseDriver(process.env.PLATFORM_NOBLESEEK_DATABASE_TRANSPORT||'websocket'),db=new driver.Client({connectionString:config.url,connectionTimeoutMillis:15000,statement_timeout:30000,query_timeout:35000});db.on('error',()=>{});try{await db.connect();return await fn(db,config);}finally{await db.end();}}
+export async function withNobleDatabase(c,secret,fn){const config=nobleConfig(c,secret),driver=databaseDriver(process.env.PLATFORM_NOBLESEEK_DATABASE_TRANSPORT||'websocket'),db=new driver.Client({connectionString:config.url,connectionTimeoutMillis:15000,statement_timeout:30000,query_timeout:35000});db.on('error',()=>{});return databaseSession(db,config,fn);}
 export async function testNoble(c,secret){return withNobleDatabase(c,secret,async(db,config)=>{await db.query('BEGIN READ ONLY');const fields=(await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name='nobleseek_article'",[config.schema])).rows.map(r=>r.column_name);if(!['id','slug','headline','body_html','status'].every(f=>fields.includes(f)))throw new AppError(400,'NobleSeek article schema could not be verified.');await db.query('ROLLBACK');return {ok:true,message:'Existing NobleSeek schema verified with a read-only query.'};});}
 export async function writeNoble(c,secret,site,post,{onWrite=()=>{},database=withNobleDatabase}={}){
  if(!post.source_url)throw new AppError(400,'NobleSeek publication requires an attributed source URL.');

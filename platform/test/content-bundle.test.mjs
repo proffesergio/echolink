@@ -5,6 +5,16 @@ import {normalizeProductCurrency} from '../server/prompts.mjs';
 const sentence='ঢাকায় স্থানীয় সড়ক সংস্কারের বিষয়ে কর্তৃপক্ষ একটি নির্দেশনা দিয়েছে। কাজের বিস্তারিত তথ্য প্রতিবেদনে তুলে ধরা হয়েছে।';
 const news={name:'Noble Seek',language:'Bangla',niche:'News',creative_policy:{contentFormat:'news_desk_v2'}};
 const rawNews=`[Part 1: Website Article]\nশিরোনাম: সড়ক সংস্কার নিয়ে নির্দেশনা\n\n${sentence.repeat(5)}\n\n${sentence.repeat(5)}\n---\n[Part 2: Facebook Caption]\nসড়ক সংস্কারে নতুন নির্দেশনা এসেছে। আপনার এলাকার পরিস্থিতি কেমন?\n\n#ঢাকা #সড়ক #সংবাদ\n---\n[Part 3: First Comment Link Text]\nবিস্তারিত পড়তে ভিজিট করুন আমাদের ওয়েবসাইট:`;
+test('local commerce routes design and caption separately and reuses supported claims for Instagram',async()=>{
+ const page={name:'Fabrything',language:'Bilingual-Mix',creative_policy:{contentFormat:'commerce_v2'}},product={title:'Cotton shirt',description:'Cotton fabric, regular fit, short sleeves.',price:500,currency:'BDT',available:true},purposes=[];
+ const result=await generateContentBundle({page,post:{type:'product_sale'},product,connection:{provider:'ollama',config:{model:'fixture'}}},{complete:async(_c,_s,_p,{purpose})=>{purposes.push(purpose);return purpose==='design_brief'?'Warm studio background, soft lighting, actual product photo, top headline, original logo and website footer.':'পছন্দের Cotton shirt বেছে নিন।\n• Cotton fabric\n• Regular fit\n• Short sleeves\nঅর্ডার করতে ইনবক্সে যোগাযোগ করুন।';}});
+ assert.deepEqual(purposes,['design_brief','product_caption']);assert.equal(result.warnings.length,0);assert(result.instagramCaption.includes('আপডেটেড মূল্য'));assert(!result.caption.includes('500'));assert(result.designBrief.includes('studio'));
+});
+test('unsupported local product claims are replaced with checked catalogue copy instead of blocking the batch',async()=>{
+ const page={name:'Fabrything',language:'Bilingual-Mix',creative_policy:{contentFormat:'commerce_v2'}},product={title:'Cotton shirt',description:'Cotton fabric, regular fit, short sleeves.',price:500,currency:'BDT',available:true};
+ const result=await generateContentBundle({page,post:{type:'product_sale'},product,connection:{provider:'ollama',config:{model:'fixture'}}},{complete:async(_c,_s,_p,{purpose})=>purpose==='design_brief'?'Studio background, soft light and logo.':'এই শার্টের ৭৭৭ দিনের নিশ্চয়তা আছে। আজই অর্ডার করতে ইনবক্সে যোগাযোগ করুন।'});
+ assert(result.initialWarnings.some(w=>w.startsWith('Check numbers')));assert(!result.caption.includes('৭৭৭'));assert.equal(result.warnings.length,0);assert(result.caption.includes('আপডেটেড মূল্য'));
+});
 test('three-part news output maps to website prose, caption and URL-free comment rather than leaking the whole answer',async()=>{
  let system;const result=await generateContentBundle({page:news,post:{type:'news',title:'সড়ক সংস্কার',body:sentence.repeat(15),seo:{}},connection:{}},{complete:async(_c,_s,_p,o)=>{system=o.systemPrompt;return rawNews;}});
  assert.equal(result.title,'সড়ক সংস্কার নিয়ে নির্দেশনা');assert.equal(result.article.paragraphCount,2);assert(result.article.wordCount>70);assert(!result.caption.includes('Part'));assert(!result.caption.includes('শিরোনাম'));assert(!result.commentText.includes('https'));assert.equal(result.warnings.length,0);assert(system.includes(NEWS_BUNDLE_PROMPT));
@@ -13,11 +23,11 @@ test('invalid structured replies get one format repair and never publish a parti
  let calls=0;await assert.rejects(()=>generateContentBundle({page:news,post:{type:'news',title:'সড়ক',body:sentence,seo:{}},connection:{}},{complete:async()=>{calls++;return 'একটি অসম্পূর্ণ উত্তর';}}),e=>e.code==='content_format');assert.equal(calls,2);
  assert.throws(()=>splitContentBundle('[Part 1: Article]\na\n---\n[Part 3: Caption]\nb\n---\n[Part 2: Comment]\nc'),/mislabelled/);
 });
-test('commerce bundle preserves verified price, separate Instagram copy and image art direction, and flags invented scarcity',async()=>{
+test('commerce bundle removes prices from both channels, adds website price notice and flags invented scarcity',async()=>{
  const page={name:'Fabrything',language:'Bilingual-Mix',creative_policy:{contentFormat:'commerce_v2',commerce:{includePrice:true}}},product={title:'Cotton shirt',description:'Cotton fabric, regular fit, short sleeves.',price:500,currency:'BDT',available:true};
  const raw=`[Part 1: Image Graphic Design Text Brief]\nReal cotton shirt, soft studio light, warm background, short top-centred headline and original logo.\n---\n[Part 2: Facebook Post Caption]\n✨ আরামদায়ক Cotton shirt বেছে নিন।\n• Cotton fabric\n• Regular fit\n• Short sleeves\nমূল্য: 500 BDT\nস্টক সীমিত! অর্ডার করতে ইনবক্সে যোগাযোগ করুন।\n---\n[Part 3: Instagram Post Caption]\nনিত্যদিনের সহজ স্টাইলে Cotton shirt।\n\n#Fabrything #CottonShirt #Style #EverydayWear #Fashion`;
  const result=await generateContentBundle({page,post:{type:'product_sale'},product,connection:{}},{complete:async(_c,_s,_p,o)=>{assert(o.systemPrompt.includes(COMMERCE_BUNDLE_PROMPT));return raw;}});
- assert(result.caption.includes('500 BDT'));assert(result.instagramCaption.includes('#Fashion'));assert(result.designBrief.includes('studio'));assert(result.warnings.some(w=>w.startsWith('Urgency')));
+ assert(!result.caption.includes('500 BDT'));assert(result.caption.includes('আপডেটেড মূল্য জানতে আমাদের ওয়েবসাইট দেখুন।'));assert(result.instagramCaption.includes('আপডেটেড মূল্য জানতে আমাদের ওয়েবসাইট দেখুন।'));assert.equal(result.priceSnapshot,null);assert(!result.warnings.some(w=>w.includes('price is missing')));assert(result.instagramCaption.includes('#Fashion'));assert(result.designBrief.includes('studio'));assert(result.warnings.some(w=>w.startsWith('Urgency')));
 });
 test('Bangladesh catalogue prices correct the rupee label without converting or changing amounts or foreign-currency catalogues',()=>{
  for(const [input,expected]of [['₹ 1,250','৳ 1,250'],['INR 500','BDT 500'],['Rs. ৫০০','BDT ৫০০'],['500 INR','500 BDT'],['৳ ৫০০','৳ ৫০০']])assert.equal(normalizeProductCurrency(input,{currency:'BDT'}),expected);

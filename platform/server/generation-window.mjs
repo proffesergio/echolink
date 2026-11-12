@@ -3,8 +3,9 @@ import {pageClock,inWindow,findSlot,wallTimeToInstant} from './scheduling.mjs';
 // Finishing a prepared design and booking delivery must not be parked all day.
 export const startsGeneration=kind=>['aggregate','generate','import_products'].includes(kind);
 
-export function generationAvailability(rule,page,reservations=[],{now=new Date()}={}){
+export function generationAvailability(rule,page,reservations=[],{now=new Date(),urgent=false}={}){
  if(rule.enabled===false)return {allowed:false,next:new Date(+now+5*60000),message:'This Page’s automation is paused. Preparation waits; existing scheduled delivery remains independent.'};
+ if(urgent)return {allowed:true,emergency:true,message:'Explicit priority preparation; publishing limits and memory safeguards still apply.'};
  const window=rule.generation_window||{};
  if(!window.enabled)return {allowed:true,emergency:false};
  const inside=inWindow({...page,window_start:window.start||'22:00',window_end:window.end||'07:00'},now);
@@ -15,6 +16,9 @@ export function generationAvailability(rule,page,reservations=[],{now=new Date()
  try{next=wallTimeToInstant(date+'T'+start,page.timezone);}catch{next=new Date(+now+3600000);}
  if(inside)return {allowed:true,emergency:false,leadMinutes:Math.ceil((+next-+now)/60000)+(rule.refill_minutes||60)};
  if(window.emergency_refill){
+  // Unprepared/held automatic news drafts reserve calendar space, but cannot
+  // keep an empty delivery queue falsely "healthy" while their writing waits.
+  if(page.kind==='news'&&!page.require_review)reservations=reservations.filter(r=>!['draft','review','failed','rejected'].includes(r.status));
   const until=new Date(+now+(rule.refill_minutes||60)*60000);
   try{findSlot({...page,daily_cap:Math.min(page.daily_cap,rule.daily_target)},reservations,{from:new Date(+now+60000),until,spread:page.creative_policy?.scheduleMode!=='interval'});return {allowed:true,emergency:true,until,message:'Queue is near empty. Preparing a small daytime refill with the memory safeguards active.'};}catch(e){if(e.code!=='no_slot')throw e;}
   // A healthy queue must wake again when it reaches the lead time, rather than
