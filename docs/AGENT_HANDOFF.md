@@ -65,7 +65,7 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   `scripts/ensure-platform.mjs`, `platform-status.mjs`. No new backend model or
   Prometheus/Grafana service was installed.
 
-## Current Operations release — November12
+## Previous Operations release — November12
 
 - Final READY production deployment: `dpl_3naxyNV4HE2NK39zPABsMCM17vw2`,
   https://echolink-hmbw2brxk-omniteam1.vercel.app; alias https://echolinkbd.vercel.app.
@@ -145,8 +145,8 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
 - New request: clean up Page Settings and other popups, redesign Content grid,
   and restore NobleSeek branding on news creatives. User explicitly approved
-  both designs. Implementation is complete and verified locally; frontend
-  deployment is being updated after the checks below.
+  both designs. Implementation is deployed and verified at
+  https://echolinkbd.vercel.app.
 - Designs in the existing CMS project: Page Settings dialog
   https://p.superdesign.dev/draft/6c13b372-bba3-4da6-9d22-a002970f4953 (v3);
   Content Grid https://p.superdesign.dev/draft/b5ef7ba5-a27d-4783-9ca6-eea7deadc200 (v2).
@@ -157,8 +157,8 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   responsive derivative992aaa64-362d-4059-9177-af7a7f04fb09; grid
   88a31da4-3125-47c9-b31e-bf99d74b89f4, linked responsive
   2f8e9224-6ab1-4141-b81a-f2c79ab8778c. All completed. Targets/HTML/resume
-  are private under .superdesign. Read their responsive output before integration;
-  use each unchanged target LayerDoc with 12ui improve for implementation closeout.
+  are private under .superdesign. Responsive output was read before integration;
+  both unchanged target LayerDocs completed12ui improve closeout.
 - Logo root cause: current Noble Seek Page had NO logo asset at all. Matched its
   existing clean NobleSeek mark to its currently fetched actual Facebook Page
   picture, then saved a tenant-scoped asset and attached logoAssetId under a row
@@ -186,13 +186,32 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   and grid. Full browser suite passed, including hidden validation, keyboard
   navigation, focus trap, unsaved settings, grid details and mobile overflow.
   Isolated visual harness passed sticky footer, original-ratio portrait/square/
-  landscape previews, logo preview, details-to-edit, zero JS errors/API writes.
-  Platform/root builds pass. Core unit coverage remains208 passing tests from
-  the logo release; CI will rerun portable/root checks on the new source.
+  landscape previews, logo preview, details-to-edit, post/connection sticky
+  footers, mobile connection layout and zero JS errors/API writes. Platform/root
+  builds and CI portable/root tests pass. Preview fixtures/server were cleaned up
+  from creator_test only. No production worker restart was needed for this UI.
 - 15 focused rendering/brand/recovery tests and all208 portable tests pass.
   Graceful platform restart applied the renderer with active/unknown receipts
   preserved. Following checks: all seven services healthy; one real preparation
   resumed with inference concurrency1 and emergency guard still active.
+
+## Current verified production release — November12
+
+- Source765a3f8eed92f87349fb3fdf490b35a09ac1bcde: approved settings/dialog/grid
+  implementation, including all original25 Page fields and full publication actions.
+- READY deployment dpl_7ywEiCXXRayeXHDuar98ErZx9X6r,
+  https://echolink-jtj7y0vq7-omniteam1.vercel.app; production alias
+  https://echolinkbd.vercel.app. Native Git deployment
+  dpl_Ag5jXWepH4ucKkY5G2vTDWLMRtWT also READY for the same source.
+- GitHub Actions43169226646: test and deploy both SUCCESS. Live entry
+  index-DNifb4Yg.js, app-C_Stilmi.js, CSS app-CuldIRN0.css.
+  Production homepage/entry/app/health200; new settings/grid markers present;
+  anonymous Operations401. README remains a client-facing SaaS overview without
+  setup instructions; repository visibility remains PUBLIC per owner authorization.
+- Final read-only local check12:40 Dhaka: all seven services healthy; workerRSS
+  155MB, host free5634MB, pool waiters0. Three queued tasks, zero due/running,
+  16 retained failures. Inference concurrency1 and emergency memory guard remain.
+  These observations do not mean all retained failures have been resolved.
 
 ## Current inference and newsroom work
 
