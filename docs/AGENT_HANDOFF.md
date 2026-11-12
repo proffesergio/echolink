@@ -144,13 +144,13 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 ## Settings/grid refresh and NobleSeek logo — November12
 
 - New request: clean up Page Settings and other popups, redesign Content grid,
-  and restore NobleSeek branding on news creatives. UI implementation awaits
-  explicit new-screen approval required by the invoked SuperDesign workflow.
-  Review request is pending in chat; no frontend changes have been made yet.
+  and restore NobleSeek branding on news creatives. User explicitly approved
+  both designs. Implementation is complete and verified locally; frontend
+  deployment is being updated after the checks below.
 - Designs in the existing CMS project: Page Settings dialog
   https://p.superdesign.dev/draft/6c13b372-bba3-4da6-9d22-a002970f4953 (v3);
   Content Grid https://p.superdesign.dev/draft/b5ef7ba5-a27d-4783-9ca6-eea7deadc200 (v2).
-  They preserve the approved shell and exact EchoLink wordmark. Proposed dialog:
+  They preserve the approved shell and exact EchoLink wordmark. Implemented dialog:
   left section navigation, grouped fields, scrolling body/sticky footer. Grid:
   complete uncropped previews, short summaries and clear details/edit actions.
 - 12ui conversion targets: settings18d984eb-c438-44a8-8b95-aa3f2bd2dc2b,
@@ -169,6 +169,26 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   remains intact. Private render of a real saved newsroom item shows the actual
   logo: .codex/brand-review/nobleseek-restored-news.jpg. This is a private render,
   not a model QA run, website write or social publication.
+- `platform/client/settings-dialog.jsx` / `.css`: shared popup frame with
+  bounded body/sticky footer, scroll lock, focus trap/return, Escape/backdrop close
+  and busy-close protection. Page Settings has General, Brand & design, Writing
+  & prompts, Channels, Publishing, Connections and Advanced panels. Panels stay
+  mounted; unsaved values persist and native validation reveals hidden fields.
+  Existing payloads/approval controls remain. Other editor popups use the frame.
+- `platform/client/content-grid.css` and `ContentGridCard` in `cms.jsx`: three/two/
+  one columns, complete uncropped creatives, short copy, truthful receipts/time,
+  details/edit actions. Details fetch the protected full post and retain all
+  existing audits/scheduling/manual/uncertain-delivery actions. List behavior and
+  scoped freshness/pagination remain. New settings icon assets derive from the
+  approved 12ui kit; existing logos/photos are preserved rather than stock crops.
+- Both target-based12ui alignment kits completed, read and reviewed. Captures
+  under platform/.local/verification show desktop/mobile settings, brand panel
+  and grid. Full browser suite passed, including hidden validation, keyboard
+  navigation, focus trap, unsaved settings, grid details and mobile overflow.
+  Isolated visual harness passed sticky footer, original-ratio portrait/square/
+  landscape previews, logo preview, details-to-edit, zero JS errors/API writes.
+  Platform/root builds pass. Core unit coverage remains208 passing tests from
+  the logo release; CI will rerun portable/root checks on the new source.
 - 15 focused rendering/brand/recovery tests and all208 portable tests pass.
   Graceful platform restart applied the renderer with active/unknown receipts
   preserved. Following checks: all seven services healthy; one real preparation

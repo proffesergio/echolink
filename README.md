@@ -24,9 +24,9 @@ Manage several brands without mixing their content, settings or publishing calen
 
 ## A content desk that stays current
 
-**Find the work that matters.** Move between drafts, review, scheduled content and published posts. Search the loaded library, switch between list and grid views, and open a post to inspect its creative, captions and delivery details. Published content is ordered by confirmed publication time.
+**Find the work that matters.** Move between drafts, review, scheduled content and published posts. Search the loaded library, switch between list and preview grid views, and open a focused details window to inspect the complete creative, captions and delivery receipts. Published content is ordered by confirmed publication time.
 
-**Keep your brand consistent.** Maintain Page-specific prompts, logos, fonts and creative preferences. Prepare news, commerce and original content through a shared workflow while keeping each Page's identity.
+**Keep your brand consistent.** Maintain Page-specific prompts, logos, fonts and creative preferences. Focused settings sections organize brand, writing, channels, publishing and connections. Prepare news, commerce and original content through a shared workflow while keeping each Page's identity.
 
 **Plan with confidence.** Use the calendar to reserve publishing slots and follow the next scheduled post. Automation follows the Page's approval, spacing and posting rules. Delivery receipts distinguish confirmed publication from a request that still needs attention.
 
