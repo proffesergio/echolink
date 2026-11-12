@@ -79,11 +79,12 @@ export function briefQuality(text,dossier,page){
 export function briefWriterSchema(dossier){
  const known=[...new Set(sourceNumbers(dossier.canonicalTitle+' '+dossier.evidence.map(f=>f.text).join(' ')).flatMap(n=>[n,n.replace(/\d/g,d=>'০১২৩৪৫৬৭৮৯'[Number(d)])]))];
  const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- // Bound whitespace words and the script at decoding time. A single text field
- // avoids a small model getting stuck closing a paragraph array inside a string.
+ // Keep the native grammar compact: hundreds of optional word repetitions make
+ // CPU decoding expensive. Static quality checks enforce the80–500-word range.
+ // A single field avoids a model getting stuck closing a paragraph array.
  // Digits may start a word only when that number is present in the evidence.
  const letters='[-\u0980-\u09e5\u09f0-\u09ffA-Za-z,;:()/%+–—।.!?]',word=known.length?'(?:'+letters+'+|(?:'+known.map(escape).join('|')+')'+letters+'*)':letters+'+';
- const pattern='^(?:'+word+'[ ]+){79,499}'+word+'[।!?]$';
+ const pattern='^(?:'+word+'[ ]+)*'+word+'[।!?]$';
  return {type:'object',additionalProperties:false,properties:{text:{type:'string',pattern}},required:['text']};
 }
 const reviewSchema={type:'object',additionalProperties:false,properties:{supported:{type:'boolean'},contextComplete:{type:'boolean'},conflictsResolved:{type:'boolean'},issues:{type:'array',maxItems:3,items:{type:'string',maxLength:180}}},required:['supported','contextComplete','conflictsResolved','issues']};

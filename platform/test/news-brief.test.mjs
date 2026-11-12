@@ -29,10 +29,14 @@ test('double-escaped paragraph breaks and a repeated source headline are normali
 test('a claim that the ministry was unaware cannot replace the source statement that it noticed the misinformation',()=>{
  const d={canonicalTitle:'মন্ত্রণালয়ের বিজ্ঞপ্তি',evidence:[{id:'F1',source:0,text:'বিষয়টি কৃষি মন্ত্রণালয়ের নজরে এসেছে।'}],sources:[{label:'ইত্তেফাক'}],conflicts:[]};assert(briefQuality('বাতিলের কোনো খবর তাদের নজরে আসেনি।',d,page).warnings.some(w=>w.includes('denial of awareness')));
 });
-test('brief decoding constrains words, script and numerals without constraining source sentence structure',()=>{
+test('compact decoding constrains script/numerals while static checks enforce the80–500-word range',()=>{
  const schema=briefWriterSchema(prepareBriefEvidence(post)),pattern=new RegExp(schema.properties.text.pattern,'u'),text=paragraphs.join(' ');
  assert(!schema.properties.text.pattern.includes('\\s'),'llama.cpp rejects shorthand whitespace and silently drops that pattern');
- assert(pattern.test(text));assert(pattern.test(text+' '+text));assert(!pattern.test(Array(6).fill(text).join(' ')));assert(!pattern.test(text.replace('নাগরিকদের','না윅রিকদের')));assert(!pattern.test(text.replace('নাগরিকদের','123 নাগরিকদের')));
+ assert(!/\{\d+,\d+\}/.test(schema.properties.text.pattern),'native decoding must not expand hundreds of optional words');
+ assert(pattern.test(text));assert(pattern.test(text+' '+text));assert(!pattern.test(text.replace('নাগরিকদের','না윅রিকদের')));assert(!pattern.test(text.replace('নাগরিকদের','123 নাগরিকদের')));
+ const dossier=prepareBriefEvidence(post);
+ assert(briefQuality(Array(6).fill(text).join('\n\n'),dossier,page).warnings.some(w=>w.includes('at most 500')));
+ assert(briefQuality('নাগরিকদের সেবা বাড়াতে পরিকল্পনা নেওয়া হয়েছে।',dossier,page).warnings.some(w=>w.includes('at least 80')));
  assert.equal(newsWords(parseBrief(JSON.stringify({text}))),newsWords(text));assert.equal(parseBrief(JSON.stringify({text})).split('\n\n').length,2);
 });
 test('automatic brief uses one writer and one whole-report reviewer, then passes the publishing gate',async()=>{

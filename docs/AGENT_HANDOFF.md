@@ -240,7 +240,9 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   a repeatedly failing source remains held while collection moves on. Memory
   waits retain the five-minute backoff, serialized inference and emergency guard.
 - Corrected unsupported shorthand whitespace/escaped-hyphen constructs in the
-  writer's native schema. Word count, factual, originality, chronology, language
+  writer's native schema. A compact repeating-word grammar avoids hundreds of
+  optional decode branches; the80–500-word range is still enforced after writing.
+  All13 focused brief tests pass after that simplification. Factual, originality, chronology, language
   and independent whole-report review remain mandatory. HTTP500 is now correctly
   described as a model request failure when the service has responded, instead
   of always claiming the host is offline. Do not claim the schema warning alone
