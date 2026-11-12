@@ -2,6 +2,7 @@ import {createServer} from 'node:http';
 import {createLocalInferenceGate,localInferenceGate} from '../server/inference-resources.mjs';
 import {verifyExpandedOperations} from './operations-db-check.mjs';
 import {verifyLiveNewsTiming} from './news-timing-db-check.mjs';
+import {verifyContentLifecycle} from './content-status-db-check.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -61,6 +62,12 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    assert.equal((await call('/api/state',{cookie:b.cookie,workspace:a.workspace.id})).status,403);
    assert.equal((await call('/api/pages/'+pageA.id,{method:'PUT',body:data,cookie:b.cookie})).status,404);
    assert.equal((await call('/api/pages',{method:'POST',body:data,cookie:a.cookie,withOrigin:false})).status,403);
+  });
+  await t.test('canonical lifecycle follows generation and rendering atomically without rewriting delivery receipts',async()=>{
+   await transaction(a.workspace.id,db=>verifyContentLifecycle(db,a.workspace.id,pageA.id));
+   assert.equal((await call('/api/content-events')).status,401);
+   const event=await fetch(origin+'/api/content-events',{headers:{cookie:a.cookie}});
+   assert.equal(event.status,200);assert.match(event.headers.get('content-type'),/text\/event-stream/);assert.match(await event.text(),/event: content/);
   });
   await t.test('encrypted connections are not disclosed or linkable from another tenant',async()=>{
    connectionA=(await call('/api/connections',{method:'POST',cookie:a.cookie,body:{name:'Private AI',provider:'openai',config:{model:'configured-model'},secret:{apiKey:'not-a-real-test-key'}}})).data;

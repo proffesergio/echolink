@@ -10,6 +10,11 @@ export function useContentPosts({request,view,pageId,revision,receivedAt,enabled
   catch(error){if(ticket===sequence.current)setProgress({key,loading:false,error:error.message});}
  },[request,key,view,pageId]);
  useEffect(()=>{if(active)load(window.current.key===key?window.current.count:100);return()=>{sequence.current++;};},[active,key,revision,receivedAt,load]);
+ const optimisticPost=(id,patch)=>{
+  let previous,next;
+  setResult(current=>{if(current.key!==key)return current;previous=current.posts.find(p=>p.id===id);if(!previous)return current;next={...previous,...patch};return {...current,posts:current.posts.map(p=>p.id===id?next:p)};});
+  return ()=>setResult(current=>current.key===key&&previous?{...current,posts:current.posts.map(p=>p===next?previous:p)}:current);
+ };
  const matching=result.key===key;
- return {posts:matching?result.posts:[],total:matching?result.total:0,updatedAt:matching?result.updatedAt:null,hasMore:matching&&result.hasMore,loading:active&&(progress.key!==key||progress.loading),error:progress.key===key?progress.error:null,loadMore:()=>load((window.current.key===key?window.current.count:100)+100),refresh:()=>load(window.current.key===key?window.current.count:100)};
+ return {active,optimisticPost,posts:matching?result.posts:[],total:matching?result.total:0,updatedAt:matching?result.updatedAt:null,hasMore:matching&&result.hasMore,loading:active&&(progress.key!==key||progress.loading),error:progress.key===key?progress.error:null,loadMore:()=>load((window.current.key===key?window.current.count:100)+100),refresh:()=>load(window.current.key===key?window.current.count:100)};
 }

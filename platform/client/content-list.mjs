@@ -1,9 +1,9 @@
-export const CONTENT_VIEWS=new Set(['attention','posts','review','drafts','scheduled','published','ready_manual','archive','trash']);
+export const CONTENT_VIEWS=new Set(['attention','preparing','posts','review','drafts','scheduled','published','ready_manual','archive','trash']);
 export function contentListPath({view='posts',pageId='all',offset=0,limit=100}){
  const params=new URLSearchParams({limit:String(limit),offset:String(offset)});
  if(pageId&&pageId!=='all')params.set('page',pageId);
  if(['archive','trash'].includes(view))params.set('bucket',view);
- else if(view!=='posts')params.set('status',view==='drafts'?'draft':view);
+ else if(view!=='posts')params.set('status',view==='drafts'?'draft':view==='review'?'NEED_ATTENTION':view);
  return '/api/posts?'+params;
 }
 export async function fetchContentWindow(request,{view,pageId,count=100}){

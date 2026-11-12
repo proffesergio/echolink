@@ -1,3 +1,4 @@
+import {effectiveContentWorkflow} from './content-workflow.mjs';
 import {isPreparationWait,retrySeconds} from './task-state.mjs';
 import {nextDelivery} from './next-delivery.mjs';
 const deliveryKinds=['publish','publish_instagram','post_link_comment'];
@@ -7,6 +8,7 @@ export function pipelineForPage(state,page,{postId=null,now=Date.now()}={}){
  const tasks=(state.tasks||[]).filter(t=>t.page_id===page.id).sort((a,b)=>time(b)-time(a));
  const posts=(state.posts||[]).filter(p=>p.page_id===page.id&&!p.deleted_at&&!p.archived_at);
  const live=tasks.find(t=>t.status==='running'),retry=tasks.filter(isPreparationWait).sort((a,b)=>new Date(a.not_before)-new Date(b.not_before))[0],chosen=posts.find(p=>p.id===(postId||live?.post_id||retry?.post_id))||posts.find(p=>p.id===tasks.find(t=>t.post_id)?.post_id)||posts[0];
+ const workflow=effectiveContentWorkflow(page);
  const chain=chosen?tasks.filter(t=>t.post_id===chosen.id):tasks.filter(t=>!t.post_id);
  const stage=(id,label,kinds,evidence=false,{off=false,note=''}={})=>{
   const matches=chain.filter(t=>kinds.includes(t.kind)),running=matches.find(t=>t.status==='running'),latest=matches[0],queued=matches.find(t=>t.status==='queued');
@@ -18,8 +20,8 @@ export function pipelineForPage(state,page,{postId=null,now=Date.now()}={}){
  const ig=(state.social_destinations||[]).some(d=>d.page_id===page.id&&d.enabled&&d.platform==='instagram');
  const destinations=(state.publicationDeliveries||[]).filter(d=>d.post_id===chosen?.id),instagram=(state.social_deliveries||[]).find(d=>d.post_id===chosen?.id),comment=(state.linkComments||[]).find(d=>d.post_id===chosen?.id);
  const stages=[stage('source',page.kind==='news'||page.kind==='ecommerce'?prep:'Content brief',page.kind==='ecommerce'?['import_products']:['aggregate'],!!(chosen?.body||chosen?.product_id)),
-  stage('write',chosen?.type==='reel'?'Video storyboard':page.kind==='news'?'Full report + evidence review':'Channel copy',['generate','write_article'],page.kind==='news'?!!chosen?.seo?.article?.wordCount&&!chosen.seo.article.needsReview:!!chosen?.caption),
-  stage('design',chosen?.type==='reel'?'9:16 video':'Branded design',['creative','render_reel'],!!chosen?.creative?.assetId),
+  stage('write',workflow==='VIDEO_REELS'?'Video storyboard':page.kind==='news'?'Full report + evidence review':'Channel copy',['generate','write_article'],page.kind==='news'?!!chosen?.seo?.article?.wordCount&&!chosen.seo.article.needsReview:!!chosen?.caption),
+  stage('design',workflow==='VIDEO_REELS'?'9:16 video':workflow==='TEXT'?'Text only':'Branded design',['creative','render_reel'],!!chosen?.creative?.assetId,{off:workflow==='TEXT',note:'Text workflow has no image or video stage'}),
   stage('schedule',page.require_review?'Review → calendar':'Auto-check → calendar',[],['scheduled','publishing','published','ready_manual'].includes(chosen?.status),{note:chosen?.scheduled_at?'Booked '+new Date(chosen.scheduled_at).toLocaleString():chosen?.planned_at?'Planned · awaiting preparation':chosen?.status==='review'?'Waiting for content checks':''}),
   stage('website','Website first',['publish'],!!chosen?.website_url||destinations.some(d=>d.destination==='website'&&d.status==='published'),{off:!page.website_publishing,note:'Optional website publishing is off'}),
   stage('facebook',manual?'Profile handoff':'Facebook',['publish','manual_handoff'],!!chosen?.fb_post_id||!!chosen?.manual_url),
@@ -33,8 +35,8 @@ export function pipelineForPage(state,page,{postId=null,now=Date.now()}={}){
  }
  if(page.creative_policy?.contentFormat==='news_desk_v3'){
   const web=stages.find(s=>s.id==='website'),design=stages.find(s=>s.id==='design'),creating=chain.find(t=>t.kind==='creative'&&t.status==='running');
-  if(creating&&/^Website/.test(creating.phase||'')){web.status='running';web.task=creating;web.progress=creating.progress;web.note=creating.phase;design.status='pending';design.progress=0;design.note='Waiting for the full website report to be verified';}
-  const index=stages.indexOf(web);stages.splice(index,1);stages.splice(2,0,web);const social=stage('social','Facebook summary',[],!!chosen?.caption&&!chosen?.seo?.article?.socialPending);if(creating&&/^Facebook/.test(creating.phase||'')){social.status='running';social.task=creating;social.note=creating.phase;social.progress=creating.progress;design.status='pending';design.progress=0;design.note='Waiting for the checked Facebook summary';}else if(!chosen?.caption){social.status='pending';social.progress=0;social.note='Waiting for the confirmed website report';}stages.splice(3,0,social);
+  if(creating&&/^Website/.test(creating.phase||'')){web.status='running';web.task=creating;web.progress=creating.progress;web.note=creating.phase;if(workflow!=='TEXT'){design.status='pending';design.progress=0;design.note='Waiting for the full website report to be verified';}}
+  const index=stages.indexOf(web);stages.splice(index,1);stages.splice(2,0,web);const social=stage('social','Facebook summary',[],!!chosen?.caption&&!chosen?.seo?.article?.socialPending);if(creating&&/^Facebook/.test(creating.phase||'')){social.status='running';social.task=creating;social.note=creating.phase;social.progress=creating.progress;if(workflow!=='TEXT'){design.status='pending';design.progress=0;design.note='Waiting for the checked Facebook summary';}}else if(!chosen?.caption){social.status='pending';social.progress=0;social.note='Waiting for the confirmed website report';}stages.splice(3,0,social);
  }
  const active=tasks.filter(t=>t.status==='running'),waiting=tasks.filter(t=>t.status==='queued');
  return {page,post:chosen,posts,stages,tasks:chain,active,waiting,retry:chain.filter(isPreparationWait).sort((a,b)=>new Date(a.not_before)-new Date(b.not_before))[0],next:nextDelivery(state,page.id,now),events:chain.flatMap(t=>(t.events||[]).map(e=>({...e,taskId:t.id,kind:t.kind,status:t.status}))).sort((a,b)=>new Date(a.at)-new Date(b.at)).slice(-70),now};

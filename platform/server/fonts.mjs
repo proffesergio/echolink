@@ -1,3 +1,4 @@
+import {effectiveProfilePage} from './profile-config.mjs';
 import * as fontkit from 'fontkit';
 import sharp from 'sharp';
 import {readFile,writeFile,mkdir,unlink} from 'node:fs/promises';
@@ -38,15 +39,27 @@ export async function uploadFont(w,body){
  });}catch(error){await unlink(path).catch(()=>{});if(error instanceof AppError)throw error;throw new AppError(400,'The font could not be rendered. Try a different Unicode font.');}
 }
 export async function resolvePageFonts(page){
+ page=effectiveProfilePage(page);
  const result={};
  for(const [role,key] of [['headline','headlineFontAssetId'],['body','bodyFontAssetId']]){
   const id=page.brand?.[key];if(!id)continue;
   const asset=await transaction(page.workspace_id,async db=>(await db.query('SELECT id,path,mime FROM creator.assets WHERE workspace_id=$1 AND id=$2',[page.workspace_id,id])).rows[0]);
   if(!asset||!fontMimes.includes(asset.mime))throw new AppError(409,'A selected design font is unavailable. Update this Page’s font settings.');
-  const info=await describe(asset);result[role]={...info,path:asset.path};
+  const info=await describe(asset);if(['Bangla','Bilingual-Mix'].includes(page.language)&&!info.supportsBangla)throw new AppError(409,'Choose a font supporting Bengali for this Page language.');result[role]={...info,path:asset.path};
  }
  return result;
 }
+// Named profile families are requests, not claims that a host has those fonts.
+// Uploaded assets use their inspected family; otherwise use a known safe fallback.
+export function profileFontChoice(page,role,fallback='Nirmala UI'){
+ const requestedFamily=page.profile_config?.typography_config?.[role+'_font_family'];
+ const asset=page.designFonts?.[role];if(asset)return {...asset,requestedFamily:requestedFamily||asset.family,fallbackUsed:false};
+ const known=requestedFamily==='Noto Sans Bengali'||!requestedFamily&&fallback==='Nirmala UI';
+ const needsBangla=['Bangla','Bilingual-Mix'].includes(effectiveProfilePage(page).language);
+ if(known||requestedFamily&&needsBangla)return {family:'Noto Sans Bengali',path:bundledBangla,requestedFamily:requestedFamily||'Noto Sans Bengali',fallbackUsed:!!requestedFamily&&requestedFamily!=='Noto Sans Bengali'};
+ const generic=['sans-serif','serif'].includes(requestedFamily)?requestedFamily:requestedFamily?'sans-serif':fallback;
+ return {family:generic,requestedFamily:requestedFamily||fallback,fallbackUsed:!!requestedFamily&&!['sans-serif','serif'].includes(requestedFamily)};
+}
 export function fontOptions(page,role,size,fallback='Nirmala UI'){
- const selected=page.designFonts?.[role]||(!page.designFonts?.[role]&&fallback==='Nirmala UI'?{family:'Noto Sans Bengali',path:bundledBangla}:null);return {font:(selected?.family||fallback)+' '+Math.round(size),...(selected?{fontfile:selected.path}:{})};
+ const selected=profileFontChoice(page,role,fallback);return {font:selected.family+' '+Math.round(size),...(selected.path?{fontfile:selected.path}:{})};
 }

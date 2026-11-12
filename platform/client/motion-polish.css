@@ -1,0 +1,33 @@
+/* Presentation only: never remount editors or animate live content reordering. */
+.shell{--motion-fast:160ms;--motion-enter:220ms;--motion-ease:cubic-bezier(.2,.7,.3,1)}
+.shell :where(button,a,input,select,textarea,summary){transition:background-color var(--motion-fast) ease,border-color var(--motion-fast) ease,color var(--motion-fast) ease,box-shadow var(--motion-fast) ease}
+.shell :where(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid #bf4864;outline-offset:3px}
+.shell :where(button,a,input,select,textarea,summary){scroll-margin-block:16px}
+.cms-dialog-backdrop{animation:cms-fade-in var(--motion-fast) ease both}
+.cms-dialog{animation:cms-panel-in var(--motion-enter) var(--motion-ease) both}
+.settings-section-panels>section:not([hidden]),.video-stage-main>.panel{animation:cms-panel-in var(--motion-enter) var(--motion-ease) both}
+.settings-section-nav,.settings-section-panels>section,.editor-body,.editor-details{scrollbar-gutter:stable}
+.cms-grid-card{transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease}
+.cms-grid-card:focus-within{border-color:#dc8197;box-shadow:0 3px 12px #2430440c}
+.studio-toolbar>div,.studio-grid>section,.studio-job .row>strong,.status-side,.page-card .row>div{min-width:0}
+.studio-toolbar h2,.studio-job p,.studio-job strong,.studio-preview h3,.page-card h3,.ai-wave-heading h3{overflow-wrap:anywhere}
+.studio-toolbar .actions{justify-content:flex-end}
+.studio-grid{grid-template-columns:minmax(0,.75fr) minmax(0,1.3fr) minmax(0,.85fr)}
+.studio-preview>video{display:block;width:100%;max-height:620px;border-radius:12px;background:#12171a}
+.studio-stages li{color:#52657e;line-height:1.6}
+.studio-stages li span{flex:none;border-color:#dce4ee;color:#b64b65}
+.studio-job .row{align-items:flex-start;flex-wrap:wrap}
+.studio-job .row>span,.status-side time,.ai-wave-checkpoint{font-variant-numeric:tabular-nums}
+.studio-preview .caption{overscroll-behavior:contain}
+.page-card .row>div:not(.page-avatar){flex:1}
+.page-card .details{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
+.page-card .details strong{overflow-wrap:anywhere}
+.video-stage-main,.video-production-aside dd{overflow-wrap:anywhere}
+@keyframes cms-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes cms-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(hover:hover){.cms-grid-card:hover{border-color:#d2dce7;box-shadow:0 4px 16px #2430440a}}
+@media(max-width:1250px){.studio-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}.studio-grid>section:last-child{grid-column:1/-1}.studio-settings{display:grid;grid-template-columns:minmax(120px,.5fr) minmax(0,1fr);gap:12px 18px}.studio-settings dt,.studio-settings dd{margin:0;align-self:start}}
+@media(max-width:900px){.studio-toolbar{align-items:flex-start;flex-direction:column}.studio-toolbar .actions{justify-content:flex-start}.studio-grid{gap:16px}}
+@media(max-width:760px){.shell .sidebar{transition:transform var(--motion-enter) var(--motion-ease)}.topbar>span{min-width:0;overflow-wrap:anywhere}.top-right{flex-wrap:wrap;justify-content:flex-end}.page-heading{flex-wrap:wrap}.page-heading>div{min-width:0}.studio-grid{grid-template-columns:minmax(0,1fr)}.studio-grid>section:last-child{grid-column:auto}.studio-settings{grid-template-columns:minmax(0,.8fr) minmax(0,1fr)}.studio-toolbar .actions{gap:8px}.studio-toolbar .actions button{min-height:38px}.cms-dialog .modal-actions{flex-wrap:wrap}.cms-dialog .modal-actions>.settings-save-note{flex:1 1 100%;max-width:none}.cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr))}.destination-receipt{min-width:0;flex-basis:100%}}
+/* Covers inherited animations too, including status, sidebar and progress rules. */
+@media(prefers-reduced-motion:reduce){.shell,.shell *,.shell *::before,.shell *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

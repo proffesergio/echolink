@@ -12,5 +12,6 @@ export function scopeState(value,pageId){
  out.insights=(value.insights||[]).filter(s=>s.page_id===page.id);
  out.pageMirrors=(value.pageMirrors||[]).filter(m=>m.page_id===page.id);
  out.archiveCounts=(value.pageArchiveCounts||[]).find(c=>c.page_id===page.id)||{archived:0,trash:0};
+ out.contentStatusCounts=Object.fromEntries((value.pageContentStatusCounts||[]).filter(x=>x.page_id===page.id).map(x=>[x.status,Number(x.count)]));
  out.postCounts=Object.fromEntries((value.pagePostCounts||[]).filter(x=>x.page_id===page.id).map(x=>[x.status,x.count]));return out;
 }
