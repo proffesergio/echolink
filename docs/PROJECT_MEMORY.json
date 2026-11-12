@@ -284,17 +284,17 @@
     "cms": "User approved modern light canvas/charcoal sidebar/coral UI; real data/search/list-grid/row details, prompt/media/newsroom entries. SuperDesign + 12ui conversions/target alignment; no unsafe bulk low-overlap selector patch.",
     "videoUI": "UI only. Research/brief, scene script/visual prompts, voice/caption plan, timeline and review/export profiles for YouTube/Facebook/Instagram/TikTok. Browser-local drafts keyed by workspace/Page. Render/export/schedule disabled; future open-source tools marked Planned. No new model or video backend.",
     "deployment": {
-      "id": "dpl_7ywEiCXXRayeXHDuar98ErZx9X6r",
-      "url": "https://echolink-jtj7y0vq7-omniteam1.vercel.app",
+      "id": "dpl_4AYP5CdpXwfZ3cY9ek1e8L7rvaqi",
+      "url": "https://echolink-czh5w8uin-omniteam1.vercel.app",
       "productionUrl": "https://echolinkbd.vercel.app",
       "status": "READY",
-      "frontendBundle": "index-DNifb4Yg.js",
-      "operationsBundle": "app-C_Stilmi.js",
-      "sourceCommit": "765a3f8eed92f87349fb3fdf490b35a09ac1bcde",
-      "githubActions": "43169226646: test + deploy SUCCESS",
-      "alternateGitDeployment": "dpl_Ag5jXWepH4ucKkY5G2vTDWLMRtWT READY",
-      "workerRestart": "Not needed for frontend release; studio-v8 renderer already live.",
-      "liveVerification": "Homepage/entry/app/health200; settings/grid markers present; anonymous Operations401. All seven runtime services healthy12:40 Dhaka. Test preview cleaned up.",
+      "frontendBundle": "index-UlM-KyLn.js",
+      "operationsBundle": "app-BP7OcCbN.js",
+      "sourceCommit": "c35ce1e998755516f65f7a6fd6c6688cf3bd4db9",
+      "githubActions": "43182897762: test + deploy SUCCESS",
+      "alternateGitDeployment": "dpl_6WGSEQHDRNH9dqUwy4Uck59Tbpb8 READY",
+      "workerRestart": "Graceful restart applied live-news timing24h/compact schema; active deliveries drained, ambiguous receipts preserved.",
+      "liveVerification": "Homepage/entry/app/health200; latest/24h settings label present; anonymous Operations401. All seven runtime services healthy14:32 Dhaka. Website/Facebook187-word report receipts confirmed14:21:20 and delayed comment published.",
       "privateRepositoryHistory": "Private author check remained blocked after owner connection confirmation; owner explicitly authorized public fallback. Repository PUBLIC; native Git and Actions deployment both now succeed.",
       "cssBundle": "app-CuldIRN0.css"
     },
@@ -304,6 +304,6 @@
     "repository": "GitHub proffesergio/echolink made PRIVATE at first on Nov12. Private author-access check remained blocked after owner replied Connected. Owner explicitly authorized public fallback if required for Vercel; visibility restored PUBLIC and verified. README SaaS/client-only with no setup. Root private:true/UNLICENSED prevents package publishing; it does not hide public source or operating guides. No author identity was changed.",
     "newsBrand": "Nov12: owner Noble Seek Page had no logoAssetId. Existing clean mark visually verified against current actual Facebook Page picture, saved tenant-scoped and attached without overwriting uploads. No posts modified. studio-v8 news renderer now respects light variant/width/adaptive original settings. Private real-post render verified;208 portable tests +15 focused checks pass; graceful restart applied backend.",
     "settingsGridRefresh": "User approved both designs. Implemented shared accessible popup frame/sticky footer, seven persisted Page settings sections with hidden validation routing. New equal-column preview grid with contained original-ratio media and full protected details dialog; original actions, controls, freshness and isolation retained. Both 12ui target kits/manual alignment reviewed. Full browser + isolated desktop/mobile visual QA pass; no JS errors, overflow, API writes or publications. Deployed READY from765a3f8; production markers/health verified and CI test+deploy SUCCESS43169226646. Generic post/connection footer/mobile checks pass; isolated preview fixtures cleaned up.",
-    "newsTiming": "Nov12: owner explicitly requests24h source eligibility (12–24h allowed), newest unseen reporting first. Live aggregation bypasses spread/overnight buffering, ignores held backlog, queues one upcoming item and rechecks after1min. Earliest slot honors actual7min gap/cap70, Page window/approval/factual/crisis/tenant checks. Model failures bounded to2 one-minute retries; memory waits5min/emergency guard retained. Delayed unsent source backed up/retained for review; no uncertain/published receipt reset. Real187-word source14:12:57 selected14:14:01, website verified and scheduled14:21; normal Facebook publication confirmed14:21:20, today5→6, comment queued14:26:20. One recovered cycle is not guaranteed70/day capacity.215 portable/30 integration/63 root and browser/build checks pass; worker gracefully restarted, frontend deploy pending."
+    "newsTiming": "Nov12: owner explicitly requests24h source eligibility (12–24h allowed), newest unseen reporting first. Live aggregation bypasses spread/overnight buffering, ignores held backlog, queues one upcoming item and rechecks after1min. Earliest slot honors actual7min gap/cap70, Page window/approval/factual/crisis/tenant checks. Model failures bounded to2 one-minute retries; memory waits5min/emergency guard retained. Delayed unsent source backed up/retained for review; no uncertain/published receipt reset. Real187-word source14:12:57 selected14:14:01, website verified and scheduled14:21; normal Facebook publication confirmed14:21:20, today5→6, delayed comment also published; website/Facebook receipts confirmed. One recovered cycle is not guaranteed70/day capacity.215 portable/30 integration/63 root and browser/build checks pass; worker gracefully restarted, final compact schema deployed/sourcec35ce1e; READYdpl_4AYP5CdpXwfZ3cY9ek1e8L7rvaqi, Actions43182897762SUCCESS, production24h label/health verified. Final14:32 all seven services healthy; one normal preparation running. Avoid broad local tests overlapping inference."
   }
 }

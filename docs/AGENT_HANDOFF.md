@@ -195,7 +195,7 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   preserved. Following checks: all seven services healthy; one real preparation
   resumed with inference concurrency1 and emergency guard still active.
 
-## Current verified production release — November12
+## Settings/grid production release — November12
 
 - Source765a3f8eed92f87349fb3fdf490b35a09ac1bcde: approved settings/dialog/grid
   implementation, including all original25 Page fields and full publication actions.
@@ -258,15 +258,31 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   automatically for14:21. One earlier fresh teaser was correctly held and the
   next source was collected without a30-minute cooldown. The same post then published
   normally at14:21:20 Dhaka (scheduled14:21:00), bringing today’s confirmed
-  news total from5 to6. Its delayed first-link comment is queued for14:26:20.
+  news total from5 to6. Its delayed first-link comment subsequently published too. Website and
+  Facebook receipts both explicitly confirmed; Facebook ID is saved.
   This demonstrates one recovered cycle, not guaranteed70/day throughput.
 - Validation:215 portable tests,30 isolated API/integration checks,63 root tests,
   full browser suite and platform/root builds pass. Tests submitted no real news,
   model requests, website writes or social publications; the observation above is
   the existing authorized production automation, not a synthetic QA publication.
   Code: news-timing.mjs, scheduling.mjs/planner.mjs, generation-window/buffer.mjs,
-  news-research.mjs, jobs.mjs and focused news-timing tests. Frontend wording update
-  is awaiting deployment; README remains client-facing without setup instructions.
+  news-research.mjs, jobs.mjs and focused news-timing tests. README remains
+  client-facing without setup instructions.
+- Final source c35ce1e998755516f65f7a6fd6c6688cf3bd4db9 is deployed READY:
+  dpl_4AYP5CdpXwfZ3cY9ek1e8L7rvaqi,
+  https://echolink-czh5w8uin-omniteam1.vercel.app; native Git deployment
+  dpl_6WGSEQHDRNH9dqUwy4Uck59Tbpb8 also READY. Production alias unchanged.
+  Actions43182897762 SUCCESS; prior source f0dcff6 Actions43182516598 SUCCESS.
+  Entry index-UlM-KyLn.js/app-BP7OcCbN.js verified200 with24h/latest label;
+  health200, anonymous Operations401. Compact schema's13 focused tests pass;
+  CI portable/root checks pass on that final source. Graceful restart completed.
+- Final14:32 Dhaka read-only check: all seven services healthy, workerRSS153MB,
+  host free2602MB, pool waiting0;2queued/0due/1running/17retained failures.
+  Inference remains serialized, reserve768MiB/emergency512MiB. The187-word
+  report measured writer97.2s/reviewer225.6s during verification load. These are
+  measured examples, not guaranteed speed or accuracy;70/day remains a ceiling.
+  Do not overlap broad local test suites with live inference on this small PC.
+  No submitted/uncertain delivery was killed or reset by the refresh.
 
 ## Current inference and newsroom work
 
