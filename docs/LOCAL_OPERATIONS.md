@@ -128,3 +128,10 @@ was applied and public visibility verified. The README stays SaaS/client-facing
 without setup steps, but public source and historical guides are visible. Root
 package private:true prevents package publication; it is not source access control.
 No Git identity was falsified and no paid plan was enabled.
+
+Final verification: Git deployment dpl_ocCzn2ur5JaGMSzz1Aawg8LtR48Z and Actions
+deployment dpl_3naxyNV4HE2NK39zPABsMCM17vw2 are READY for cb278338. Actions
+43156762485 test and deployment jobs both passed. Production serves the verified
+index-D342ZObb.js / app-n02bVhhs.js, including final mobile polish. Homepage,
+assets and health200; anonymous Owner Operations401. All seven runtime service
+checks healthy at10:45 Dhaka. No further connection approval is pending.

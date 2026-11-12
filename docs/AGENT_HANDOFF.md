@@ -67,25 +67,33 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
 ## Current Operations release — November12
 
-- READY production deployment: `dpl_7y2U6ZPKiLhmtG1yCXrpVGbSeHJv`,
-  https://echolink-n86iba907-omniteam1.vercel.app; alias https://echolinkbd.vercel.app.
-  Live entry `index-Bf6ByUy9.js`, Operations chunk `app-CsVyjIjY.js`.
-  Homepage, entry, Operations chunk and public health returned200; anonymous
-  Operations returned401. This includes the approved monitor and final typography.
-- One later mobile-only CSS fix removes the hidden sidebar shadow. It was built
-  and browser-verified locally (`index-D342ZObb.js` / `app-n02bVhhs.js`) but its
-  private deployment `dpl_BwWkoiDQjkyVp7x9ESyA1Nwbqqc8` was BLOCKED.
-  API reason: commit author lacks deployment access; `TEAM_ACCESS_REQUIRED`,
-  `isVerified:false`. Making the repository private activated Hobby author checks.
-  The owner explicitly authorized making the repository public if needed for this deployment. After a second private retry failed, that fallback was applied; no author identity was falsified.
-- GitHub authenticated owner is proffesergio; current commit email matches that
-  GitHub user's public email. Vercel CLI identity is billsfariji-4299. User was
-  asked to connect proffesergio in the actual Hobby owner account's Vercel Login
-  Connections, then reply Connected. No paid seat/plan upgrade was purchased.
-  Owner replied Connected, but retry dpl_6Do21YVBjufTdGrsMHPVCVpJyvoC still returned BLOCKED. Public fallback authorized/applied; final release verification follows below.
-- Isolated Operations preview accounts/servers were cleaned up. The interrupted
-  browser screenshot fixture was removed only from creator_test; final full suite
-  passed. No production publishing/inference restart was needed for frontend work.
+- Final READY production deployment: `dpl_3naxyNV4HE2NK39zPABsMCM17vw2`,
+  https://echolink-hmbw2brxk-omniteam1.vercel.app; alias https://echolinkbd.vercel.app.
+  Source cb2783385dde9fb5935804fa35e038d6821d5dc9. Native Git deployment
+  dpl_ocCzn2ur5JaGMSzz1Aawg8LtR48Z also READY for the same source.
+  Live entry `index-D342ZObb.js`, Operations chunk `app-n02bVhhs.js`, including
+  the closed-mobile-sidebar shadow fix. Homepage, entry, Operations chunk and
+  public health returned200; anonymous Operations returned401.
+- GitHub Actions43156762485 completed successfully: test AND deploy jobs passed.
+  Local verification:205 portable tests,63 root tests,29 isolated API checks,
+  full browser suite, targeted final mobile navigation/overflow checks and builds.
+- Final read-only runtime check10:45 Dhaka: all seven services healthy; workerRSS
+  154MiB; host free6625MiB; pool waiters0; native tokens12242 input/1044 output
+  recorded from real preparation. Four queued tasks, zero due/running,16 retained
+  failures. These are observations, not a guarantee that all queued work is done.
+- Privacy history: the repository was made private at first. Vercel Hobby
+  author-access checks blocked the final deployment. User replied Connected to
+  the owner-link request, but the private retry still returned TEAM_ACCESS_REQUIRED.
+  User then explicitly authorized public visibility if required for Vercel; that
+  fallback was applied and PUBLIC verified. Both automatic deployment paths now
+  work. No paid plan was enabled and no Git author identity was changed. Public
+  source and operating guides remain visible; removing README setup does not hide
+  them. Root private:true/UNLICENSED prevents package publication, not source access.
+- Isolated preview accounts/servers were cleaned up. The interrupted screenshot
+  fixture was removed only from creator_test, then the final full browser suite
+  passed. No production worker restart, synthetic inference or test publication
+  was submitted for the frontend release. Earlier blocked deployments remain as
+  history; cancelled Actions43156332895 had a passing test job and held deployment.
 
 ## Current CMS release — November 11
 
