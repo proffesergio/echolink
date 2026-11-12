@@ -1,10 +1,12 @@
 import {pageClock,inWindow,findSlot,wallTimeToInstant} from './scheduling.mjs';
+import {liveNews} from './news-timing.mjs';
 // Only starting resource-heavy source/copy work observes generation hours.
 // Finishing a prepared design and booking delivery must not be parked all day.
 export const startsGeneration=kind=>['aggregate','generate','import_products'].includes(kind);
 
 export function generationAvailability(rule,page,reservations=[],{now=new Date(),urgent=false}={}){
  if(rule.enabled===false)return {allowed:false,next:new Date(+now+5*60000),message:'This Page’s automation is paused. Preparation waits; existing scheduled delivery remains independent.'};
+ if(liveNews(page))return {allowed:true,emergency:false,message:'Live news preparation runs throughout the day; publication limits and memory safeguards still apply.'};
  if(urgent)return {allowed:true,emergency:true,message:'Explicit priority preparation; publishing limits and memory safeguards still apply.'};
  const window=rule.generation_window||{};
  if(!window.enabled)return {allowed:true,emergency:false};

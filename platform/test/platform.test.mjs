@@ -1,6 +1,7 @@
 import {createServer} from 'node:http';
 import {createLocalInferenceGate,localInferenceGate} from '../server/inference-resources.mjs';
 import {verifyExpandedOperations} from './operations-db-check.mjs';
+import {verifyLiveNewsTiming} from './news-timing-db-check.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -276,6 +277,7 @@ test('real accounts, tenant isolation, concurrent quotas, approvals and owner bi
    await transaction(a.workspace.id,db=>db.query('UPDATE creator.automation_rules SET backlog_limit=200,next_run_at=now() WHERE page_id=$1',[pageA.id]));
    const generated=await tickAutomations();assert(generated.queued>0&&generated.queued<=2);assert.equal((await tickAutomations()).queued,0,'a second check cannot bypass next_run_at');await transaction(a.workspace.id,db=>db.query('UPDATE creator.automation_rules SET enabled=false WHERE page_id=$1',[pageA.id]));
   });
+  await t.test('live news refills one fresh story, skips held history and books promptly without publishing',()=>verifyLiveNewsTiming({workspaceId:o.workspace.id}));
   await t.test('shared n8n permissions are owner controlled and hidden from clients by default',async()=>{
    assert.equal((await call('/api/owner/integrations',{method:'PUT',cookie:a.cookie,body:{n8nEnabled:true,n8nVisibleToClients:true}})).status,403);
    assert.equal((await call('/api/global-integrations/test',{method:'POST',cookie:a.cookie,body:{}})).status,403);

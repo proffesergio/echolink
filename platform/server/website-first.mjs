@@ -4,9 +4,11 @@ import {writeNoble,verifyNoblePublic} from './nobleseek.mjs';
 import {publicURL,remoteJSON} from './net.mjs';
 import {AppError} from './errors.mjs';
 import {newsReportProblem} from './news-quality.mjs';
+import {newsFreshnessProblem} from './news-timing.mjs';
 export async function websiteBeforeDesign({task,page,post,site,connection},{updateTask,write=writeNoble,verify=verifyNoblePublic,request=remoteJSON,transact=transaction,receipt=deliveryState}={}){
  let submitted=false,confirmed=!!post.website_url;
  try{
+  const stale=newsFreshnessProblem(page,post);if(stale)throw new AppError(409,stale,'news_stale');
   const problem=newsReportProblem(post,page,{social:false});if(problem)throw new AppError(409,problem,'newsroom_review');
   if(!['nobleseek_db','wordpress'].includes(site.connector))throw new AppError(400,'This website does not support article publication.');
   if(!confirmed)await transact(task.workspace_id,async db=>{
@@ -27,7 +29,7 @@ export async function websiteBeforeDesign({task,page,post,site,connection},{upda
   await updateTask(task,10,'Website · checking the live report before preparing Facebook copy and design');if(site.connector==='nobleseek_db')await verify(site,article.slug||'echolink-'+post.id,{expectedText:post.seo?.article?.text});
   await receipt(task,'website','confirmed',{phase:'Full website report verified; news design can begin',url:post.website_url});return post.website_url;
  }catch(error){
-  if(error.code==='publication_unknown')throw error;
+  if(['publication_unknown','news_stale'].includes(error.code))throw error;
   const failure=publicationFailure(error,{websiteSubmitted:submitted,websiteConfirmed:false,stage:'website'});
   if(!confirmed)await receipt(task,'website',failure.unknown?'unknown':'failed',{phase:failure.message,error:failure.message});
   throw new AppError(confirmed?503:409,confirmed?'The report is saved. Waiting for its live website URL to verify before design.':failure.message,failure.unknown?'publication_unknown':'website_stage');

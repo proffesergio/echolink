@@ -213,6 +213,59 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   16 retained failures. Inference concurrency1 and emergency memory guard remain.
   These observations do not mean all retained failures have been resolved.
 
+## Live newsroom scheduling — November12
+
+- Owner reported only5 publications by early afternoon despite70/day and7-minute
+  gap. Read-only audit confirmed70 daily cap/target and7-minute minimum, but
+  scheduleMode=spread, overnight22:00–07:00 generation, a5-minute emergency
+  refill horizon and old rebuild drafts were delaying fresh collection. The
+  spread grid was roughly20 minutes; a live source repeatedly waited on model
+  HTTP500s and later the generation-window check. Ollama itself remained reachable.
+- Aggregated news now selects the newest unseen source timestamp first, with
+  a24-HOUR maximum source age explicitly requested by the owner (supersedes the
+  initial three-hour proposal).12–24-hour reporting remains eligible. Check age
+  before preparation, website write and final social booking/execution; missing
+  or future source timestamps need correction. Manual reports retain editorial
+  control. Old/held source fingerprints, factual/crisis holds and all receipts stay.
+- Live news uses earliest available slots, not spread alignment or a preserved
+  far-future planned_at. Actual publication still enforces the7-minute minimum,
+  Page window, daily70 cap, approval/version, factual/crisis and tenant checks.
+  Keep a single upcoming prepared item, scan feeds again after a minute, avoid
+  model ranking for latest-first selection and prioritize queued automated news
+  after active work/explicit urgent tasks; publishing keeps its separate lane.
+- Live collection ignores overnight generation hours and held/error drafts do not
+  fill its active backlog. No-source/failed-source checks resume after one minute
+  rather than blocking the whole news desk for the legacy30-minute cooldown.
+  Transient model/host errors retry twice at one-minute intervals per news task;
+  a repeatedly failing source remains held while collection moves on. Memory
+  waits retain the five-minute backoff, serialized inference and emergency guard.
+- Corrected unsupported shorthand whitespace/escaped-hyphen constructs in the
+  writer's native schema. Word count, factual, originality, chronology, language
+  and independent whole-report review remain mandatory. HTTP500 is now correctly
+  described as a model request failure when the service has responded, instead
+  of always claiming the host is offline. Do not claim the schema warning alone
+  proved the cause of every previous500 response.
+- Owner NobleSeek settings saved: interval scheduling, latest selection, generation
+  window disabled, batch1; cap70/gap7 retained. Backed up privately before changes.
+  One delayed, never-submitted version1 source was retained in Review and its queued
+  preparation canceled only after checking no manual save, receipt or attempt.
+  No published or uncertain post was reset. Worker restarted gracefully; tunnel
+  supervisor reconnected normally and all seven services recovered healthy.
+- Real observation14:20 Dhaka: a source published14:12:57 was selected14:14:01,
+  completed a187-word checked report, saved/verified on the website and scheduled
+  automatically for14:21. One earlier fresh teaser was correctly held and the
+  next source was collected without a30-minute cooldown. The same post then published
+  normally at14:21:20 Dhaka (scheduled14:21:00), bringing today’s confirmed
+  news total from5 to6. Its delayed first-link comment is queued for14:26:20.
+  This demonstrates one recovered cycle, not guaranteed70/day throughput.
+- Validation:215 portable tests,30 isolated API/integration checks,63 root tests,
+  full browser suite and platform/root builds pass. Tests submitted no real news,
+  model requests, website writes or social publications; the observation above is
+  the existing authorized production automation, not a synthetic QA publication.
+  Code: news-timing.mjs, scheduling.mjs/planner.mjs, generation-window/buffer.mjs,
+  news-research.mjs, jobs.mjs and focused news-timing tests. Frontend wording update
+  is awaiting deployment; README remains client-facing without setup instructions.
+
 ## Current inference and newsroom work
 
 - PC: i5-6500 / 4 logical threads / ~12 GiB RAM / GT730; CPU inference.

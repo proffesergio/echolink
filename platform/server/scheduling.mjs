@@ -1,5 +1,6 @@
 import {AppError} from './errors.mjs';
 import {newsReportProblem} from './news-quality.mjs';
+import {newsFreshnessProblem,spreadSchedule,liveNews} from './news-timing.mjs';
 const clocks=new Map();
 export function pageClock(page,now=new Date()){
  let format=clocks.get(page.timezone);if(!format){format=new Intl.DateTimeFormat('en-CA',{timeZone:page.timezone,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});clocks.set(page.timezone,format);}
@@ -40,13 +41,15 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
  }
  throw new AppError(409,'No open slot fits this Page’s window, daily target, posting gap and plan period. Adjust the Page schedule.','no_slot');
 }
-export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,await bookings(db,w,page.id,postId),{from,until,spread:spread&&page.creative_policy?.scheduleMode!=='interval',target});}
+export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
+export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,usableBookings(page,await bookings(db,w,page.id,postId)),{from,until,spread:spreadSchedule(page,spread),target});}
 export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
+ const stale=newsFreshnessProblem(page,post,{now});if(stale)throw new AppError(409,stale,'news_stale');
  const newsroomProblem=newsReportProblem(post,page);if(newsroomProblem)throw new AppError(409,newsroomProblem,'newsroom_review');
  if(!page.active)throw new AppError(409,'Enable this Page before publishing.');
  if(post.approved_version!==post.version)throw new AppError(409,'Approve the current version before publishing.');
  if(!inWindow(page,now))throw new AppError(409,'Outside this Page’s posting window. Choose a time in the calendar.','outside_window');
- const reserved=await bookings(client,workspaceId,page.id,post.id),slots=execution?reserved.filter(s=>['published','publishing','unknown','ready_manual'].includes(s.status)):reserved,problem=slotProblem(page,slots,now);
+ const reserved=usableBookings(page,await bookings(client,workspaceId,page.id,post.id)),slots=execution?reserved.filter(s=>['published','publishing','unknown','ready_manual'].includes(s.status)):reserved,problem=slotProblem(page,slots,now);
  if(problem)throw new AppError(409,problem==='posting_gap'?'This time is too close to another Page post. Choose the next available slot.':problem==='daily_cap'?'This Page’s daily publishing target is already booked.':'Choose a time inside this Page’s posting window.',problem);
  if(slots.some(x=>['publishing','unknown'].includes(x.status)&&!x.at))throw new AppError(409,'Another publication is in progress or needs reconciliation.','publication_pending');
 }

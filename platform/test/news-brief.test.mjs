@@ -31,6 +31,7 @@ test('a claim that the ministry was unaware cannot replace the source statement 
 });
 test('brief decoding constrains words, script and numerals without constraining source sentence structure',()=>{
  const schema=briefWriterSchema(prepareBriefEvidence(post)),pattern=new RegExp(schema.properties.text.pattern,'u'),text=paragraphs.join(' ');
+ assert(!schema.properties.text.pattern.includes('\\s'),'llama.cpp rejects shorthand whitespace and silently drops that pattern');
  assert(pattern.test(text));assert(pattern.test(text+' '+text));assert(!pattern.test(Array(6).fill(text).join(' ')));assert(!pattern.test(text.replace('নাগরিকদের','না윅রিকদের')));assert(!pattern.test(text.replace('নাগরিকদের','123 নাগরিকদের')));
  assert.equal(newsWords(parseBrief(JSON.stringify({text}))),newsWords(text));assert.equal(parseBrief(JSON.stringify({text})).split('\n\n').length,2);
 });

@@ -17,14 +17,14 @@ export function clusterStories(articles,now=Date.now()){
  }
  return clusters;
 }
-export function shortlistStories(clusters,{recent=[],categories=[],now=Date.now(),limit=8,notBefore=null}={}){
+export function shortlistStories(clusters,{recent=[],categories=[],now=Date.now(),limit=8,notBefore=null,latest=false}={}){
  const counts=new Map();for(const r of recent)counts.set(r.category,(counts.get(r.category)||0)+1);
  return clusters.filter(c=>(!notBefore||+new Date(c.primary.date)>=+new Date(notBefore))&&(!categories.length||categories.includes(c.primary.category))&&!recent.some(r=>r.source_hash===articleHash(c.primary.url)||storySimilarity(r.title,c.primary.title)>=.8||c.articles.some(a=>r.source_hash===articleHash(a.url))))
  .map(c=>{const domains=new Set(c.articles.map(a=>new URL(a.url).hostname.replace(/^www\./,''))),age=Math.max(0,(now-+new Date(c.primary.date))/3600000);return {...c,sourceCount:domains.size,score:Math.max(0,24-age)+Math.min(3,domains.size-1)*8+(c.primary.image?3:0)-Math.min(5,counts.get(c.primary.category)||0)*4};})
- .sort((a,b)=>b.score-a.score).slice(0,limit);
+ .sort((a,b)=>(latest?+new Date(b.primary.date)-+new Date(a.primary.date):0)||b.score-a.score||a.primary.url.localeCompare(b.primary.url)).slice(0,limit);
 }
 // Cache is tenant/Page scoped, bounded, and invalidated by feed configuration.
-export function createFeedCollector({read=readFeed,clock=Date.now,ttl=600000}={}){
+export function createFeedCollector({read=readFeed,clock=Date.now,ttl=60000}={}){
  const cache=new Map();
  return async(workspaceId,pageId,feeds,onProgress=async()=>{})=>{
   const key=workspaceId+':'+pageId,signature=JSON.stringify(feeds.map(f=>[f.id,f.url,f.fallback_url]));let entry=cache.get(key);

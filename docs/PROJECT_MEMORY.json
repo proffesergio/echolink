@@ -162,6 +162,11 @@
       "id": "settings-dialog",
       "file": "platform/client/settings-dialog.jsx",
       "role": "Shared popup frame/focus/scroll behavior; preserved Page setting panels and validation"
+    },
+    {
+      "id": "news-timing",
+      "file": "platform/server/news-timing.mjs",
+      "role": "Live aggregation freshness24h, latest-first short queue, interval slots and one-minute refill policy"
     }
   ],
   "edges": [
@@ -268,7 +273,7 @@
     "recovery": "Nov11:16 automated drafts backed up/reset, one saved manual draft retained. First ministry story source-corrected to107 words, independently re-reviewed, updated existing website URL and exact text verified; auto approved/scheduled17:16 Dhaka Nov11. Temporary preparation hold restored; unknown receipts retained; no QA text promoted.",
     "sampling": "brief writer0.6/repair0.3, reviewer0; legacy modes retained; no accuracy claims from temperature or word count",
     "resources": "windows_quality; CPU4; brief writer/reviewer context6144; context ceiling8192; output ceiling4096; review output1024; reserve768MiB; abort512MiB",
-    "tests": "205 portable tests,63 root tests and29 isolated API integration tests pass; platform/root builds pass. Full browser suite passes Operations refresh/stale/read-only/mobile, Content/video/actions and zero JS errors. Final mobile shadow fix verified with navigation/overflow checks; no real test publication.",
+    "tests": "215 portable,30 isolated API/integration and63 root tests pass; builds and full browser suite pass. Live-news checks cover24h eligibility, newest-source order, one-item refill/held backlog, hidden legacy planned time and stale preparation/website/social guards. No real model/publication submitted by tests.",
     "secrets": "ignored env files and .codex; never print or commit",
     "historical": "docs/status.md is historical; do not use as current deployment state",
     "modelRouting": "Gemma3 4B Q4 writing/design; Qwen3 4B independent review/complex structured tasks; free local serialized. DeepSeek official paid cloud API assessed, not called.",
@@ -298,6 +303,7 @@
     "operationsUI": "User approved Nov12; implemented Owner Operations with real read-only API,30s refresh/stale recovery, live count charts, infrastructure/queue/connector/query/model details. SuperDesign target e6ab4822-d1b9-4a3e-b949-da5f0f8e6f48 + completed 12ui target alignment. No fake raster charts or load-balancer claims.",
     "repository": "GitHub proffesergio/echolink made PRIVATE at first on Nov12. Private author-access check remained blocked after owner replied Connected. Owner explicitly authorized public fallback if required for Vercel; visibility restored PUBLIC and verified. README SaaS/client-only with no setup. Root private:true/UNLICENSED prevents package publishing; it does not hide public source or operating guides. No author identity was changed.",
     "newsBrand": "Nov12: owner Noble Seek Page had no logoAssetId. Existing clean mark visually verified against current actual Facebook Page picture, saved tenant-scoped and attached without overwriting uploads. No posts modified. studio-v8 news renderer now respects light variant/width/adaptive original settings. Private real-post render verified;208 portable tests +15 focused checks pass; graceful restart applied backend.",
-    "settingsGridRefresh": "User approved both designs. Implemented shared accessible popup frame/sticky footer, seven persisted Page settings sections with hidden validation routing. New equal-column preview grid with contained original-ratio media and full protected details dialog; original actions, controls, freshness and isolation retained. Both 12ui target kits/manual alignment reviewed. Full browser + isolated desktop/mobile visual QA pass; no JS errors, overflow, API writes or publications. Deployed READY from765a3f8; production markers/health verified and CI test+deploy SUCCESS43169226646. Generic post/connection footer/mobile checks pass; isolated preview fixtures cleaned up."
+    "settingsGridRefresh": "User approved both designs. Implemented shared accessible popup frame/sticky footer, seven persisted Page settings sections with hidden validation routing. New equal-column preview grid with contained original-ratio media and full protected details dialog; original actions, controls, freshness and isolation retained. Both 12ui target kits/manual alignment reviewed. Full browser + isolated desktop/mobile visual QA pass; no JS errors, overflow, API writes or publications. Deployed READY from765a3f8; production markers/health verified and CI test+deploy SUCCESS43169226646. Generic post/connection footer/mobile checks pass; isolated preview fixtures cleaned up.",
+    "newsTiming": "Nov12: owner explicitly requests24h source eligibility (12–24h allowed), newest unseen reporting first. Live aggregation bypasses spread/overnight buffering, ignores held backlog, queues one upcoming item and rechecks after1min. Earliest slot honors actual7min gap/cap70, Page window/approval/factual/crisis/tenant checks. Model failures bounded to2 one-minute retries; memory waits5min/emergency guard retained. Delayed unsent source backed up/retained for review; no uncertain/published receipt reset. Real187-word source14:12:57 selected14:14:01, website verified and scheduled14:21; normal Facebook publication confirmed14:21:20, today5→6, comment queued14:26:20. One recovered cycle is not guaranteed70/day capacity.215 portable/30 integration/63 root and browser/build checks pass; worker gracefully restarted, frontend deploy pending."
   }
 }

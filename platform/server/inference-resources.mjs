@@ -57,7 +57,7 @@ export function createLocalInferenceGate({memory=freemem,request=remoteJSON,moni
    }
   }
  }catch(error){
-  if([502,503,504].includes(error.status)&&error.code!=='inference_resource_wait'&&(!error.upstreamStatus||error.upstreamStatus>=500))throw new AppError(503,error.status===504?'The local model exceeded its response time budget. Preparation stays queued for retry; booked publishing continues.':'The local inference host is unavailable. Preparation stays queued; booked publishing continues.','inference_host_wait');
+  if([502,503,504].includes(error.status)&&error.code!=='inference_resource_wait'&&(!error.upstreamStatus||error.upstreamStatus>=500))throw new AppError(503,error.upstreamStatus>=500?'The local inference service is reachable but its model request failed (HTTP '+error.upstreamStatus+'). Preparation stays queued for retry; booked publishing continues.':error.status===504?'The local model exceeded its response time budget. Preparation stays queued for retry; booked publishing continues.':'The local inference host is unavailable. Preparation stays queued; booked publishing continues.','inference_host_wait');
   throw error;
  }};
  return {
@@ -73,7 +73,7 @@ export function createLocalInferenceGate({memory=freemem,request=remoteJSON,moni
     try{return await fn({settings,signal:controller.signal});}finally{active--;}
    }catch(error){
     if(error.code==='inference_resource_wait')throw error;
-    if([502,503,504].includes(error.status)&&(!error.upstreamStatus||error.upstreamStatus>=500))throw new AppError(503,error.status===504?'The local model exceeded its response time budget. Preparation stays queued for retry; booked publishing continues.':'The local inference host is unavailable. Preparation stays queued; booked publishing continues.','inference_host_wait');
+    if([502,503,504].includes(error.status)&&(!error.upstreamStatus||error.upstreamStatus>=500))throw new AppError(503,error.upstreamStatus>=500?'The local inference service is reachable but its model request failed (HTTP '+error.upstreamStatus+'). Preparation stays queued for retry; booked publishing continues.':error.status===504?'The local model exceeded its response time budget. Preparation stays queued for retry; booked publishing continues.':'The local inference host is unavailable. Preparation stays queued; booked publishing continues.','inference_host_wait');
     throw error;
    }finally{clearInterval(monitor);release();}
   },
