@@ -4,7 +4,8 @@ import {productLogo} from './brand.mjs';
 import {prepareProductPhoto} from './product-photo.mjs';
 import sharp from 'sharp';
 import {createHash} from 'node:crypto';
-export const PRODUCT_DESIGN_VERSION='product-v7';
+import {commerceStyle,commerceBackground,HEADLINE_PRESETS,pointerMarkup,safeInk} from './commerce-design.mjs';
+export const PRODUCT_DESIGN_VERSION='product-v8';
 const escape=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 export const productCallouts=product=>analyzeProduct(product).callouts;
 export function shortProductTitle(value){
@@ -24,14 +25,16 @@ export function productDesignVariant(post,policy={}){
 export async function renderProductCreative({post,page,product={},background,sourcePhoto,brandLogo,website,width,height}){
  const analysis=analyzeProduct(product),policy=page.creative_policy||{},variant=productDesignVariant(post,policy),design={...analysis.design,...(variant==='quiet'?{font:'Segoe UI',motif:'quiet',descriptor:''}:variant==='editorial'?{font:['electronics','fan'].includes(analysis.type)?'Bahnschrift':'Georgia',descriptor:''}:{}),...(post.creative?.style==='bold'?{font:'Bahnschrift'}:post.creative?.style==='minimal'?{font:'Segoe UI'}:{})},[paper,tint,ink,accent]=design.palette,muted='#657676',pad=Math.round(width*.055),scale=width/1080,detailScale=Math.min(scale,height/1080),landscape=width>height,layers=[],visibleText=[],textBounds=[];
  const svg=(body,x=0,y=0,w=width,h=height)=>layers.push({input:Buffer.from(`<svg width="${Math.round(w)}" height="${Math.round(h)}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`),left:Math.round(x),top:Math.round(y)});
+ const styling=commerceStyle(post,policy),headlinePreset=HEADLINE_PRESETS[styling.preset];
  const text=async(value,x,y,w,h,size=32,align='left',color=ink,font=design.font,weight='normal',opacity=1)=>{
-  if(!value)return;visibleText.push(String(value));const bytes=await sharp({text:{text:`<span foreground="${color}" weight="${weight}">${escape(value)}</span>`,...fontOptions(page,y<height*.205?'headline':'body',size,font),width:Math.max(1,Math.round(w)),align,wrap:'word-char',rgba:true,spacing:4}}).resize({width:Math.max(1,Math.round(w)),height:Math.max(1,Math.round(h)),fit:'inside',withoutEnlargement:true}).png().toBuffer();
+  if(!value)return;visibleText.push(String(value));const isHeadline=y<height*.205,bytes=await sharp({text:{text:`<span foreground="${color}" weight="${weight}" letter_spacing="${isHeadline?headlinePreset.tracking:0}">${escape(value)}</span>`,...fontOptions(page,isHeadline?'headline':'body',size,font),width:Math.max(1,Math.round(w)),align,wrap:'word-char',rgba:true,spacing:4}}).resize({width:Math.max(1,Math.round(w)),height:Math.max(1,Math.round(h)),fit:'inside',withoutEnlargement:true}).png().toBuffer();
   const m=await sharp(bytes).metadata(),left=Math.round(x+(align==='center'?(w-m.width)/2:align==='right'?w-m.width:0)),top=Math.round(y);let input=bytes;
   if(opacity<1){const {data,info}=await sharp(bytes).ensureAlpha().raw().toBuffer({resolveWithObject:true});for(let i=3;i<data.length;i+=4)data[i]=Math.round(data[i]*opacity);input=await sharp(data,{raw:{width:info.width,height:info.height,channels:4}}).png().toBuffer();}
   layers.push({input,left,top});textBounds.push({text:String(value),left,top,width:m.width,height:m.height});
  };
  svg(`<defs><radialGradient id="paper" cx="46%" cy="38%" r="80%"><stop stop-color="#ffffff"/><stop offset=".64" stop-color="${paper}"/><stop offset="1" stop-color="${tint}"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#paper)"/>`);
  if(background){layers.push({input:await sharp(background,{limitInputPixels:40000000}).resize(width,height,{fit:'cover'}).png().toBuffer(),left:0,top:0});svg(`<rect width="100%" height="100%" fill="${paper}" opacity=".76"/>`);}
+ const variation=commerceBackground(styling,{width,height,paper,tint,accent});if(variation)svg(variation);
  if(design.motif==='rays'){
   const cx=width*.5,cy=height*.45,r=Math.max(width,height)*1.4;
   for(let i=0;i<12;i++){const a=i*Math.PI/6,b=a+Math.PI/13;svg(`<path d="M${cx} ${cy}L${cx+Math.cos(a)*r} ${cy+Math.sin(a)*r}L${cx+Math.cos(b)*r} ${cy+Math.sin(b)*r}Z" fill="${tint}" opacity=".35"/>`);}
@@ -45,7 +48,10 @@ export async function renderProductCreative({post,page,product={},background,sou
  const logoY=Math.round(height*.025);
  if(brandLogo){const logo=await productLogo(brandLogo,{dark:false,mode:page.brand?.logoDarkAssetId?'original':page.brand?.logoMode||'original',width:Math.min(140,(page.brand?.logoDarkWidth||104)*scale)}),m=await sharp(logo).metadata();layers.push({input:logo,left:Math.round((width-m.width)/2),top:logoY});}
  const title=headlineFor(post,product),titleY=height*(landscape?.115:.108),titleH=height*(landscape?.115:.085),font=/[\u0980-\u09ff]/u.test(title)?'Nirmala UI':design.font;
- if(design.layout==='playful'&&title.split(' ').length>1&&!/[\u0980-\u09ff]/u.test(title)){
+ if(styling.preset==='highlight')svg(`<rect x="${pad}" y="${titleY-6*scale}" width="${width-pad*2}" height="${titleH+12*scale}" rx="${8*scale}" fill="${tint}"/>`);
+ if(styling.preset==='stacked'&&title.split(' ').length>1){const parts=title.split(' '),half=Math.ceil(parts.length/2);await text(parts.slice(0,half).join(' '),pad,titleY,width-pad*2,titleH*.52,40*scale,'center',ink,font,'bold');await text(parts.slice(half).join(' '),pad,titleY+titleH*.53,width-pad*2,titleH*.47,34*scale,'center',ink,font,'normal');}
+ else if(styling.preset!=='original')await text(title,pad,titleY,width-pad*2,titleH,44*scale,'center',safeInk(styling.preset==='highlight'?tint:paper,ink),headlinePreset.font||font,headlinePreset.weight);
+ else if(design.layout==='playful'&&title.split(' ').length>1&&!/[\u0980-\u09ff]/u.test(title)){
   const [lead,...rest]=title.split(' ');await text(lead,pad,titleY,width-pad*2,titleH*.53,48*scale,'center',accent,font,'bold');await text(rest.join(' '),pad,titleY+titleH*.55,width-pad*2,titleH*.45,31*scale,'center',ink,design.secondaryFont,'bold');
  }else await text(title,pad,titleY,width-pad*2,titleH,44*scale,'center',ink,font,design.layout==='editorial'?'normal':'bold');
  const sideRail=design.layout==='technical'&&!landscape&&analysis.callouts.length>0;
@@ -70,8 +76,9 @@ export async function renderProductCreative({post,page,product={},background,sou
  const footer=footerDomain(policy,website);
  if(footer){const badgeW=Math.min(width-pad*2,Math.max(300*scale,footer.length*12*scale+75*scale)),x=(width-badgeW)/2,y=height*.922,badgeH=44*detailScale;svg(`<rect width="${badgeW}" height="${badgeH}" rx="${9*detailScale}" fill="${ink}"/><g transform="translate(${badgeW-54*detailScale},0) scale(${detailScale})"><path d="M17 8V29L23 24L29 35L34 32L28 21L37 20Z" fill="${paper}"/></g>`,x,y,badgeW,badgeH);await text(footer,x+14*scale,y+9*detailScale,badgeW-64*scale,badgeH-12*detailScale,18*detailScale,'center',paper,'Segoe UI','bold');}
  const handles=[['fb',policy.facebookHandle],['ig',policy.instagramHandle]].filter(([,h])=>h);
+ if(styling.pointer.enabled){const size=Math.round(72*detailScale*styling.pointer.size),x=Math.round(width*.78),y=Math.round(height*(styling.pointer.target==='product'?.64:.87));svg(`<svg viewBox="0 0 84 88" width="${size}" height="${size}">${pointerMarkup(styling.pointer)}</svg>`,Math.min(x,width-pad-size),Math.min(y,height-pad-size),size,size);}
  for(const [type,handle]of handles){const groupW=Math.min((width-pad*2)/2,handle.length*10*scale+37*scale),x=type==='fb'?pad:width-pad-groupW,y=height-30*scale,icon=type==='fb'?`<path d="M14 23V13h3l.5-4H14V7c0-1 .5-2 2-2h2V1h-3c-4 0-5 2-5 6v2H7v4h3v10" fill="${ink}"/>`:`<rect x="2" y="2" width="20" height="20" rx="6" fill="none" stroke="${ink}" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="${ink}" stroke-width="2"/><circle cx="18" cy="6" r="1.5" fill="${ink}"/>`;svg(`<g transform="scale(${scale*.78})">${icon}</g>`,x,y,24*scale,24*scale);await text('@'+handle.replace(/^@/,''),x+25*scale,y,groupW-25*scale,24*scale,15*scale,'left',muted,'Segoe UI');}
  const output=sharp({create:{width,height,channels:4,background:paper}}).composite(layers).jpeg({quality:95,mozjpeg:true});
  if(background)output.withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>');
- return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!sourcePhoto,designVariant:variant,designVersion:PRODUCT_DESIGN_VERSION,analysis,visibleText,textBounds,photoMode,photoQuality,heroBounds};
+ return {bytes:await output.toBuffer(),width,height,sourcePhotoUsed:!!sourcePhoto,designVariant:variant,designVersion:PRODUCT_DESIGN_VERSION,commerceStyle:styling,analysis,visibleText,textBounds,photoMode,photoQuality,heroBounds};
 }

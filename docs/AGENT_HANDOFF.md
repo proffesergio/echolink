@@ -2,6 +2,20 @@
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
+## Local-only commerce and journal work — November12
+
+- New task strictly prohibits Git pushes, production deployments/migrations and any
+  running-service restart/kill/interruption. Hosted SuperDesign/12ui design work
+  was explicitly authorized as an exception. No runtime activation occurred.
+- Backend/renderer/font/journal bridge code is prepared locally. The requested UI
+  upgrade is NOT complete: owner visual approval is pending for commerce controls
+  and the journal buyer-guide draft. Do not claim the live CMS/blog has this upgrade.
+- Full details, remaining tasks, verification limits and exact changed-file lists:
+  `docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md`; sibling Fabrything checkout is actually
+  `../fabrythingweb`, with `docs/JOURNAL_ECHOLINK_HANDOFF.md`. Both local review
+  branches are `codex/local-commerce-journal`. Production deployment records below
+  remain historical/current live records and were not advanced by this task.
+
 ## Runtime and delivery
 
 - Frontend: React/Vite on Vercel, https://echolinkbd.vercel.app.
