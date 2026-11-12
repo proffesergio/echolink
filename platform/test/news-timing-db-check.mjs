@@ -30,7 +30,13 @@ export async function verifyLiveNewsTiming({workspaceId}){
   const booked=await transaction(workspaceId,async db=>(await db.query('SELECT status,scheduled_at,approved_version,version FROM creator.posts WHERE id=$1',[fresh.id])).rows[0]);
   assert.equal(booked.status,'scheduled');assert.equal(booked.approved_version,booked.version);assert(+booked.scheduled_at<start+3*60000,'legacy future planned time and spread must not defer fresh news');
   await transaction(workspaceId,db=>db.query('UPDATE creator.automation_rules SET next_run_at=now() WHERE id=$1',[fixture.rule.id]));
-  assert.equal((await tickAutomations()).queued,1,'one booked news item must not suppress preparation of its successor');
+  const successor=await transaction(workspaceId,async db=>(await db.query("SELECT count(*)::int AS n FROM creator.tasks WHERE workspace_id=$1 AND page_id=$2 AND kind='aggregate' AND status='queued'",[workspaceId,fixture.page.id])).rows[0]);
+  assert.equal(successor.n,1,'booking must immediately enqueue its successor without waiting for another planning tick');
+  assert.equal((await tickAutomations()).queued,0,'the planning tick cannot duplicate an already queued successor');
+  const nextTitle='Second fresh source fixture',nextSeo={...fresh.seo,article:{...article,reviewedTextHash:reviewedNewsHash(nextTitle,text)}};
+  const next=await transaction(workspaceId,async db=>{await db.query("UPDATE creator.tasks SET status='succeeded' WHERE workspace_id=$1 AND page_id=$2 AND kind='aggregate' AND status='queued'",[workspaceId,fixture.page.id]);return (await db.query("INSERT INTO creator.posts(workspace_id,page_id,type,title,caption,status,source_url,seo) VALUES($1,$2,'news',$3,'A complete source-supported caption.','review','https://example.com/fresh',$4) RETURNING id",[workspaceId,fixture.page.id,nextTitle,nextSeo])).rows[0];});
+  await continuePipeline({workspace_id:workspaceId,page_id:fixture.page.id,post_id:next.id,kind:'creative',input:{pipeline:{ruleId:fixture.rule.id}}},{});
+  const filled=await transaction(workspaceId,async db=>({scheduled:(await db.query("SELECT count(*)::int AS n FROM creator.posts WHERE page_id=$1 AND status='scheduled'",[fixture.page.id])).rows[0].n,pending:(await db.query("SELECT count(*)::int AS n FROM creator.tasks WHERE page_id=$1 AND kind='aggregate' AND status='queued'",[fixture.page.id])).rows[0].n}));assert.equal(filled.scheduled,2);assert.equal(filled.pending,0,'two bookings must stop the immediate refill chain');
   const receipts=await transaction(workspaceId,async db=>(await db.query('SELECT count(*)::int AS n FROM creator.publication_deliveries WHERE workspace_id=$1 AND page_id=$2',[workspaceId,fixture.page.id])).rows[0]);assert.equal(receipts.n,0,'booking never submits a website or social write');
  }finally{
   process.env.PLATFORM_PUBLISHING_ENABLED=prior;

@@ -321,7 +321,13 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
   automation: a116-word dairy report published16:31:17 Dhaka; the next106-word
   education report generated/reviewed from16:32:52 to16:34:52 and booked16:39.
   These are measured cycles, not guarantees of every report's speed or70/day.
-  Final successor calendar/receipts and deployment are being verified.
+  Follow-up publication16:39:16 confirmed, another106-word report published
+  16:47:07; a105-word report was booked16:54 while its successor was already
+  writing16:48. Immediate successor enqueue now runs inside successful booking,
+  before evergreen work can occupy the preparation lane; no extra inference runs
+  concurrently. The isolated integration check verifies that booking queues its
+  successor immediately, repeated planning does not duplicate it and two bookings
+  stop the chain. Final deployment/calendar checks follow.
 
 ## Current inference and newsroom work
 

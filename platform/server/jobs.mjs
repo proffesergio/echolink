@@ -397,6 +397,17 @@ export async function continuePipeline(task,result){
    if(page.require_review||factualHold)await queueApprovalNotification(db,w,page,post,{force:factualHold});
    if(factualHold)await db.query("UPDATE creator.posts SET last_error='Automatic source check needs correction before publication.' WHERE workspace_id=$1 AND id=$2",[w,post.id]);
    if(rule)await db.query('UPDATE creator.automation_rules SET last_message=$3 WHERE workspace_id=$1 AND id=$2',[w,rule.id,factualHold?'Source check needs correction. This draft stays out of automatic publishing.':automatic?'Caption and creative scheduled for automatic publication.':page.require_review?'Calendar slot prepared; waiting for editorial approval.':'Calendar slot prepared; enable and connect this Page to resume publication.']);
+   if(automatic&&liveNews(page)&&rule){
+    // Queue the successor before the preparation lane can pick an evergreen
+    // task. Waiting for its next planning tick can leave a due news slot empty.
+    await db.query('SAVEPOINT news_successor');
+    try{
+     const plan=await requireGenerationCapacity(db,w),buffer=generationBuffer(rule,page,await bookings(db,w,page.id),{periodEnd:plan.period_end});
+     const pending=(await db.query("SELECT 1 FROM creator.tasks WHERE workspace_id=$1 AND page_id=$2 AND ($3::uuid IS NULL OR id<>$3) AND status IN ('queued','running') AND kind NOT IN ('publish','manual_handoff','publish_instagram','post_link_comment','apply_page_brand','notify_approval','sync_insights') LIMIT 1",[w,page.id,task.id||null])).rowCount;
+     if(buffer.count&&!pending){await enqueue(db,w,'aggregate',{pageId:page.id,input:{pipeline:{ruleId:rule.id,makeCreative:rule.make_creative,autoPublish:rule.auto_publish}}});await db.query("UPDATE creator.automation_rules SET last_message='Current news is booked; its next fresh successor is already queued.' WHERE workspace_id=$1 AND id=$2",[w,rule.id]);}
+    }catch{await db.query('ROLLBACK TO SAVEPOINT news_successor');await db.query("UPDATE creator.automation_rules SET last_message='Current news is booked; the next planning check will retry successor preparation.' WHERE workspace_id=$1 AND id=$2",[w,rule.id]);}
+    finally{await db.query('RELEASE SAVEPOINT news_successor');}
+   }
   }
  });
 }
