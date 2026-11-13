@@ -1,15 +1,17 @@
+import {contentWorkflow,workflowPublicationProblem} from '../shared/content-workflow.mjs';
 import {AppError} from './errors.mjs';
 import {audit} from './db.mjs';
 import {reservePublication,entitlements,releasePublication} from './quotas.mjs';
 import {nextSlot,publishGate,bookings,slotProblem,usableBookings} from './scheduling.mjs';
-export function readyForApproval(post){
+export function readyForApproval(post,page){
+ if(page){const problem=workflowPublicationProblem(page,post);if(problem)throw new AppError(409,problem,'content_workflow');}
  if(!post.caption?.trim())throw new AppError(400,'Generate or write the caption before approval.');
- if((post.creative.sourceImage||['image','product_sale','reel'].includes(post.type))&&!post.creative.assetId)throw new AppError(409,'Design and review the image before approval.');
+ if((!page||contentWorkflow(page)!=='TEXT')&&(post.creative.sourceImage||['image','product_sale','reel'].includes(post.type))&&!post.creative.assetId)throw new AppError(409,'Design and review the image before approval.');
 }
 export async function approve(db,w,actor,post,{version,confirmWarnings=false,automatic=false}={}){
  if(version!==undefined&&version!==post.version)throw new AppError(409,'This draft changed. Refresh and review its latest caption and image.','version_changed');
  if(post.seo?.safety?.requiresHuman&&(automatic||!actor))throw new AppError(409,'This sensitive content requires a human review and explicit approval.');
- readyForApproval(post);if(post.seo.editorialWarnings?.length&&!confirmWarnings)throw new AppError(409,'Review the editorial warnings and confirm before approval.');
+ const page=(await db.query('SELECT * FROM creator.pages WHERE workspace_id=$1 AND id=$2',[w,post.page_id])).rows[0];readyForApproval(post,page);if(post.seo.editorialWarnings?.length&&!confirmWarnings)throw new AppError(409,'Review the editorial warnings and confirm before approval.');
  await db.query("UPDATE creator.posts SET status='approved',approved_version=version,updated_at=now() WHERE workspace_id=$1 AND id=$2",[w,post.id]);await audit(db,w,actor,automatic?'post.auto_authorized':'post.approved','post',post.id,{warningsAcknowledged:confirmWarnings,automatic});return {...post,status:'approved',approved_version:post.version};
 }
 export async function queuePublication(db,w,actor,page,post,{at,autoPick=false,approveCurrent=false,version,confirmWarnings=false,planOnly=false,spread=false,target,ignoreTaskId=null,fallbackToSlot=false}={}){

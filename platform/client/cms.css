@@ -27,3 +27,6 @@ a{color:#b83652}input,select,textarea{background:#fff;color:#1a1c1e;border-color
 .content:is([data-view=posts],[data-view=drafts],[data-view=review],[data-view=published],[data-view=scheduled],[data-view=attention],[data-view=ready_manual]) .status-center>.task-telemetry{display:none}.content:is([data-view=posts],[data-view=drafts],[data-view=review],[data-view=published],[data-view=scheduled],[data-view=attention],[data-view=ready_manual]) .status-main small{display:none}
 .auth-card{background:#fff;box-shadow:0 8px 40px #20304008;border-radius:12px}.auth-story{background:#f3f5f7}.auth-story .brand{color:#1a1c1e}.auth-card .google{background:#f8fafc;color:#334155;border-color:#dce3eb}.auth-links button{color:#69798d}.auth-card .divider{color:#8b97a7}.auth-story .pills span{border-color:#d7e0e8;color:#68798c}.auth-card .field>span{color:#4c5a6b}
 @media(max-width:760px){.sidebar:not(.visible){box-shadow:none}}
+
+/* Canonical editorial states are independent of raw delivery statuses. */
+.status.PREPARING{background:#fff0de;color:#8a541c}.status.NEED_ATTENTION,.status.FAILED{background:#fff0ec;color:#a13e2b}.status.SCHEDULED,.status.APPROVED{background:#e9f1ff;color:#315b99}.status.PUBLISHED{background:#e8f5ed;color:#287548}.status.DRAFT{background:#f0eeeb;color:#6d645c}

@@ -561,3 +561,74 @@ is automatically enforced. For the broader SaaS scope consult the relevant
 sections of `MULTI_TENANT_PLAN.md` and `PLATFORM_ROADMAP.md`, treating their dated
 items as plans until verified. When changing inference host, review the existing
 operator CPU/context overrides; remote CPUs are not capped by this worker's count.
+
+## Profile/content upgrade — November 13 (local source)
+
+- Backend fairness: `queue-scheduler.mjs` claims the least recently served
+  workspace/profile preparation turn; urgent/news preference stays within that
+  turn. Uses persisted started_at with heartbeat_at fallback because interrupted
+  text recovery/restart clears started_at. Failed/deferred attempts consume turns.
+  Redis preparation IDs wake the same SQL scheduler; delivery retains exact IDs,
+  due times and its independent lane. No per-profile prompts/settings, source
+  rules, publishing gaps, single-inference limit or emergency guard changed.
+  Focused SQL QA:12 checks passed using disposable PGlite via PGLITE_MODULE;
+  seven related planner/queue/news/window/buffer/resource test files also passed.
+  No live credentials/models/publication used. Equal turns do not promise equal elapsed time.
+  No runtime restart/deployment or live Redis integration was performed here.
+
+- Requested multi-entity/profile isolation and Preparing/Needs attention repair.
+  Runbook: `docs/PROFILE_CONTENT_UPGRADE.md`; migrations SQL017, SQL018, SQL019.
+- Canonical `posts.content_status` is separate from delivery `posts.status`.
+  Post/task triggers atomically classify active preparation, review and errors;
+  uncertain/publishing/manual receipts keep their existing reconciliation state.
+- Overview counts and content lists use the canonical classification, with
+  repeatable-read snapshots. Authenticated finite SSE revision frames reconnect
+  every3s through the buffered bridge; pulse remains the fallback/task telemetry.
+- This coding task has not migrated the live database, restarted the worker,
+  deployed the UI or submitted real inference, website writes or social posts.
+  Isolated PostgreSQL-WASM migration/lifecycle/RLS checks passed; complete
+  credentialed API/browser regression against creator_test is still separate.
+- Final portable suite: 257 passed; React/Vite build passed. All19 migrations,
+  named defaults, old personal INSERT compatibility, lifecycle and runtime-role
+  tenant isolation passed in disposable PostgreSQL-WASM (no live credentials).
+- Workflow selector: TEXT / PHOTO_CAPTION / VIDEO_REELS in isolated profile
+  config; explicit setting supersedes old reels presets. Personal defaults PHOTO.
+  Editable regeneration clears stale media/approval; unresolved receipts remain
+  protected. Video captions follow language; narration/overlays remain Bengali.
+- Isolated mocked browser smoke passed: workflow/studio settings, phase waves,
+  profile task scoping, pause/reduced motion, typography payload, optimistic
+  rollback and 390/768/1280 layouts; zero JS errors or API writes. This does not
+  replace the credentialed creator_test regression above.
+
+## Resumed profile release — November 13
+
+- Owner authorized main/Vercel release using existing deployment workflow. Existing
+  dashboard prompts, languages, presets and workflow choices must be preserved.
+- SQL018/019 now add schema/constraints without backfilling profile configuration
+  or changing existing language; supersedes named-default migration notes above.
+  New profiles still receive creation defaults; explicit workflow edits remain.
+- Settings JSON is merged before validation so omitted prompt/settings fields
+  survive saves; explicit edits/clears are honored. No live settings write made.
+- Preparation claims use least-recently-served profile turns, including failed
+  and deferred work; delivery keeps priority/deadlines. Redis preparation IDs
+  wake the SQL scheduler. One model/inference and emergency guard remain. Equal
+  turns are not equal elapsed task time. Disposable SQL fairness checks pass.
+- Motion/layout polish uses reduced-motion support, persistent mounted settings
+  panels, responsive studio and personal-profile naming.
+- Production worker/database are on another machine behind Cloudflare. The checked
+  in GitHub workflow builds/tests/deploys Vercel frontend and proxy only; no remote
+  worker updater or DB migration step is configured there. Backend activation
+  requires SQL017–019 and a graceful restart on that machine. Health now exposes
+  contentLifecycleVersion/profileWorkflowVersion to distinguish source activation.
+- Final resumed validation:261 portable checks pass (one optional SQL test skipped
+  in that runner, separately passed all12 fairness checks with PGlite);63 root
+  tests, both builds and all19 migration/lifecycle/isolation checks pass. Mocked
+  Chrome at320/390/768/1280 verifies exact supported manual prompt payloads,
+  unsaved edits, Profile labels, reduced motion and pause; zero JS errors and
+  real API requests. Existing GitHub/Vercel workflow files remain unchanged.
+- Release6bc0071 pushed to main. Existing Actions43302756707 test+deploy SUCCESS;
+  production deployment dpl_FUqzCy1ELSUcxofDNE6iE3Sd5BU9 READY at
+  https://echolinkbd.vercel.app. Native Git deployment also READY. Live HTML and
+  app-CGLpkk04.js verified with workflow/Profile/pause markers; anonymous state401.
+  Worker health remains version2 without new feature markers: remote backend
+  activation/migrations are still pending, and no restart was performed here.

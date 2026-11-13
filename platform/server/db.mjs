@@ -9,10 +9,10 @@ export function database(){
   if(!pool){const driver=databaseDriver();pool=new driver.Pool({...databaseClientOptions(parseDatabaseSecret(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT_BASE64?Buffer.from(process.env.DATABASE_CA_CERT_BASE64,'base64').toString():''),{transport:process.env.PLATFORM_DATABASE_TRANSPORT||'tcp',max:Math.max(1,Math.min(6,Number(process.env.DATABASE_POOL_MAX)||2))}),connectionTimeoutMillis:15000,statement_timeout:30000,query_timeout:35000,keepAlive:true});pool.on('connect',instrumentDatabaseClient);pool.on('error',()=>console.error('Platform database idle connection interrupted. The next request will reconnect.'));}return pool;
 }
 export const query=(sql,args=[])=>database().query(sql,args);
-export async function transaction(workspaceId,fn,{owner=false}={}){
+export async function transaction(workspaceId,fn,{owner=false,snapshot=false}={}){
   const client=await database().connect();
   const connectionError=()=>console.error('Active database connection interrupted; this operation will report its outcome.');client.on('error',connectionError);
-  try{await client.query('BEGIN');await client.query("SELECT set_config('creator.workspace_id',$1,true),set_config('creator.super_admin',$2,true)",[workspaceId||'',owner?'true':'false']);
+  try{await client.query(snapshot?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');await client.query("SELECT set_config('creator.workspace_id',$1,true),set_config('creator.super_admin',$2,true)",[workspaceId||'',owner?'true':'false']);
     const result=await fn(client);await client.query('COMMIT');return result;
   }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();client.removeListener('error',connectionError);}
 }

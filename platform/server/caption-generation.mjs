@@ -1,9 +1,12 @@
+import {effectiveProfilePage,profilePostWarnings} from './profile-config.mjs';
 import {captionPrompt,prepareCaption} from './prompts.mjs';
 import {textCompletion} from './providers.mjs';
 import {editorialWarnings,criticalEditorialWarnings} from './editorial.mjs';
 import {groundedProductCaption,groundedBanglaProductCaption} from './grounded-product-caption.mjs';
 import {hasOperationalCopy} from './public-copy.mjs';
 export function captionLanguageWarnings(caption,page){
+ page=effectiveProfilePage(page);
+ const profileWarnings=profilePostWarnings(caption,page);if(profileWarnings.length)return profileWarnings;
  const prose=String(caption||'').replace(/#[\p{L}\p{M}\p{N}_]+/gu,'');
  if(/<\/?(?:tool_call|tool_response|think|analysis|assistant)\b|\[\/?INST\]|<\|[^>]*\|>/iu.test(prose))return ['Language policy found an internal model marker in the audience copy. Rewrite it before publication.'];
  if(/\\[nrt]/u.test(prose))return ['Content format: literal escaped whitespace remains in the published prose.'];
@@ -14,6 +17,7 @@ export function captionLanguageWarnings(caption,page){
  return [];
 }
 export async function generateFactualCaption({page,post,product,connection,secret={},channel='facebook',insights=null,compact=false},{complete=textCompletion,onMetrics=()=>{},onCorrection=async()=>{}}={}){
+ page=effectiveProfilePage(page);
  const purpose=product?(channel==='instagram'?'instagram_caption':'product_caption'):['news','blog'].includes(post.type)?'news_caption':'general';
  const {facts,system,prompt}=captionPrompt(page,post,product,insights,channel,{compact});
  const grounded=compact&&product&&page.language==='Bilingual-Mix',banglaProduct=compact&&product&&page.language==='Bangla',prepare=raw=>{

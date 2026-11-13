@@ -197,6 +197,35 @@
       "id": "journal-images",
       "file": "platform/server/journal-images.mjs",
       "role": "Offline bounded responsive WebP export with alt text; does not upload or generate AI imagery"
+    },
+    {
+      "id": "profile-fair-scheduler",
+      "file": "platform/server/queue-scheduler.mjs",
+      "role": "Least recently served profile preparation turns; persisted start/heartbeat fallback; delivery priority and due-time leases preserved",
+      "files": [
+        "platform/server/redis-queue.mjs",
+        "platform/test/queue-scheduler.test.mjs"
+      ]
+    },
+    {
+      "id": "canonical-content-status",
+      "file": "platform/shared/content-status.mjs",
+      "role": "Seven editorial statuses; persisted posts.content_status via SQL017 post/task triggers; delivery receipts retain raw status"
+    },
+    {
+      "id": "profile-isolation",
+      "file": "platform/server/profile-config.mjs",
+      "role": "Entity classification and isolated profile language, typography and domain policy; SQL018",
+      "files": [
+        "platform/shared/content-workflow.mjs",
+        "platform/sql/019-content-workflow.sql",
+        "platform/test/content-workflow.test.mjs"
+      ]
+    },
+    {
+      "id": "profile-upgrade-runbook",
+      "file": "docs/PROFILE_CONTENT_UPGRADE.md",
+      "role": "Migration order, bounded SSE refresh semantics and NobleSeek/Fabrything regression checklist"
     }
   ],
   "edges": [
@@ -351,6 +380,8 @@
       "pending": "Approve designs; implement commerce preview/control UI, journal/connector/brief forms, topic archive and reusable article/product block UI; visual QA. Complete release review before owner CI/CD push.",
       "verification": "229 EchoLink portable and63 root tests/builds passed; targeted final journal tests and browser WOFF/WOFF2 registration passed. Fabrything209 backend, final8 bridge checks,16 existing frontend checks; isolated build compiles with baseline warnings. Full lint166 baseline errors/234 warnings, zero new errors verified against HEAD. No live model/publication test.",
       "handoff": "docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md"
-    }
+    },
+    "profileContentUpgrade": "Nov13 local source completed: canonical editorial status with atomic post/task triggers; complete per-profile counts and snapshot lists; authenticated finite SSE revision events with pulse fallback; isolated entities/languages/typography/domain policies and phase-reactive wave UI. Per-profile TEXT/PHOTO_CAPTION/VIDEO_REELS overrides legacy reels presets; personal defaults PHOTO; existing receipts protected; video captions follow language independently of Bengali narration. Final257 portable tests and build pass; all19 migrations plus lifecycle/named-default/legacy-insert/RLS checks pass in disposable PostgreSQL-WASM. SQL017/018/019 not applied to production; no runtime restart/deployment, real inference or publication QA. Credentialed creator_test API regression remains unrun in this checkout. Isolated mocked browser smoke passed workflow/studio controls, phase waves, profile scoping, typography, optimistic rollback, reduced motion and 390/768/1280 layouts with zero JS errors or API writes.",
+    "profileReleaseResume": "Nov13: preserve all existing prompts/languages/workflow choices. SQL018/019 schema only; creation defaults for new profiles. Merge omitted settings before validation; explicit edits honored. Fair least-recently-served profile preparation turns in SQL and Redis wakeups; delivery priority and single inference/memory guard retained. Accessible motion/responsive layout and Profile naming. Owner authorizes main/Vercel release. Existing workflow deploys frontend/proxy only; external tunneled worker needs migrations017-019 and graceful restart; health version markers detect backend activation. No live prompt/config mutation or test publication. Released6bc0071 to main; Actions43302756707 test/deploy SUCCESS; Vercel dpl_FUqzCy1ELSUcxofDNE6iE3Sd5BU9 READY, production asset app-CGLpkk04.js verified and anonymous state401.261 portable pass plus12 disposable fairness checks,63 root, builds and mocked320/390/768/1280 Chrome pass. Worker health still lacks feature markers; remote migration/restart NOT performed, backend activation pending."
   }
 }

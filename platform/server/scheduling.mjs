@@ -1,3 +1,5 @@
+import {workflowPublicationProblem} from '../shared/content-workflow.mjs';
+import {captionLanguageWarnings} from './caption-generation.mjs';
 import {AppError} from './errors.mjs';
 import {newsReportProblem} from './news-quality.mjs';
 import {newsFreshnessProblem,spreadSchedule,liveNews} from './news-timing.mjs';
@@ -44,6 +46,11 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
 export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
 export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,usableBookings(page,await bookings(db,w,page.id,postId)),{from,until,spread:spreadSchedule(page,spread),target});}
 export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
+ const workflowProblem=workflowPublicationProblem(page,post);if(workflowProblem)throw new AppError(409,workflowProblem,'content_workflow');
+ if(page.profile_config?.language_mode){
+  const texts=[post.caption,post.seo?.channelCaptions?.instagram,post.seo?.article?.text].filter(Boolean);
+  for(const text of texts){const warnings=captionLanguageWarnings(text,page).filter(w=>w.startsWith('Language policy'));if(warnings.length)throw new AppError(409,warnings.join(' '),'profile_language');}
+ }
  const stale=newsFreshnessProblem(page,post,{now});if(stale)throw new AppError(409,stale,'news_stale');
  const newsroomProblem=newsReportProblem(post,page);if(newsroomProblem)throw new AppError(409,newsroomProblem,'newsroom_review');
  if(!page.active)throw new AppError(409,'Enable this Page before publishing.');

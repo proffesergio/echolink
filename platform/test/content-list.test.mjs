@@ -6,9 +6,9 @@ const page='1189994b-2ea0-4bd6-a19f-a212a23295be';
 
 test('Content query scopes Page and status before pagination and sorts by delivery time',()=>{
  const q=contentListQuery(new URLSearchParams({page,status:'published',offset:'100',limit:'100'}));
- assert.match(q.where,/workspace_id=\$1/);assert.match(q.where,/page_id=\$2/);assert.match(q.where,/status=\$3/);assert.deepEqual(q.values,[page,'published']);assert.match(q.order,/^published_at DESC NULLS LAST/);assert.equal(q.offset,100);
+ assert.match(q.where,/workspace_id=\$1/);assert.match(q.where,/page_id=\$2/);assert.match(q.where,/status=\$3/);assert.deepEqual(q.values,[page,'PUBLISHED']);assert.match(q.order,/^published_at DESC NULLS LAST/);assert.equal(q.offset,100);
  const scheduled=contentListQuery(new URLSearchParams({status:'scheduled'}));assert.match(scheduled.order,/scheduled_at,planned_at\) ASC/);
- const attention=contentListQuery(new URLSearchParams({status:'attention'}));assert.match(attention.where,/status IN \('failed','unknown','publishing'\)/);assert.deepEqual(attention.values,[null]);
+ const attention=contentListQuery(new URLSearchParams({status:'attention'}));assert.match(attention.where,/content_status IN \('NEED_ATTENTION','FAILED'\)/);assert.deepEqual(attention.values,[null]);
  assert.throws(()=>contentListQuery(new URLSearchParams({status:'published;DELETE'})),/Invalid content status/);
  assert.throws(()=>contentListQuery(new URLSearchParams({page:'not-a-page'})),/Invalid Page/);
 });
