@@ -1,20 +1,14 @@
-# EchoLink handoff — 2026-11-12
+# EchoLink handoff — 2026-11-13
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
-## Local-only commerce and journal work — November12
+## Commerce, journal and remote merge — November13
 
-- New task strictly prohibits Git pushes, production deployments/migrations and any
-  running-service restart/kill/interruption. Hosted SuperDesign/12ui design work
-  was explicitly authorized as an exception. No runtime activation occurred.
-- Backend/renderer/font/journal bridge code is prepared locally. The requested UI
-  upgrade is NOT complete: owner visual approval is pending for commerce controls
-  and the journal buyer-guide draft. Do not claim the live CMS/blog has this upgrade.
-- Full details, remaining tasks, verification limits and exact changed-file lists:
-  `docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md`; sibling Fabrything checkout is actually
-  `../fabrythingweb`, with `docs/JOURNAL_ECHOLINK_HANDOFF.md`. Both local review
-  branches are `codex/local-commerce-journal`. Production deployment records below
-  remain historical/current live records and were not advanced by this task.
+- Owner approved both hosted designs and authorized main pushes/CI/CD after checks. Existing live service restart/kill restrictions remain. No worker activation or manual production migration occurred.
+- Merged incoming64b435f (profile workflows, fair queue, SQL017–019) with local commerce/journal code; merge505b09a preserves both. New SQL020 adds the signed connector to the database constraint. Fabrything had no incoming remote changes.
+- Approved commerce controls/font uploader and full structured journal/topic UI are implemented, with direct server-rendered canonical pages. New commerce/journal controls wait for worker capability markers. Source details remain out of list projections.
+- Verification:278 portable +63 root tests;20 disposable PostgreSQL migrations;1,187 Fabrything backend +18 frontend tests; isolated builds and320/390/768/1440 browser QA. Full frontend lint166 baseline errors/234 warnings, zero new errors. Seven live services healthy on read-only check; no synthetic model/publication QA.
+- Release/activation details, limitations and exact files: `docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md` and sibling `../fabrythingweb/docs/JOURNAL_ECHOLINK_HANDOFF.md`. CI/CD receipts pending dispatch; the running worker remains unchanged.
 
 ## Runtime and delivery
 

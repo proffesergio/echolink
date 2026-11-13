@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12",
+  "updated": "2026-11-13",
   "entry": "docs/AGENT_HANDOFF.md",
   "runtime": "platform Node worker + React/Vite; n8n optional",
   "nodes": [
@@ -186,7 +186,7 @@
     {
       "id": "commerce-settings",
       "file": "platform/server/commerce-settings.mjs",
-      "role": "Validated commerce styling and focused journal Page plans; new controls await visual approval"
+      "role": "Validated commerce styling, approved controls and focused journal plans"
     },
     {
       "id": "journal",
@@ -366,7 +366,7 @@
     "newsTiming": "Nov12: owner explicitly requests24h source eligibility (12–24h allowed), newest unseen reporting first. Live aggregation bypasses spread/overnight buffering, ignores held backlog, queues one upcoming item and rechecks after1min. Earliest slot honors actual7min gap/cap70, Page window/approval/factual/crisis/tenant checks. Model failures bounded to2 one-minute retries; memory waits5min/emergency guard retained. Delayed unsent source backed up/retained for review; no uncertain/published receipt reset. Real187-word source14:12:57 selected14:14:01, website verified and scheduled14:21; normal Facebook publication confirmed14:21:20, today5→6, delayed comment also published; website/Facebook receipts confirmed. One recovered cycle is not guaranteed70/day capacity.215 portable/30 integration/63 root and browser/build checks pass; worker gracefully restarted, final compact schema deployed/sourcec35ce1e; READYdpl_4AYP5CdpXwfZ3cY9ek1e8L7rvaqi, Actions43182897762SUCCESS, production24h label/health verified. Final14:32 all seven services healthy; one normal preparation running. Avoid broad local tests overlapping inference.",
     "newsSpeed": "Nov12 afternoon: owner reported slow writing and no successor booked. Keep2 near-term bookings, one preparation/model at once; supersedes prior one-item policy. Source scope200words/2000chars retains whole denials/qualifications/both conflict sides or holds; full static facts and independent entire-output review remain. Context4096/output1400 writer256 reviewer; HTTP150s/180s/shared360s attempt. Latest aggregation skips teasers/used candidates within3-candidate scan;8s article reads,24k cache. Immediate successor enqueue prevents evergreen work occupying the lane first; integration verifies no duplicates and stops at2 bookings. Final CI222 portable/63 root and30 local API checks pass; tests submit no real publication. Real news published16:31:17,16:39:16,16:47:07,16:54:18; next123-word report booked17:02 and another preparing16:57. One106-word report measured39.8s writing+78.9s review (~122s pipeline). Source8ae216c applied gracefully; final Actions43204576029SUCCESS and both Vercel pathsREADY. Quality holds remain; no guarantee every cycle succeeds or reaches70/day.",
     "localCommerceJournal": {
-      "status": "LOCAL ONLY; backend/design preparation, NOT completed UI. Required visual approval question pending. Do not push, restart live services, deploy, apply production migrations or publish fixtures.",
+      "status": "Design approved; UI implemented and locally verified; user authorizes main push through CI/CD. No live service interruption or external worker activation.",
       "repos": [
         "C:/Users/bhnbi/Music/echolink",
         "C:/Users/bhnbi/Music/fabrythingweb"
@@ -376,9 +376,9 @@
         "https://p.superdesign.dev/draft/0d6e4ad4-f137-4041-a357-ebb3d5995188",
         "https://p.superdesign.dev/draft/7d29b50f-e326-4e21-9082-1008bfa806e7"
       ],
-      "implemented": "Commerce v8 API/renderer styling; TTF/OTF/WOFF/WOFF2 upload and real shaping; signed journal generation/delivery; Django topic/structured content schema and migration; canonical HTML, trust templates, metadata and robots/sitemap code. Runtime unchanged.",
-      "pending": "Approve designs; implement commerce preview/control UI, journal/connector/brief forms, topic archive and reusable article/product block UI; visual QA. Complete release review before owner CI/CD push.",
-      "verification": "229 EchoLink portable and63 root tests/builds passed; targeted final journal tests and browser WOFF/WOFF2 registration passed. Fabrything209 backend, final8 bridge checks,16 existing frontend checks; isolated build compiles with baseline warnings. Full lint166 baseline errors/234 warnings, zero new errors verified against HEAD. No live model/publication test.",
+      "implemented": "Approved commerce controls + browser fonts; seeded renderer/pointer styles; signed journal bridge + profile/article forms; Django schema + complete React/server article blocks, topic archive, affiliate/trust/SEO routes; SQL020; merged remote SQL017–019.",
+      "pending": "Push/observe CI/CD; external worker migrations/normal graceful activation separately; owner journal secret, tenant allowlist, topics, evidence, licensed images and verification IDs.",
+      "verification": "278 portable +63 root;20 disposable PG migrations;1187 backend +18 frontend; isolated builds; responsive browser/font checks. Full lint166 baseline errors/234 warnings; zero new errors.",
       "handoff": "docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md"
     },
     "profileContentUpgrade": "Nov13 local source completed: canonical editorial status with atomic post/task triggers; complete per-profile counts and snapshot lists; authenticated finite SSE revision events with pulse fallback; isolated entities/languages/typography/domain policies and phase-reactive wave UI. Per-profile TEXT/PHOTO_CAPTION/VIDEO_REELS overrides legacy reels presets; personal defaults PHOTO; existing receipts protected; video captions follow language independently of Bengali narration. Final257 portable tests and build pass; all19 migrations plus lifecycle/named-default/legacy-insert/RLS checks pass in disposable PostgreSQL-WASM. SQL017/018/019 not applied to production; no runtime restart/deployment, real inference or publication QA. Credentialed creator_test API regression remains unrun in this checkout. Isolated mocked browser smoke passed workflow/studio controls, phase waves, profile scoping, typography, optimistic rollback, reduced motion and 390/768/1280 layouts with zero JS errors or API writes.",

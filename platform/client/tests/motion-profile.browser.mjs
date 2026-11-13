@@ -60,6 +60,7 @@ try{
  await dialog.getByLabel('Caption instructions',{exact:true}).fill(unsaved);
  await dialog.getByRole('tab',{name:'General',exact:true}).click();
  await dialog.getByRole('tab',{name:'Brand & design',exact:true}).click();
+ assert.notEqual(await dialog.locator('.settings-section-nav .settings-masked-icon').first().evaluate(el=>getComputedStyle(el).maskImage),'none','Bundled SVG data URLs must remain valid CSS masks');
  for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});await overflow();}
  await dialog.getByRole('tab',{name:'Writing & prompts',exact:true}).click();
  assert.equal(await dialog.getByLabel('Caption instructions',{exact:true}).inputValue(),unsaved);

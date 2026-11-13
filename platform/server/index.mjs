@@ -24,7 +24,7 @@ export function createApp(){return createServer(async(req,res)=>{
  try{
   const expected=new URL(env().origin),host=req.headers.host;if(env().production&&host==='localhost:'+env().port){res.writeHead(302,{location:env().origin+req.url,'cache-control':'no-store'});res.end();return;}if(![expected.host,'127.0.0.1:'+env().port].includes(host))throw new AppError(400,'Unrecognized application host.');
   const url=new URL(req.url,env().origin),method=req.method;let response;
-  if(url.pathname==='/api/health'&&method==='GET')response=Response.json({ok:true,app:'EchoLink',version:2,contentLifecycleVersion:1,profileWorkflowVersion:1,publishingEnabled:env().publishing});
+  if(url.pathname==='/api/health'&&method==='GET')response=Response.json({ok:true,app:'EchoLink',version:2,contentLifecycleVersion:1,profileWorkflowVersion:1,commerceDesignVersion:8,journalBridgeVersion:1,publishingEnabled:env().publishing});
   else if(/^\/api\/public-media\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicMedia(url);
   else if(/^\/api\/catalogue-feed\/[a-f0-9-]{36}$/.test(url.pathname)&&['GET','HEAD'].includes(method))response=await publicCatalogueFeed(url);
   else if(url.pathname==='/internal/platform/operations'&&method==='GET'){
