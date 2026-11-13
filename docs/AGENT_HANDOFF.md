@@ -8,7 +8,7 @@ Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 - Merged incoming64b435f (profile workflows, fair queue, SQL017–019) with local commerce/journal code; merge505b09a preserves both. New SQL020 adds the signed connector to the database constraint. Fabrything had no incoming remote changes.
 - Approved commerce controls/font uploader and full structured journal/topic UI are implemented, with direct server-rendered canonical pages. New commerce/journal controls wait for worker capability markers. Source details remain out of list projections.
 - Verification:278 portable +63 root tests;20 disposable PostgreSQL migrations;1,187 Fabrything backend +18 frontend tests; isolated builds and320/390/768/1440 browser QA. Full frontend lint166 baseline errors/234 warnings, zero new errors. Seven live services healthy on read-only check; no synthetic model/publication QA.
-- Release/activation details, limitations and exact files: `docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md` and sibling `../fabrythingweb/docs/JOURNAL_ECHOLINK_HANDOFF.md`. CI/CD receipts pending dispatch; the running worker remains unchanged.
+- Release/activation details, limitations and exact files: `docs/LOCAL_COMMERCE_JOURNAL_REVIEW.md` and sibling `../fabrythingweb/docs/JOURNAL_ECHOLINK_HANDOFF.md`. Code released: EchoLink36c95cf, Actions43407916552 test/deploy SUCCESS; Fabrything31a5af9 frontend+backend Vercel SUCCESS. Live blog/archive/style/topics and dashboard checks return200. The running worker remains unchanged and lacks new feature markers; SQL017–020/normal graceful activation must be scheduled separately.
 
 ## Runtime and delivery
 

@@ -45,7 +45,9 @@ Architecture follows [Google’s people-first content guidance](https://develope
 
 ## Release state
 
-Release candidate verified locally; main pushes and hosted CI/CD receipts are recorded after dispatch. The local worker remains on its previously running code until separately activated.
+November13 hosted release verified: EchoLink source36c95cf, Actions43407916552 test/deploy SUCCESS; native Vercel DZkg5cdDeoiRNeANNmQpyoCoyAj7 SUCCESS. Fabrything source31a5af9: frontend67jVYtawZKyBywAAuKagePx9718a and backendAVjh6xyjiz6pAfspjSFBpYvCnaxi SUCCESS. Live /blog, /journal.css and /api/store/journal/topics/ return200 with the new archive/style/API markers. EchoLink homepage/health200. External worker profile/journal feature markers remain absent; no worker restart or manual production migration occurred.
+
+[EchoLink CI run](https://github.com/proffesergio/echolink/actions/runs/43407916552). Both repositories were clean and synchronized with origin/main after code pushes. A final documentation-only checkpoint records these outcomes.
 
 <!-- FILE_MANIFEST -->
 ## Exact release files relative to fetched main
@@ -92,6 +94,7 @@ Release candidate verified locally; main pushes and hosted CI/CD receipts are re
 
 ### Fabrything
 
+- `docs/project-memory/CURRENT.md`
 - `.gitignore`
 - `README.md`
 - `backend/.env.example`
