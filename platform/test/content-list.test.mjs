@@ -17,6 +17,8 @@ test('Content pagination preserves Page, status and bucket scope',()=>{
  assert.equal(params.get('page'),page);assert.equal(params.get('status'),'published');assert.equal(params.get('offset'),'100');
  const archive=new URL('https://example.test'+contentListPath({view:'archive',pageId:page})).searchParams;assert.equal(archive.get('bucket'),'archive');assert.equal(archive.get('status'),null);
  assert.match(contentListPath({view:'drafts'}),/status=draft/);
+ assert.match(contentListPath({view:'review'}),/status=review/);
+ const review=contentListQuery(new URLSearchParams({status:'review'}));assert.deepEqual(review.values,[null]);assert.match(review.where,/status='review'/);assert.match(review.where,/NOT COALESCE/);
 });
 test('Refreshing a loaded content window retains later pages rather than resetting to dashboard sample',async()=>{
  const requests=[];let version=1;

@@ -24,3 +24,11 @@ test('validation prevents a refill threshold longer than the configured buffer a
  const base={page_id:randomUUID(),name:'Buffered'};assert.throws(()=>validate('rule',{...base,buffer_hours:1,refill_minutes:90}));
  const valid=validate('rule',{...base,generation_mode:'buffered',buffer_hours:2,refill_minutes:45,refill_until:'2030-01-01'});assert.equal(valid.refill_until,undefined);assert.equal(valid.generation_mode,'buffered');
 });
+
+test('held commerce plans cannot pretend an automatic calendar is full; receipts still reserve slots',()=>{
+ const commerce={...page,kind:'ecommerce',require_review:false};
+ const held=reservations.map(r=>({...r,status:'review',held:true}));
+ assert.equal(generationBuffer(rule,commerce,held,{now}).count,3);
+ assert.equal(generationBuffer(rule,commerce,reservations.map(r=>({...r,held:true})),{now}).count,0);
+ assert.equal(generationBuffer(rule,{...commerce,require_review:true},held,{now}).count,0);
+});

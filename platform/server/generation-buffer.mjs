@@ -1,9 +1,10 @@
-import {findSlot} from './scheduling.mjs';
+import {findSlot,usableBookings} from './scheduling.mjs';
 import {liveNews,liveNewsRefill} from './news-timing.mjs';
 
 // A refill has a fixed end: a moving horizon could keep a slow generator busy forever.
 // Use actual calendar reservations, rather than treating a far-future post as coverage.
 export function generationBuffer(rule,page,reservations,{now=new Date(),periodEnd,leadMinutes}={}){
+ reservations=usableBookings(page,reservations);
  if(liveNews(page))return liveNewsRefill(rule,page,reservations,{now,periodEnd});
  const hours=Math.min(page.kind==='news'?24:2160,Number(rule.buffer_hours||4)),low=Math.max(Number(rule.refill_minutes||60),Number(leadMinutes)||0);
  const targetPage={...page,daily_cap:Math.min(page.daily_cap,rule.daily_target)};

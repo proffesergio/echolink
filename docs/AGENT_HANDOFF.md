@@ -2,6 +2,22 @@
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
+## Workflow continuity — November14
+
+- New local source fixes independent planning, held-backlog stalls, daily catalog checks/cohort limits, and matching attention/approval/preparation counts/lists. See `docs/WORKFLOW_CONTINUITY_2026-11-14.md` for exact files, tests, diagnosis, personal-profile readiness and the concrete activation proposal.
+- Live audit: worker still old, schema001–016; Fabrything20-item backlog includes16 errors and four other drafts. SQL017–021 and a graceful worker/bridge restart remain pending the owner's exception to the explicit no-live-interruption constraint. Do not claim live activation or stop a service without that exception. A private prechange database backup is complete.
+- Verification:272 portable,24 disposable PostgreSQL checks/all21 migrations,63 root tests, isolated build and scoped1440/390 tab browser QA. No model call, real publication, notification, live config edit or production EchoLink migration occurred. Verification concurrency is now bounded to two.
+- Hossain Billal: review required, routine paused, routed Gemma3/Qwen3 text checkpoints installed; designed studio images available, no image-generation provider assigned. Personal sharing stays a manual handoff; approval/pause remain intact.
+- Sibling Fabrything sourcebf06014 frontend/backend Git deployments succeeded. Approved product banner and staff-only CSV/JSON exports are live; anonymous export401 and live desktop/mobile banner/photo/zero-JS-error checks pass. Main home/shop/deals/product documents/canonicals/sitemap work after2fcf19d. Dedicated store worker remains unactivated because exported protected values are placeholders and Meta credentials are missing.
+
+## Fabrything media and indexing — November13
+
+- Continued work is in sibling `../fabrythingweb`, source90370b6 pushed to main after owner-approved SuperDesign/12ui Media & capacity UI. CI deployment is being verified; full scope/checks are in `../fabrythingweb/docs/MEDIA_CAPACITY_INDEXING_2026-11-13.md`.
+- Added atomic CPU image jobs with original retention/CAS restore, storage provenance/budgets and an independent WhatsApp outbox/callback lane. Public commerce HTML preserves the existing React shell, analytics and verification; the apex-to-www redirect remains intentional.
+- Fabrything checks:1,220 backend,38 React and4 Node tests;33 final focused checks; isolated build; responsive320/390/768/1440 browser QA. No real order, notification or publication was submitted.
+- Owner logged into the correct Fabrything Vercel account and authorized production env export. The private export outside both repositories has22 protected placeholders, not usable credentials. WhatsApp credentials are absent. Do not load it into EchoLink or treat its failed probes as live service outages.
+- No existing live worker, bridge, inference host or server was restarted. Fabrything store worker activation remains pending original private environment and provider setup. EchoLink source/runtime is unchanged.
+
 ## Commerce, journal and remote merge — November13
 
 - Owner approved both hosted designs and authorized main pushes/CI/CD after checks. Existing live service restart/kill restrictions remain. No worker activation or manual production migration occurred.

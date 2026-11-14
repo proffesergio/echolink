@@ -1,5 +1,5 @@
 import {AppError,uuid} from './errors.mjs';
-import {ATTENTION_SQL,CONTENT_STATUS} from '../shared/content-status.mjs';
+import {ATTENTION_FILTER_SQL,APPROVAL_FILTER_SQL,CONTENT_STATUS} from '../shared/content-status.mjs';
 
 const statuses=new Set(['draft','review','approved','scheduled','publishing','published','failed','unknown','ready_manual']);
 // Lists are queried in their own Page/status scope, never filtered from the
@@ -12,7 +12,8 @@ export function contentListQuery(params){
  const offset=Math.floor(Math.max(0,Math.min(100000,Number(params.get('offset'))||0))),limit=Math.floor(Math.max(1,Math.min(300,Number(params.get('limit'))||100)));
  const filter=bucket==='trash'?'deleted_at IS NOT NULL':bucket==='archive'?'archived_at IS NOT NULL AND deleted_at IS NULL':'archived_at IS NULL AND deleted_at IS NULL';
  const canonical=({preparing:'PREPARING',draft:'DRAFT',review:'NEED_ATTENTION',approved:'APPROVED',scheduled:'SCHEDULED',published:'PUBLISHED',failed:'FAILED'})[status]||(Object.hasOwn(CONTENT_STATUS,status)?status:null);
- const statusFilter=status==='attention'?' AND '+ATTENTION_SQL:canonical?' AND content_status=$3':status?' AND status=$3':'';
+ const semantic=status==='attention'||status==='review';
+ const statusFilter=status==='attention'?' AND '+ATTENTION_FILTER_SQL:status==='review'?' AND '+APPROVAL_FILTER_SQL:canonical?' AND content_status=$3':status?' AND status=$3':'';
  const order=bucket==='trash'?'deleted_at DESC, id DESC':bucket==='archive'?'archived_at DESC, id DESC':status==='published'?'published_at DESC NULLS LAST, updated_at DESC, id DESC':status==='scheduled'?'COALESCE(scheduled_at,planned_at) ASC NULLS LAST, id DESC':'updated_at DESC, created_at DESC, id DESC';
- return {page,status,bucket,offset,limit,where:`workspace_id=$1 AND ${filter} AND ($2::uuid IS NULL OR page_id=$2)${statusFilter}`,values:[page,...(status&&status!=='attention'?[canonical||status]:[])],order};
+ return {page,status,bucket,offset,limit,where:`workspace_id=$1 AND ${filter} AND ($2::uuid IS NULL OR page_id=$2)${statusFilter}`,values:[page,...(status&&!semantic?[canonical||status]:[])],order};
 }

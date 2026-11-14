@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-13",
+  "updated": "2026-11-14",
   "entry": "docs/AGENT_HANDOFF.md",
   "runtime": "platform Node worker + React/Vite; n8n optional",
   "nodes": [
@@ -226,6 +226,15 @@
       "id": "profile-upgrade-runbook",
       "file": "docs/PROFILE_CONTENT_UPGRADE.md",
       "role": "Migration order, bounded SSE refresh semantics and NobleSeek/Fabrything regression checklist"
+    },
+    {
+      "id": "workflow-continuity",
+      "file": "platform/server/automation-planning.mjs",
+      "role": "Independent planning; actionable backlog; daily catalog checks and bounded product cohorts; SQL021; matching editorial list/count predicates",
+      "related": [
+        "docs/WORKFLOW_CONTINUITY_2026-11-14.md",
+        "platform/test/workflow-continuity.test.mjs"
+      ]
     }
   ],
   "edges": [
@@ -384,5 +393,26 @@
     },
     "profileContentUpgrade": "Nov13 local source completed: canonical editorial status with atomic post/task triggers; complete per-profile counts and snapshot lists; authenticated finite SSE revision events with pulse fallback; isolated entities/languages/typography/domain policies and phase-reactive wave UI. Per-profile TEXT/PHOTO_CAPTION/VIDEO_REELS overrides legacy reels presets; personal defaults PHOTO; existing receipts protected; video captions follow language independently of Bengali narration. Final257 portable tests and build pass; all19 migrations plus lifecycle/named-default/legacy-insert/RLS checks pass in disposable PostgreSQL-WASM. SQL017/018/019 not applied to production; no runtime restart/deployment, real inference or publication QA. Credentialed creator_test API regression remains unrun in this checkout. Isolated mocked browser smoke passed workflow/studio controls, phase waves, profile scoping, typography, optimistic rollback, reduced motion and 390/768/1280 layouts with zero JS errors or API writes.",
     "profileReleaseResume": "Nov13: preserve all existing prompts/languages/workflow choices. SQL018/019 schema only; creation defaults for new profiles. Merge omitted settings before validation; explicit edits honored. Fair least-recently-served profile preparation turns in SQL and Redis wakeups; delivery priority and single inference/memory guard retained. Accessible motion/responsive layout and Profile naming. Owner authorizes main/Vercel release. Existing workflow deploys frontend/proxy only; external tunneled worker needs migrations017-019 and graceful restart; health version markers detect backend activation. No live prompt/config mutation or test publication. Released6bc0071 to main; Actions43302756707 test/deploy SUCCESS; Vercel dpl_FUqzCy1ELSUcxofDNE6iE3Sd5BU9 READY, production asset app-CGLpkk04.js verified and anonymous state401.261 portable pass plus12 disposable fairness checks,63 root, builds and mocked320/390/768/1280 Chrome pass. Worker health still lacks feature markers; remote migration/restart NOT performed, backend activation pending."
+  },
+  "fabrythingMediaRelease": {
+    "date": "2026-11-14",
+    "repository": "../fabrythingweb",
+    "sourceCommit": "bf06014",
+    "handoff": "../fabrythingweb/docs/MEDIA_CAPACITY_INDEXING_2026-11-13.md",
+    "ci": "Frontend6fo6qmtDysmsK7DFCyNuCTq1sFFS and backendHZKFvwu6Q5iVuFeQ2RqUX4ZSKn41 successful; live banner/photo and protected export checked",
+    "activation": "Dedicated worker not activated; protected Vercel exports are placeholders and Meta settings are absent",
+    "echoRuntimeChanged": false,
+    "routingFix": "2fcf19d; live complete canonical HTML and899 sitemap URLs"
+  },
+  "workflowContinuity": {
+    "date": "2026-11-14",
+    "handoff": "docs/WORKFLOW_CONTINUITY_2026-11-14.md",
+    "status": "Source verified; live activation pending restart exception",
+    "observedMigrations": 16,
+    "requiredMigrations": 21,
+    "verification": "272 portable +24 disposable SQL checks +63 root; isolated build; scoped tab browser QA1440/390; no external writes or inference",
+    "restartAuthorized": false,
+    "liveConfigChanged": false,
+    "personalProfile": "Review required; routine disabled; routed text available; no image-generation connection; manual sharing"
   }
 }

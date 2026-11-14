@@ -8,3 +8,6 @@ export function contentStatus(post){
  return ({draft:'DRAFT',review:'NEED_ATTENTION',approved:'APPROVED',scheduled:'SCHEDULED',publishing:'SCHEDULED'})[post.status]||CONTENT_STATUS.DRAFT;
 }
 export const ATTENTION_SQL="content_status IN ('NEED_ATTENTION','FAILED')";
+export const EDITORIAL_HOLD_SQL="(last_error IS NOT NULL OR status IN ('failed','unknown') OR seo->'safety'->>'requiresHuman'='true' OR jsonb_array_length(CASE WHEN jsonb_typeof(seo->'editorialWarnings')='array' THEN seo->'editorialWarnings' ELSE '[]'::jsonb END)>0)";
+export const ATTENTION_FILTER_SQL=`(content_status IN ('NEED_ATTENTION','FAILED') AND ${EDITORIAL_HOLD_SQL})`;
+export const APPROVAL_FILTER_SQL=`(status='review' AND content_status<>'PREPARING' AND NOT COALESCE(${EDITORIAL_HOLD_SQL},false))`;

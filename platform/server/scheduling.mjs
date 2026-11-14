@@ -1,4 +1,5 @@
 import {workflowPublicationProblem} from '../shared/content-workflow.mjs';
+import {EDITORIAL_HOLD_SQL} from '../shared/content-status.mjs';
 import {captionLanguageWarnings} from './caption-generation.mjs';
 import {AppError} from './errors.mjs';
 import {newsReportProblem} from './news-quality.mjs';
@@ -20,7 +21,7 @@ export function wallTimeToInstant(value,timezone){
  for(let i=0;i<3;i++){const local=pageClock({timezone},new Date(at));at+=desired-Date.parse(local.date+'T'+local.time+':00Z');}
  const check=pageClock({timezone},new Date(at));if(check.date+'T'+check.time!==value)throw new AppError(400,'That local time does not exist in this timezone. Choose another time.');return new Date(at);
 }
-export async function bookings(db,w,pageId,exclude=null){return(await db.query(`SELECT id,status,COALESCE(published_at,scheduled_at,planned_at) AS at FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND ($3::uuid IS NULL OR id<>$3) AND deleted_at IS NULL AND archived_at IS NULL AND (status IN ('published','publishing','unknown','scheduled','ready_manual') OR planned_at IS NOT NULL) AND (COALESCE(published_at,scheduled_at,planned_at)>now()-interval '8 days' OR status IN ('publishing','unknown'))`,[w,pageId,exclude])).rows;}
+export async function bookings(db,w,pageId,exclude=null){return(await db.query(`SELECT id,status,COALESCE(published_at,scheduled_at,planned_at) AS at,${EDITORIAL_HOLD_SQL} AS held FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND ($3::uuid IS NULL OR id<>$3) AND deleted_at IS NULL AND archived_at IS NULL AND (status IN ('published','publishing','unknown','scheduled','ready_manual') OR planned_at IS NOT NULL) AND (COALESCE(published_at,scheduled_at,planned_at)>now()-interval '8 days' OR status IN ('publishing','unknown'))`,[w,pageId,exclude])).rows;}
 export function slotProblem(page,reservations,at){
  if(!inWindow(page,at))return 'outside_window';if(page.daily_cap<1)return 'daily_cap';
  const date=pageClock(page,at).date,timed=reservations.filter(x=>x.at),today=timed.filter(x=>pageClock(page,new Date(x.at)).date===date);
@@ -43,7 +44,7 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
  }
  throw new AppError(409,'No open slot fits this Page’s window, daily target, posting gap and plan period. Adjust the Page schedule.','no_slot');
 }
-export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
+export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):page.kind==='ecommerce'&&!page.require_review?reservations.filter(r=>!r.held||['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
 export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,usableBookings(page,await bookings(db,w,page.id,postId)),{from,until,spread:spreadSchedule(page,spread),target});}
 export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
  const workflowProblem=workflowPublicationProblem(page,post);if(workflowProblem)throw new AppError(409,workflowProblem,'content_workflow');
