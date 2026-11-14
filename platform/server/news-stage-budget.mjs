@@ -6,6 +6,6 @@ export async function boundedNewsStage(run,{deadlineMs,purpose}={}){
  if(deadlineMs<=0)throw new AppError(422,'The local news preparation time budget is exhausted. This source remains held; the queue can continue.','news_stage_timeout');
  try{return await run(deadlineMs);}catch(error){
   if(error.status!==504)throw error;
-  throw new AppError(422,(purpose==='news_review'?'News evidence review':'News writing')+' exceeded its short local time budget. This source is retained; preparation can move to the next story.','news_stage_timeout');
+  throw new AppError(422,(purpose==='journal_review'?'Journal evidence review':purpose==='journal_article'?'Journal writing':purpose==='news_review'?'News evidence review':'News writing')+' exceeded its short local time budget. This source is retained; preparation can move to the next story.','news_stage_timeout');
  }
 }

@@ -235,6 +235,11 @@
         "docs/WORKFLOW_CONTINUITY_2026-11-14.md",
         "platform/test/workflow-continuity.test.mjs"
       ]
+    },
+    {
+      "id": "fabrything-blog",
+      "file": "docs/FABRYTHING_BLOG_ACTIVATION.md",
+      "role": "Website-only English audio journal; source-backed research, model review, signed receipt reconciliation and activation status"
     }
   ],
   "edges": [

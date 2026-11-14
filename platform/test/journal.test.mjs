@@ -1,11 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createHmac} from 'node:crypto';
+import {createHmac,createHash} from 'node:crypto';
 import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal} from '../server/journal.mjs';
 const w='11111111-1111-4111-8111-111111111111',p='22222222-2222-4222-8222-222222222222',postId='33333333-3333-4333-8333-333333333333';
 const fixture=()=>({version:'fabrything-journal-v1',sourceKey:[w,p,postId].join(':'),workspaceId:w,pageId:p,title:'Choose a compatible accessory',slug:'compatible-accessory',excerpt:'Check the manual before ordering.',seoTitle:'Accessory compatibility',seoDescription:'How to check a connector.',keyword:'compatible connector',problem:'Avoid an incompatible connector',audience:'Shoppers',intent:'buying_guide',clusterSlug:'accessories',tags:['accessories'],sources:[{title:'Manual',url:'https://example.com/manual'}],products:[],blocks:[{type:'heading',text:'Check the manual'},{type:'paragraph',text:'Read the supplied connector documentation before choosing an accessory.'},{type:'image',alt:'Connector dimensions in the manual',width:1200,height:675}],editorial:{reviewed:true},publish:true});
 const secret='test-only-'.repeat(5),connection={config:{url:'https://www.fabrything.com'},secret:{apiKey:secret}},site={url:'https://www.fabrything.com'};
 function post(payload=fixture()){return {id:postId,workspace_id:w,page_id:p,title:payload.title,seo:{article:{text:'Check the manual\n\nRead the supplied connector documentation before choosing an accessory.'},journal:{payload,reviewedHash:journalHash(payload),sourceHash:journalSourceHash({})}}};}
+
+test('a lost website response is reconciled by a signed receipt without a second POST',async()=>{
+ let posts=0,lookups=0;const prepared=post();
+ const send=async(url,options)=>{
+  if(options?.method==='POST'){posts++;throw Object.assign(new Error('Connection interrupted'),{status:502});}
+  if(url.includes('sourceKey=')){lookups++;assert(options.headers['X-EchoLink-Signature']);return {ok:true,bytes:Buffer.from(JSON.stringify({id:8,url:'https://www.fabrything.com/blog/compatible-accessory',status:'PUBLISHED',sourceKey:fixture().sourceKey,payloadHash:createHash('sha256').update(JSON.stringify(journalSchema.parse(fixture()))).digest('hex')}))};}
+  return {ok:true,bytes:Buffer.from('<article><h1>Choose a compatible accessory</h1><h2>Check the manual</h2><p>Read the supplied connector documentation before choosing an accessory.</p></article>')};
+ };
+ assert.equal((await publishJournal(connection,site,prepared,{send})).id,8);assert.equal(posts,1);assert.equal(lookups,1);
+ prepared.website_url='https://www.fabrything.com/blog/compatible-accessory';await publishJournal(connection,site,prepared,{send});assert.equal(posts,1);
+});
 test('journal contract rejects private links, missing image plans and invented product references',()=>{
  assert(journalSchema.safeParse(fixture()).success);
  const invalid=fixture();invalid.sources[0].url='https://127.0.0.1/internal';assert(!journalSchema.safeParse(invalid).success);

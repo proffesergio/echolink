@@ -44,6 +44,13 @@ test('automatic fallback uses only an installed secondary checkpoint that passes
  const cold=createLocalInferenceGate({memory:()=>4*GiB,request:async url=>({models:url.endsWith('/api/tags')?[{name:'primary',size:2.5e9},{name:'secondary',size:3.4e9}]:[]})});
  let called=false;await assert.rejects(()=>cold.run(provider,'primary',{automaticFallback:true,fallbackModel:'secondary'},async()=>{called=true;}),e=>e.code==='inference_resource_wait');assert.equal(called,false);assert.equal(cold.status().lastAdmission.model,'primary');
 });
+
+test('a resident admitted fallback stays loaded across stages instead of being released for the requested model',async()=>{
+ let resident=true;const kept=[];
+ const gate=createLocalInferenceGate({memory:()=>2*GiB,idle:{releaseExcept:async(p,model)=>{kept.push(model);if(model!=='secondary')resident=false;}},request:async url=>({models:url.endsWith('/api/tags')?[{name:'primary',size:2.5e9},{name:'secondary',size:2.4e9}]:resident?[{name:'secondary'}]:[]})});
+ const invoke=()=>gate.run(provider,'primary',{automaticFallback:true,fallbackModel:'secondary'},async({settings})=>settings.selectedModel);
+ assert.equal(await invoke(),'secondary');assert.equal(await invoke(),'secondary');assert.deepEqual(kept,['secondary','secondary']);assert.equal(resident,true);
+});
 test('enough memory retains the primary, and a cloud fallback can never be selected by the local router',async()=>{
  const requested=[];const gate=createLocalInferenceGate({memory:()=>8*GiB,request:async(url,options)=>{if(url.endsWith('/api/show'))requested.push(options.body.model);return {models:url.endsWith('/api/tags')?[{name:'primary',size:2.5e9}]:[]};}});
  assert.equal((await gate.check(provider,'primary',{automaticFallback:true,fallbackModel:'paid:cloud'})).selectedModel,'primary');assert.deepEqual(requested,['primary']);

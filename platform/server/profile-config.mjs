@@ -54,6 +54,7 @@ export function effectiveProfilePage(page){
 }
 export function namedProfileDefaults(name){
  const normalized=String(name||'').replace(/\s/gu,'').toLowerCase();
+ if(normalized==='fabrythingblog')return {content_workflow:'TEXT',language_mode:'SINGLE_LANGUAGE',primary_language:'en',languages:['en'],domain_preset:'GENERAL'};
  if(normalized==='nobleseek')return {content_workflow:'PHOTO_CAPTION',language_mode:'SINGLE_LANGUAGE',primary_language:'bn',languages:['bn'],domain_preset:'GENERAL'};
  if(normalized==='fabrything')return {content_workflow:'PHOTO_CAPTION',language_mode:'DUAL_BILINGUAL',primary_language:'bn',languages:['en','bn'],domain_preset:'GENERAL'};
  if(normalized==='hossainbillal')return {content_workflow:'PHOTO_CAPTION',language_mode:'DUAL_BILINGUAL',primary_language:'bn',languages:['en','bn'],domain_preset:'ISLAMIC_SCIENCE_AI',grounding:{references:[],topic_pillars:['AI/Tech','Muslim Polymaths','Digital Ethics']}};
@@ -63,7 +64,7 @@ export function namedProfileDefaults(name){
 export function preparePageProfile(data,body,prior){
  if(!Object.hasOwn(body,'entity_type'))data.entity_type=prior?entityType(prior):entityType(data);
  if(!Object.hasOwn(body,'profile_config'))data.profile_config=prior?.profile_config||namedProfileDefaults(data.name);
- if(!Object.hasOwn(body,'destination_type')&&Object.hasOwn(body,'entity_type'))data.destination_type=data.entity_type==='PERSONAL_PROFILE'?'facebook_profile':'facebook_page';
+ if(!Object.hasOwn(body,'destination_type')&&Object.hasOwn(body,'entity_type'))data.destination_type=prior?.destination_type==='website'&&data.entity_type!=='PERSONAL_PROFILE'?'website':data.entity_type==='PERSONAL_PROFILE'?'facebook_profile':'facebook_page';
  if(prior&&!Object.hasOwn(body,'destination_type')&&!Object.hasOwn(body,'entity_type'))data.destination_type=prior.destination_type;
  if((data.entity_type==='PERSONAL_PROFILE')!==(data.destination_type==='facebook_profile'))throw new AppError(400,'Entity type and Facebook destination must agree.');
  if(!prior&&data.entity_type==='PERSONAL_PROFILE'&&!data.profile_config.content_workflow)data.profile_config={...data.profile_config,content_workflow:'PHOTO_CAPTION'};

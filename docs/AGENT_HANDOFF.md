@@ -2,6 +2,12 @@
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
+## Fabrything Blog — November14 (activation in progress)
+
+- Owner authorized a separate website-only Fabrything Blog profile, automatic English writing/review/scheduling/publication and production CI/CD. Scope, source pool, model routing, delivery protections and verification: `docs/FABRYTHING_BLOG_ACTIVATION.md`.
+- Verified supplied Fabrything database URL; migrations already applied. Fresh backups completed for both databases. SQL022 is now applied only to the active `echolink_live` primary. New profile/rule are disabled pending checked worker and signed production bridge health; five real topic levels are configured, no test articles seeded.
+- Securely added four dedicated production blog bridge settings, preserving existing database/storage/app settings. Meta is unnecessary for website-only publishing. Separate image/WhatsApp worker remains pending its own credentials.
+
 ## Live activation — November14
 
 - The owner explicitly authorized applying all changes to live servers. A fresh private database backup completed, then SQL017–021 applied to the verified active local primary `echolink_live`, port55432. The separate prepared `echolink_local` database was not selected.

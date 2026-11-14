@@ -1,5 +1,6 @@
 import {workflowPublicationProblem} from '../shared/content-workflow.mjs';
 import {EDITORIAL_HOLD_SQL} from '../shared/content-status.mjs';
+import {websiteDestination} from '../shared/destinations.mjs';
 import {captionLanguageWarnings} from './caption-generation.mjs';
 import {AppError} from './errors.mjs';
 import {newsReportProblem} from './news-quality.mjs';
@@ -44,7 +45,7 @@ export function findSlot(page,reservations,{from=new Date(Date.now()+60000),unti
  }
  throw new AppError(409,'No open slot fits this Page’s window, daily target, posting gap and plan period. Adjust the Page schedule.','no_slot');
 }
-export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):page.kind==='ecommerce'&&!page.require_review?reservations.filter(r=>!r.held||['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
+export const usableBookings=(page,reservations)=>liveNews(page)?reservations.filter(r=>['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):(page.kind==='ecommerce'||websiteDestination(page))&&!page.require_review?reservations.filter(r=>!r.held||['published','publishing','unknown','scheduled','ready_manual'].includes(r.status)):reservations;
 export async function nextSlot(db,w,page,{postId=null,from,until,spread=false,target}={}){return findSlot(page,usableBookings(page,await bookings(db,w,page.id,postId)),{from,until,spread:spreadSchedule(page,spread),target});}
 export async function publishGate(client,workspaceId,page,post,{now=new Date(),execution=false}={}){
  const workflowProblem=workflowPublicationProblem(page,post);if(workflowProblem)throw new AppError(409,workflowProblem,'content_workflow');

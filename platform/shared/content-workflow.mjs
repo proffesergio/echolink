@@ -19,6 +19,7 @@ export function workflowMediaProblem(page,post,kind,{textOnly=false}={}){
  return null;
 }
 export function workflowPublicationProblem(page,post){
+ if(page.destination_type==='website')return post.type!=='blog'||!post.seo?.journal?.reviewedHash?'Generate and review a structured blog article before website publication.':null;
  // Unconfigured legacy posts retain their historical approval behavior.
  if(!page.profile_config?.content_workflow)return null;
  const workflow=contentWorkflow(page);

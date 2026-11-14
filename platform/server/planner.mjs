@@ -1,4 +1,5 @@
 import {contentWorkflow,workflowPublicationProblem} from '../shared/content-workflow.mjs';
+import {automaticDestination,websiteDestination,websiteConfigurationProblem} from '../shared/destinations.mjs';
 import {AppError} from './errors.mjs';
 import {audit} from './db.mjs';
 import {reservePublication,entitlements,releasePublication} from './quotas.mjs';
@@ -18,7 +19,8 @@ export async function queuePublication(db,w,actor,page,post,{at,autoPick=false,a
  if(post.deleted_at||post.archived_at||['published','publishing','unknown'].includes(post.status))throw new AppError(409,'This post cannot be queued. Restore or reconcile it first.');
  if(version!==undefined&&version!==post.version)throw new AppError(409,'The post changed. Refresh and review the latest version.','version_changed');
  const profile=page.destination_type==='facebook_profile';
- if(!planOnly&&(!page.active||!page.fb_verified&&!profile))throw new AppError(409,'Enable and verify this Page’s Facebook connection first.');
+ if(!planOnly&&(!page.active||!automaticDestination(page)))throw new AppError(409,'Enable and connect this publishing destination first.');
+ if(websiteDestination(page)){const problem=websiteConfigurationProblem(page);if(problem)throw new AppError(409,problem);const site=(await db.query("SELECT s.connector,c.provider,c.status FROM creator.websites s JOIN creator.connections c ON c.workspace_id=s.workspace_id AND c.id=s.connection_id WHERE s.workspace_id=$1 AND s.id=$2",[w,page.website_id])).rows[0];if(site?.connector!=='fabrything_blog'||site.provider!=='fabrything_blog'||site.status!=='connected')throw new AppError(409,'Test the journal website connection before scheduling.');}
  const plan=await entitlements(db,w);
  if(autoPick)at=await nextSlot(db,w,page,{postId:post.id,from:at||new Date(Date.now()+60000),until:new Date(plan.period_end),spread,target});
  if(!at||!Number.isFinite(+at))throw new AppError(400,'Choose a valid posting time.');

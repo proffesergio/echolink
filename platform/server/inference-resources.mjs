@@ -28,7 +28,7 @@ export function memoryAdmission({freeBytes,modelBytes,resident=false,settings}){
  const requiredMB=Math.ceil(required/MiB),freeMB=Math.floor(freeBytes/MiB),shortfallMB=Math.max(0,requiredMB-freeMB);
  return {ok:freeBytes>=required,requiredMB,freeMB,shortfallMB,resident,message:`Memory reserve protected: ${(freeMB/1024).toFixed(1)} GiB available; ${(requiredMB/1024).toFixed(1)} GiB needed${shortfallMB?` (${(shortfallMB/1024).toFixed(1)} GiB short)`:''}. Close unused apps; generation retries automatically. Scheduled publishing continues independently.`};
 }
-export function createLocalInferenceGate({memory=freemem,request=remoteJSON,monitorMs=2000}={}){
+export function createLocalInferenceGate({memory=freemem,request=remoteJSON,monitorMs=2000,idle=inferenceIdle}={}){
  let tail=Promise.resolve(),active=0,last=null;
  const inspect=async(provider,model,config)=>{
   assertModelUse({config:{...config,model}});
@@ -66,8 +66,13 @@ export function createLocalInferenceGate({memory=freemem,request=remoteJSON,moni
    const previous=tail;let release;tail=new Promise(resolve=>release=resolve);await previous;
    let monitor;
    try{
-    await inferenceIdle.releaseExcept(provider,model);
-    const settings=await check(provider,model,config);
+    // Resolve an admitted resident fallback before releasing other models.
+    // Releasing by the requested model used to unload that very fallback,
+    // forcing another cold load and a five-minute memory wait between stages.
+    let settings;
+    try{settings=await check(provider,model,config);}
+    catch(error){if(error.code!=='inference_resource_wait')throw error;await idle.releaseExcept(provider,model);settings=await check(provider,model,config);}
+    await idle.releaseExcept(provider,settings.selectedModel||model);
     const controller=new AbortController();active++;
     monitor=setInterval(()=>{if(memory()<settings.abortMB*MiB)controller.abort(resourceWait('Generation stopped at the low-memory threshold. It remains queued for a later retry.'));},monitorMs);monitor.unref?.();
     try{return await fn({settings,signal:controller.signal});}finally{active--;}

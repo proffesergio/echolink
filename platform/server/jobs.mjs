@@ -53,6 +53,9 @@ import {collectReportEvidence,generateNewsReport} from './news-desk.mjs';
 import {websiteBeforeDesign} from './website-first.mjs';
 import {generateJournalArticle,publishJournal,journalSignature} from './journal.mjs';
 import {prepareNewsSocial} from './news-social-stage.mjs';
+import {automaticDestination,websiteDestination} from '../shared/destinations.mjs';
+import {prepareJournalResearch} from './journal-research.mjs';
+import {publishWebsiteArticle} from './website-publication.mjs';
 import {freemem} from 'node:os';
 import {inferenceSettings,resourceWait} from './inference-resources.mjs';
 import {inferenceIdle} from './inference-idle.mjs';
@@ -113,6 +116,29 @@ export async function normalizeWorkflowDraft(db,w,page,post){
  if(pending.rowCount)throw new AppError(409,'Resolve the existing delivery before changing this draft workflow.','publication_pending');
  const updated=await db.query("UPDATE creator.posts SET type=$3,creative=$4,seo=$5,caption='',status='draft',approved_version=NULL,version=version+1,last_error=NULL,updated_at=now() WHERE workspace_id=$1 AND id=$2 AND version=$6 AND status IN ('draft','review','approved','failed') RETURNING *",[w,post.id,patch.type,patch.creative,patch.seo,post.version]);
  if(!updated.rowCount)throw new AppError(409,'The draft changed before workflow normalization.','version_changed');return updated.rows[0];
+}
+async function researchJournal(task){
+ const page=await transaction(task.workspace_id,db=>row(db,'pages',task.workspace_id,task.page_id));
+ const config=page.creative_policy?.journal?.automation;
+ if(page.kind!=='blog'||!config?.enabled)throw new AppError(409,'Enable automatic research on this journal profile.');
+ const saved=await transaction(task.workspace_id,db=>row(db,'tasks',task.workspace_id,task.id));
+ if(saved.result?.postId)return {postId:saved.result.postId};
+ await updateTask(task,10,'Journal research · checking current products in the focused store category');
+ const site=await transaction(task.workspace_id,db=>row(db,'websites',task.workspace_id,config.catalogWebsiteId));
+ const catalogConnection=await connectionFor(task.workspace_id,site.connection_id);
+ const products=await fetchProducts(site,catalogConnection.secret,catalogConnection,{categorySlugs:config.categorySlugs});
+ const usedKeys=await transaction(task.workspace_id,async db=>(await db.query("SELECT seo->'journalResearch'->>'key' AS key FROM creator.posts WHERE workspace_id=$1 AND page_id=$2 AND seo?'journalResearch'",[task.workspace_id,page.id])).rows.map(r=>r.key));
+ await updateTask(task,30,'Journal research · extracting relevant passages from trusted source pages');
+ const research=await prepareJournalResearch({plan:page.creative_policy.journal,usedKeys,products});
+ if(!research)return {message:'The approved topic and source pool is covered. Waiting for new relevant reporting; no duplicate guide generated.'};
+ const postId=await transaction(task.workspace_id,async db=>{
+  await workspaceLock(db,task.workspace_id);const current=await row(db,'pages',task.workspace_id,page.id);
+  if(JSON.stringify(current.creative_policy.journal)!==JSON.stringify(page.creative_policy.journal))throw new AppError(409,'The journal research plan changed. Retry using the current plan.');
+  const inserted=await db.query("INSERT INTO creator.posts(workspace_id,page_id,type,title,body,source_url,source_hash,seo,creative) VALUES($1,$2,'blog',$3,$4,$5,$6,$7,'{}'::jsonb) ON CONFLICT(page_id,source_hash) WHERE source_hash IS NOT NULL DO NOTHING RETURNING id",[task.workspace_id,page.id,research.title,research.body,research.sourceUrl,research.key,JSON.stringify({journalBrief:research.brief,journalResearch:research.research,contentWorkflow:'TEXT'})]);
+  if(!inserted.rowCount)return null;const id=inserted.rows[0].id;
+  await db.query("UPDATE creator.tasks SET result=$3 WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,JSON.stringify({postId:id})]);return id;
+ });
+ return postId?{postId}:{hold:true,message:'This journal topic is already allocated. Its existing delivery was preserved.'};
 }
 async function generate(task){
  const {post,page}=await transaction(task.workspace_id,async client=>{await workspaceLock(client,task.workspace_id);let post=await row(client,'posts',task.workspace_id,task.post_id);const page=await row(client,'pages',task.workspace_id,post.page_id);if(post.deleted_at||post.archived_at||['published','publishing','unknown','scheduled','ready_manual'].includes(post.status))throw new AppError(409,'Move the post to draft before generating.');post=await normalizeWorkflowDraft(client,task.workspace_id,page,post);return {post,page,product:post.product_id?await row(client,'products',task.workspace_id,post.product_id):null};});
@@ -293,6 +319,7 @@ async function analyzePageReferences(task){
 }
 
 async function publish(task){
+ const destination=await transaction(task.workspace_id,db=>row(db,'pages',task.workspace_id,task.page_id));if(websiteDestination(destination))return publishWebsiteArticle(task,{updateTask});
  if(!env().publishing)throw new AppError(409,'Live publishing is disabled in this local environment. Use dry-run, then ask the owner to enable a reviewed publishing test.');
  await updateTask(task,5,'Checking current product availability and saved campaign facts');await preflightProduct(task.workspace_id,task.post_id);
  const w=task.workspace_id;let state;
@@ -363,14 +390,14 @@ async function syncInsights(task){
  await transaction(task.workspace_id,async db=>{for(const report of reports)await db.query('INSERT INTO creator.analytics_reports(workspace_id,page_id,platform,report) VALUES($1,$2,$3,$4)',[task.workspace_id,page.id,report.platform,report]);await db.query("INSERT INTO creator.insight_snapshots(workspace_id,page_id,source,records) VALUES($1,$2,'meta',$3)",[task.workspace_id,page.id,JSON.stringify(reports[0].records)]);});
  return {message:'Facebook and Instagram report saved. Unavailable metrics are labelled, not estimated.',sampleSize:reports[0].records.length};
 }
-const handlers={render_reel:renderReel,notify_approval:task=>sendApprovalNotification(task,{updateTask}),analyze_references:analyzePageReferences,design_page_brand:task=>designPageBrand(task,{updateTask}),apply_page_brand:task=>applyPageBrand(task,{updateTask}),post_link_comment:task=>sendLinkComment(task,{updateTask}),test_connection:testConnection,verify_page:verifyPage,generate,write_article:writeArticle,creative,import_products:importProducts,aggregate,publish,manual_handoff:manualHandoff,sync_insights:syncInsights,publish_instagram:task=>publishInstagram(task,{updateTask})};
+const handlers={research_journal:researchJournal,render_reel:renderReel,notify_approval:task=>sendApprovalNotification(task,{updateTask}),analyze_references:analyzePageReferences,design_page_brand:task=>designPageBrand(task,{updateTask}),apply_page_brand:task=>applyPageBrand(task,{updateTask}),post_link_comment:task=>sendLinkComment(task,{updateTask}),test_connection:testConnection,verify_page:verifyPage,generate,write_article:writeArticle,creative,import_products:importProducts,aggregate,publish,manual_handoff:manualHandoff,sync_insights:syncInsights,publish_instagram:task=>publishInstagram(task,{updateTask})};
 export async function runOne({publishOnly=false,excludePublish=false,taskId=null}={}){
  const task=await transaction(null,client=>claimTask(client,{publishOnly,excludePublish,taskId}),{owner:true});
  if(!task)return false;
  try{
   await transaction(task.workspace_id,async client=>{await entitlements(client,task.workspace_id);const account=(await client.query('SELECT a.status FROM creator.accounts a JOIN creator.workspaces w ON w.owner_id=a.id WHERE w.id=$1',[task.workspace_id])).rows[0];if(account.status!=='active')throw new AppError(403,'Account suspended.');});
   if(task.post_id&&['generate','write_article','creative','publish'].includes(task.kind)){const stale=await transaction(task.workspace_id,async db=>newsFreshnessProblem(await row(db,'pages',task.workspace_id,task.page_id),await row(db,'posts',task.workspace_id,task.post_id)));if(stale)throw new AppError(409,stale,'news_stale');}
-  if(['generate','write_article','creative','design_page_brand','analyze_references','aggregate'].includes(task.kind)&&freemem()<inferenceSettings().reserveMB*1024*1024)throw resourceWait('Memory reserve protected. Preparation will retry in five minutes; scheduled publishing continues.');
+  if(['generate','write_article','creative','design_page_brand','analyze_references','aggregate','research_journal'].includes(task.kind)&&freemem()<inferenceSettings().reserveMB*1024*1024)throw resourceWait('Memory reserve protected. Preparation will retry in five minutes; scheduled publishing continues.');
   if((task.input.pipeline||task.input.refreshRuleId)&&startsGeneration(task.kind)&&!(task.kind==='import_products'&&task.input.catalogCheck===true)){
    const wait=await transaction(task.workspace_id,async db=>{const rule=await row(db,'automation_rules',task.workspace_id,task.input.pipeline?.ruleId||task.input.refreshRuleId),page=await row(db,'pages',task.workspace_id,task.page_id);return generationAvailability(rule,page,await bookings(db,task.workspace_id,page.id,task.post_id),{urgent:task.input.urgent===true});});
    if(!wait.allowed){await transaction(task.workspace_id,db=>db.query("UPDATE creator.tasks SET status='queued',not_before=$3,phase=$4,lease_until=NULL WHERE workspace_id=$1 AND id=$2",[task.workspace_id,task.id,wait.next,wait.message]));return true;}
@@ -405,7 +432,7 @@ export async function recoverExpiredTasks(){return transaction(null,async client
  const stale=(await client.query("SELECT * FROM creator.tasks WHERE status='running' AND lease_until<now() FOR UPDATE")).rows;
  // Text preparation is resumable and has no external publication side effect.
  // Preserve its post/checkpoints; delivery jobs still require reconciliation.
- for(const task of stale.filter(t=>['generate','write_article'].includes(t.kind)))await client.query("UPDATE creator.tasks SET status='queued',phase='Resuming saved text preparation after an interrupted worker',not_before=now(),started_at=NULL,lease_until=NULL WHERE id=$1",[task.id]);
+ for(const task of stale.filter(t=>['generate','write_article','research_journal'].includes(t.kind)))await client.query("UPDATE creator.tasks SET status='queued',phase='Resuming saved text preparation after an interrupted worker',not_before=now(),started_at=NULL,lease_until=NULL WHERE id=$1",[task.id]);
  for(const task of stale.filter(t=>t.kind==='publish_instagram')){const d=(await client.query("SELECT status FROM creator.social_deliveries WHERE workspace_id=$1 AND post_id=$2 AND platform='instagram'",[task.workspace_id,task.post_id])).rows[0];const uncertain=['publishing','unknown'].includes(d?.status);await client.query("UPDATE creator.tasks SET status=$2,phase=$3,started_at=NULL,lease_until=NULL WHERE id=$1",[task.id,uncertain?'unknown':'queued',uncertain?'Check Instagram before retrying':'Resuming Instagram media preparation']);if(uncertain)await client.query("UPDATE creator.social_deliveries SET status='unknown',last_error='Worker interrupted during Instagram publication; reconcile before retrying.' WHERE workspace_id=$1 AND post_id=$2 AND status<>'published'",[task.workspace_id,task.post_id]);}
  for(const task of stale.filter(t=>t.kind==='apply_page_brand'))await client.query("UPDATE creator.page_branding SET status='unknown',last_error='Worker interrupted during branding update; check Facebook' WHERE workspace_id=$1 AND id=$2 AND status='applying'",[task.workspace_id,task.input.brandingId]);
  for(const task of stale.filter(t=>t.kind==='notify_approval'))await client.query("UPDATE creator.approval_notifications SET status='unknown',last_error='Worker interrupted during notification; check destination' WHERE workspace_id=$1 AND id=$2 AND status='sending'",[task.workspace_id,task.input.notificationId]);
@@ -415,7 +442,7 @@ export async function recoverExpiredTasks(){return transaction(null,async client
  return stale.length;
 },{owner:true});}
 export async function continuePipeline(task,result,{transact=transaction,queue=enqueue,capacity=requireGenerationCapacity,notify=queueApprovalNotification,publication=queuePublication}={}){
- if(result.hold||!['aggregate','generate','write_article','creative','render_reel'].includes(task.kind))return;
+ if(result.hold||!['aggregate','research_journal','generate','write_article','creative','render_reel'].includes(task.kind))return;
  const w=task.workspace_id,pipeline=task.input.pipeline,postId=task.post_id||result.postId;if(!postId){if(pipeline?.ruleId)await transact(w,db=>db.query("UPDATE creator.automation_rules SET refill_until=NULL,next_run_at=now()+interval '1 minute'*CASE WHEN EXISTS(SELECT 1 FROM creator.pages p WHERE p.id=creator.automation_rules.page_id AND p.kind='news' AND p.aggregation_enabled) THEN 1 ELSE interval_minutes END,last_message='No fresh source found. Generation is resting until the source cooldown ends.' WHERE workspace_id=$1 AND id=$2",[w,pipeline.ruleId]));return;}
  await transact(w,async db=>{
   await workspaceLock(db,w);const rule=pipeline?await row(db,'automation_rules',w,pipeline.ruleId):null;
@@ -426,13 +453,13 @@ export async function continuePipeline(task,result,{transact=transaction,queue=e
   if(task.kind==='generate'&&post.type==='news'&&page.website_publishing&&!post.seo?.article?.text){await capacity(db,w);await queue(db,w,'write_article',{pageId:page.id,postId,input:{...(pipeline?{pipeline}:{}),...(task.input.urgent?{urgent:true}:{})}});return;}
   if(['generate','write_article'].includes(task.kind)&&post.type==='news'&&page.creative_policy?.contentFormat==='news_desk_v3'&&criticalEditorialWarnings(post.seo?.editorialWarnings).length){await db.query("UPDATE creator.posts SET status='review',last_error=$3 WHERE workspace_id=$1 AND id=$2",[w,post.id,'Report needs editorial correction: '+criticalEditorialWarnings(post.seo.editorialWarnings).join(' ')]);return;}
   const input={...(pipeline?{pipeline}:{}),...(task.input.urgent?{urgent:true}:{})};
-  if(task.kind==='aggregate'){await capacity(db,w);await queue(db,w,'generate',{pageId:page.id,postId,input});}
+  if(['aggregate','research_journal'].includes(task.kind)){await capacity(db,w);await queue(db,w,'generate',{pageId:page.id,postId,input});}
   else if(['generate','write_article'].includes(task.kind)&&workflow==='TEXT'&&post.seo?.article?.socialPending){await capacity(db,w);await queue(db,w,'creative',{pageId:page.id,postId,input:{...input,textOnly:true}});}
   else if(['generate','write_article'].includes(task.kind)&&workflow==='PHOTO_CAPTION'&&(page.profile_config?.content_workflow==='PHOTO_CAPTION'||post.seo?.article?.socialPending||pipeline?.makeCreative||post.creative.sourceImage||['image','product_sale'].includes(post.type))){await capacity(db,w);await queue(db,w,'creative',{pageId:page.id,postId,input});}
   else if(!pipeline&&page.require_review){await notify(db,w,page,post);return;}
   else if(['generate','write_article','creative','render_reel'].includes(task.kind)&&(rule?.auto_schedule??true)){
    const factualHold=criticalEditorialWarnings(post.seo.editorialWarnings).length>0||post.seo?.safety?.requiresHuman&&post.approved_version!==post.version;
-   const automatic=!factualHold&&(rule?.auto_publish??true)&&page.active&&!page.require_review&&env().publishing&&(page.fb_verified||page.destination_type==='facebook_profile');
+   const automatic=!factualHold&&(rule?.auto_publish??true)&&page.active&&!page.require_review&&env().publishing&&automaticDestination(page);
    await publication(db,w,null,page,post,{autoPick:true,at:!liveNews(page)&&post.planned_at&&new Date(post.planned_at)>new Date()?new Date(post.planned_at):undefined,approveCurrent:automatic,planOnly:!automatic,spread:true,target:Math.min(rule?.daily_target||page.daily_cap,page.daily_cap),ignoreTaskId:task.id});
    if(page.require_review||factualHold)await notify(db,w,page,post,{force:factualHold});
    if(factualHold)await db.query("UPDATE creator.posts SET last_error='Automatic source check needs correction before publication.' WHERE workspace_id=$1 AND id=$2",[w,post.id]);
@@ -464,7 +491,7 @@ async function holdStaleNews(db,w,post,message){
 export async function resumePreparedPosts(){
  if(!env().publishing)return {scheduled:0};
  return transaction(null,async db=>{
-  const pages=(await db.query("SELECT p.*,r.id AS rule_id,r.make_creative,r.auto_publish,r.auto_schedule,r.daily_target FROM creator.pages p LEFT JOIN creator.automation_rules r ON r.workspace_id=p.workspace_id AND r.page_id=p.id JOIN creator.workspaces w ON w.id=p.workspace_id JOIN creator.accounts a ON a.id=w.owner_id WHERE p.active AND (p.fb_verified OR p.destination_type='facebook_profile') AND NOT p.require_review AND w.status='active' AND a.status='active' AND (r.id IS NULL OR (r.enabled AND r.auto_publish AND r.auto_schedule)) ORDER BY p.id")).rows;
+  const pages=(await db.query("SELECT p.*,r.id AS rule_id,r.make_creative,r.auto_publish,r.auto_schedule,r.daily_target FROM creator.pages p LEFT JOIN creator.automation_rules r ON r.workspace_id=p.workspace_id AND r.page_id=p.id JOIN creator.workspaces w ON w.id=p.workspace_id JOIN creator.accounts a ON a.id=w.owner_id WHERE p.active AND (p.fb_verified OR p.destination_type IN ('facebook_profile','website')) AND NOT p.require_review AND w.status='active' AND a.status='active' AND (r.id IS NULL OR (r.enabled AND r.auto_publish AND r.auto_schedule)) ORDER BY p.id")).rows;
   let scheduled=0;for(const page of pages){await workspaceLock(db,page.workspace_id);
    if(page.creative_policy?.contentFormat==='news_desk_v3'&&page.rule_id){const candidates=(await db.query("SELECT p.* FROM creator.posts p WHERE workspace_id=$1 AND page_id=$2 AND status='draft' AND seo->>'rebuildReport'='true' AND deleted_at IS NULL AND archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM creator.tasks t WHERE t.workspace_id=$1 AND t.page_id=$2 AND t.status IN ('queued','running') AND t.kind NOT IN ('publish','publish_instagram','post_link_comment')) ORDER BY created_at DESC LIMIT 25",[page.workspace_id,page.id])).rows;let pending;for(const candidate of candidates){const stale=newsFreshnessProblem(page,candidate);if(stale)await holdStaleNews(db,page.workspace_id,candidate,stale);else if(!pending)pending=candidate;}if(pending){await enqueue(db,page.workspace_id,'generate',{pageId:page.id,postId:pending.id,input:{pipeline:{ruleId:page.rule_id,makeCreative:true,autoPublish:true}}});await db.query("UPDATE creator.posts SET seo=seo||'{\"rebuildReport\":false}'::jsonb,last_error=NULL WHERE id=$1",[pending.id]);}}
    const posts=(await db.query("SELECT p.* FROM creator.posts p WHERE p.workspace_id=$1 AND p.page_id=$2 AND p.status IN ('review','approved') AND p.planned_at IS NOT NULL AND p.deleted_at IS NULL AND p.archived_at IS NULL AND p.last_error IS NULL AND NOT EXISTS(SELECT 1 FROM creator.tasks t WHERE t.workspace_id=p.workspace_id AND t.post_id=p.id AND t.status IN ('queued','running')) ORDER BY p.planned_at LIMIT 20",[page.workspace_id,page.id])).rows;
@@ -492,7 +519,8 @@ export async function tickAutomations(){
     if(!count){await db.query("UPDATE creator.automation_rules SET last_message=$2,refill_until=NULL,next_run_at=CASE WHEN generation_mode='buffered' THEN now()+interval '15 minutes' ELSE next_run_at END WHERE id=$1",[rule.id,waiting>=rule.backlog_limit?'The active preparation or approval queue is full. Held content remains available in Needs attention.':page.kind==='ecommerce'&&catalogDailyRemaining(rule,page,catalogAllocated)===0?'Today’s product cohort is allocated, including held items. The next daily cohort starts tomorrow.':'Daily target or plan allowance is filled. No extra draft generated.']);continue;}
     const pipeline={ruleId:rule.id,makeCreative:rule.make_creative,autoPublish:rule.auto_publish};
     for(let batch=0;batch<count;batch++){
-    if(rule.kind==='news')await enqueue(db,rule.workspace_id,'aggregate',{pageId:rule.page_id,input:{pipeline}});
+    if(page.kind==='blog'&&page.creative_policy?.journal?.enabled){await enqueue(db,rule.workspace_id,'research_journal',{pageId:rule.page_id,input:{pipeline}});queued++;produced++;break;}
+    else if(rule.kind==='news')await enqueue(db,rule.workspace_id,'aggregate',{pageId:rule.page_id,input:{pipeline}});
     else{
      let product;if(rule.kind==='ecommerce'){const candidates=(await db.query(catalogCandidatesSQL,[rule.workspace_id,rule.website_id,page.id])).rows;const recent=(await db.query(`SELECT p.attributes->>'category' AS category FROM creator.posts s JOIN creator.products p ON p.workspace_id=s.workspace_id AND p.id=s.product_id WHERE s.workspace_id=$1 AND s.page_id=$2 ORDER BY s.created_at DESC LIMIT 5`,[rule.workspace_id,page.id])).rows.map(r=>r.category);product=pickCatalogProduct(candidates,recent);}
      if(rule.kind==='ecommerce'&&!product){if(rule.website_id){await enqueue(db,rule.workspace_id,'import_products',{pageId:page.id,input:{websiteId:rule.website_id,refreshRuleId:rule.id}});queued++;}await db.query('UPDATE creator.automation_rules SET last_message=$2 WHERE id=$1',[rule.id,'Current catalog batch is allocated or published; fetching the next unseen batch.']);break;}
