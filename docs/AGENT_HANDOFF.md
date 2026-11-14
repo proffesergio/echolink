@@ -2,7 +2,15 @@
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
-## Workflow continuity — November14
+## Live activation — November14
+
+- The owner explicitly authorized applying all changes to live servers. A fresh private database backup completed, then SQL017–021 applied to the verified active local primary `echolink_live`, port55432. The separate prepared `echolink_local` database was not selected.
+- The graceful restart drained active work and activated the updated worker/bridge supervisor. PostgreSQL and Ollama stayed running; uncertain delivery receipts remain protected. Worker and public dashboard health show lifecycle2, continuity1, profile1, commerce8 and journal1.
+- Fabrything preserves target50, minimum gap20m and24h buffer; scheduling uses spread mode, the overnight generation restriction is disabled, and batch size is3. The daily catalog check succeeded, adding100 tracked products; three real preparations queued. Noble Seek published a real item at06:14Z.
+- Gemma cold-load admission exceeded current free RAM. Existing automatic fallback is enabled to installed Qwen3 4B. Primary/task models, prompts, single-call serialization and the emergency memory guard remain. All13 inference resource tests pass. Actual daily throughput remains unmeasured.
+- Fabrything storefront/API changes are already deployed. Its dedicated image/WhatsApp worker still needs usable original private credentials and Meta setup. The owner will supply the sibling repository's `.env.local`; validate without printing secrets before activation. Protected Vercel placeholders cannot run this worker.
+
+## Workflow continuity — November14 (pre-activation evidence)
 
 - New local source fixes independent planning, held-backlog stalls, daily catalog checks/cohort limits, and matching attention/approval/preparation counts/lists. See `docs/WORKFLOW_CONTINUITY_2026-11-14.md` for exact files, tests, diagnosis, personal-profile readiness and the concrete activation proposal.
 - Live audit: worker still old, schema001–016; Fabrything20-item backlog includes16 errors and four other drafts. SQL017–021 and a graceful worker/bridge restart remain pending the owner's exception to the explicit no-live-interruption constraint. Do not claim live activation or stop a service without that exception. A private prechange database backup is complete.

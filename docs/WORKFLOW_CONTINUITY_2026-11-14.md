@@ -25,7 +25,19 @@ Designed studio typography/image composition works without an image-provider tok
 
 272 portable tests pass, with two optional PostgreSQL suites skipped in that command; both are run separately. The24 disposable PostgreSQL checks pass, including all21 migrations, fair turns, daily cohort limits, attention/approval/preparation filters, explicit retries and uncertain-receipt retention. All63 root tests pass. The isolated Vite build passes. Browser fixtures confirm nonempty scoped lists and matching tab counts,1440/390 layouts without overflow, zero JavaScript errors and zero API mutations. No synthetic model request, real website article, social post or notification was submitted. A complete private database backup was taken before any proposed live activation.
 
-## Activation awaiting the owner's restart exception
+## Live activation — completed November14
+
+The owner explicitly requested applying all changes to live servers. A fresh private backup completed at06:07Z. Before any migration, the target check found the actual selected primary is local PostgreSQL18 database `echolink_live`, port55432; the separately prepared `echolink_local` is not the active database. SQL017–021 applied successfully to the selected primary, bringing it to21 migrations. This did not switch database profiles.
+
+The graceful restart waited for active preparation and delivery to finish before replacing the worker/bridge supervisor. PostgreSQL and Ollama remained available. The public tunnel reconnected and its registry route propagated; the dashboard API returned200 with lifecycle2, continuity1, profile1, commerce8 and journal1. All seven monitored services subsequently reported healthy. Uncertain receipts were not reset or republished.
+
+Fabrything's rule now prepares batches of three throughout the day with spread scheduling, target50/day,24-hour buffer and the existing20-minute minimum gap. Its automatic catalog check succeeded at06:13Z, retaining history while fetching100 more products (300 tracked). Three real product preparations queued despite historical held drafts. Noble Seek published a real news item at06:14Z, with preparation for its successor continuing independently.
+
+Current free RAM was below Gemma's cold-load estimate. The existing resource fallback is now enabled to installed `echotent:qwen3-4b`; the primary and task routing, maximum output configuration, serialization and emergency memory guard remain unchanged. All13 inference resource tests pass, including fallback admission and low-memory cancellation. Normal source-based preparation resumed; no synthetic model QA was submitted. Actual end-to-end Fabrything scheduling and daily throughput are being observed, not assumed from queue creation.
+
+The dedicated Fabrything CPU image/WhatsApp worker is separate from this activation. Its website/API release is live, but Vercel exported protected placeholders and Meta settings are absent. The owner will add original settings to `../fabrythingweb/.env.local`; the file must be validated privately before starting that worker. No production credentials were printed or committed.
+
+## Historical pre-activation checkpoint
 
 Implementation source1e3e343 is pushed to main. GitHub Actions43561162279 completed successfully, including test and deploy; native Vercel deployment8HjJCFiGKBQYyDAHTAWeXMq33N1s also succeeded. The live dashboard returns200 with entry`index-Cf3rlN1y.js`. The existing persistent worker still returns the old health payload without lifecycle/continuity markers. The owner has been asked for the specific graceful activation exception; no answer is inferred from elapsed time. Later documentation-only commits do not activate that worker.
 

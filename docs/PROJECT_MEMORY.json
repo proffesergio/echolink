@@ -397,25 +397,29 @@
   "fabrythingMediaRelease": {
     "date": "2026-11-14",
     "repository": "../fabrythingweb",
-    "sourceCommit": "bf06014",
+    "sourceCommit": "16360a5",
     "handoff": "../fabrythingweb/docs/MEDIA_CAPACITY_INDEXING_2026-11-13.md",
     "ci": "Frontend6fo6qmtDysmsK7DFCyNuCTq1sFFS and backendHZKFvwu6Q5iVuFeQ2RqUX4ZSKn41 successful; live banner/photo and protected export checked",
-    "activation": "Dedicated worker not activated; protected Vercel exports are placeholders and Meta settings are absent",
-    "echoRuntimeChanged": false,
+    "activation": "Storefront/API live; dedicated worker pending original credentials at sibling .env.local. EchoLink worker activation and21 migrations are complete.",
+    "echoRuntimeChanged": true,
     "routingFix": "2fcf19d; live complete canonical HTML and899 sitemap URLs"
   },
   "workflowContinuity": {
     "date": "2026-11-14",
     "handoff": "docs/WORKFLOW_CONTINUITY_2026-11-14.md",
-    "status": "Source verified; live activation pending restart exception",
-    "observedMigrations": 16,
+    "status": "Live migrations and graceful worker activation complete; observing normal scheduling",
+    "observedMigrations": 21,
     "requiredMigrations": 21,
     "verification": "272 portable +24 disposable SQL checks +63 root; isolated build; scoped tab browser QA1440/390; no external writes or inference",
-    "restartAuthorized": false,
-    "liveConfigChanged": false,
+    "restartAuthorized": true,
+    "liveConfigChanged": true,
     "personalProfile": "Review required; routine disabled; routed text available; no image-generation connection; manual sharing",
     "sourceCommit": "1e3e343",
     "ci": "Actions43561162279 test/deploy SUCCESS; native Vercel8HjJCFiGKBQYyDAHTAWeXMq33N1s SUCCESS; dashboard200",
-    "activation": "Restart exception requested and pending; no migrations/config changes or live restart performed"
+    "activation": "Owner authorized applying all to live servers. Migrations017–021 applied to verified echolink_live primary; graceful drain/restart completed. Public dashboard/tunnel and worker capability markers verified. Fabrything daily catalog refresh succeeded and three real product preparations queued; Noble Seek published at06:14Z.",
+    "memoryFallback": "Gemma cold-load admission exceeded current free RAM. Enabled existing local automatic fallback to installed echotent:qwen3-4b; primary/task routing, emergency guard and single-inference lane preserved.13 resource tests pass.",
+    "database": "Local PostgreSQL18 port55432 databaseecholink_live; echolink_local is a separate prepared database",
+    "storeWorker": "Owner will add original database/R2 and Meta settings to sibling fabrythingweb/.env.local; credentials not yet available.",
+    "remaining": "Three Fabrything preparations queued; Gemma/Qwen memory admission still defers when free RAM is insufficient. Noble Seek successor hit its bounded writing time budget; next real source continues automatically. No target-throughput claim."
   }
 }
