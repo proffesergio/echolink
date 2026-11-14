@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
-import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle} from '../server/journal.mjs';
+import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle,journalProductScopeWarnings} from '../server/journal.mjs';
 const w='11111111-1111-4111-8111-111111111111',p='22222222-2222-4222-8222-222222222222',postId='33333333-3333-4333-8333-333333333333';
 const fixture=()=>({version:'fabrything-journal-v1',sourceKey:[w,p,postId].join(':'),workspaceId:w,pageId:p,title:'Choose a compatible accessory',slug:'compatible-accessory',excerpt:'Check the manual before ordering.',seoTitle:'Accessory compatibility',seoDescription:'How to check a connector.',keyword:'compatible connector',problem:'Avoid an incompatible connector',audience:'Shoppers',intent:'buying_guide',clusterSlug:'accessories',tags:['accessories'],sources:[{title:'Manual',url:'https://example.com/manual'}],products:[],blocks:[{type:'heading',text:'Check the manual'},{type:'paragraph',text:'Read the supplied connector documentation before choosing an accessory.'},{type:'image',alt:'Connector dimensions in the manual',width:1200,height:675}],editorial:{reviewed:true},publish:true});
 const secret='test-only-'.repeat(5),connection={config:{url:'https://www.fabrything.com'},secret:{apiKey:secret}},site={url:'https://www.fabrything.com'};
+test('general technology documentation cannot validate catalog-model compatibility claims',()=>{
+ const products=[{title:'Lenovo HE05X Bluetooth Neckband Earphone'}],source='LE Audio support depends on implementation in both devices.';
+ assert(journalProductScopeWarnings('The HE05X uses Classic Audio and cannot support LE Audio.',products,source).length);
+ assert(journalProductScopeWarnings('Lenovo does not support this feature.',products,source).length);
+ assert.deepEqual(journalProductScopeWarnings('Check manufacturer compatibility documentation before buying.',products,source),[]);
+ assert.deepEqual(journalProductScopeWarnings('The HE05X is documented here.',products,'Official HE05X documentation.'),[]);
+});
 function post(payload=fixture()){return {id:postId,workspace_id:w,page_id:p,title:payload.title,seo:{article:{text:'Check the manual\n\nRead the supplied connector documentation before choosing an accessory.'},journal:{payload,reviewedHash:journalHash(payload),sourceHash:journalSourceHash({})}}};}
 
 test('structured writing checkpoints survive a review interruption without another writer call',async()=>{
