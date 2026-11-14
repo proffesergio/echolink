@@ -240,6 +240,16 @@
       "id": "fabrything-blog",
       "file": "docs/FABRYTHING_BLOG_ACTIVATION.md",
       "role": "Website-only English audio journal; source-backed research, model review, signed receipt reconciliation and activation status"
+    },
+    {
+      "id": "journal-research",
+      "file": "platform/server/journal-research.mjs",
+      "role": "Trusted-source English guide briefs and current catalog examples; source/key deduplication"
+    },
+    {
+      "id": "website-only-publication",
+      "file": "platform/server/website-publication.mjs",
+      "role": "Tenant-scoped signed website delivery, quota reservations and conservative receipt reconciliation"
     }
   ],
   "edges": [
@@ -440,7 +450,7 @@
     "status": "live",
     "profileName": "Fabrything Blog",
     "destination": "https://www.fabrything.com/blog",
-    "sourceRelease": "ca3a607",
+    "sourceRelease": "f663e14",
     "storeRelease": "8d0625b",
     "migration": 22,
     "language": "English",
@@ -449,16 +459,52 @@
     "timezone": "America/New_York",
     "signedBridgeVerified": true,
     "metaRequired": false,
-    "firstPublication": "first structured-output issue corrected; real preparation retry in progress, not confirmed published",
-    "existingProfilesUnchanged": true
+    "firstPublication": {
+      "status": "published",
+      "at": "2026-11-14T12:12:06.055Z",
+      "scheduledAt": "2026-11-14T12:12:00Z",
+      "url": "https://www.fabrything.com/blog/does-your-windows-laptop-support-le-audio-check-before-buying-earbuds-b07f165ede40",
+      "wordCount": 266,
+      "writerSeconds": 83.8,
+      "reviewSeconds": 25.1,
+      "facebook": "skipped",
+      "website": "confirmed",
+      "usage": "consumed"
+    },
+    "existingProfilesUnchanged": true,
+    "sourceScope": "Official documentation only for guide prose. Catalog models shown as separate examples with a scope notice; model-specific prose needs attributable model-specific documentation. The guard runs before model review and again before delivery.",
+    "model": {
+      "writer": "gemma3:4b-it-q4_K_M",
+      "reviewer": "gemma3:4b-it-q4_K_M",
+      "automaticQwenFallback": false,
+      "reason": "Observed unsupported Qwen claims on the real source guide; preserve safe admission instead of falling back.",
+      "maxOutputTokens": 1200,
+      "writerBudgetSeconds": 480,
+      "reviewBudgetSeconds": 240,
+      "totalBudgetSeconds": 1080
+    },
+    "writerContract": "Four plain prose paragraphs; worker-owned headings, metadata and product/image blocks. Compact JSON only for review. Source/scope/completeness checks remain before delivery.",
+    "verification": {
+      "canonical": true,
+      "completeArticle": true,
+      "articleSchema": true,
+      "imagesLoaded": 3,
+      "desktopWidth": 1440,
+      "mobileWidth": 390,
+      "overflow": false,
+      "browserErrors": 0,
+      "sitemapUrls": 905,
+      "signedReceipt": true
+    }
   },
   "nobleSeekCleanup": {
     "at": "2026-11-14",
-    "archived": 494,
+    "archived": 504,
     "remainingAttention": 7,
     "humanSafetyReview": 3,
     "confirmedWebsiteSummaryReview": 4,
     "hardDeleted": 0,
-    "sourceHistoryRetained": true
+    "sourceHistoryRetained": true,
+    "lastChecked": "2026-11-14T11:53:20Z"
   }
 }
