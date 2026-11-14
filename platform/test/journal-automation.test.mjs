@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {journalTopicKey,prepareJournalResearch,trustedJournalURL,relevantJournalTopic,journalPassages} from '../server/journal-research.mjs';
 import {websiteConfigurationProblem,automaticDestination} from '../shared/destinations.mjs';
-import {websitePublicationFailure} from '../server/website-publication.mjs';
+import {websitePublicationFailure,publishWebsiteArticle} from '../server/website-publication.mjs';
 import {journalSlug} from '../server/journal.mjs';
 import {readFabrythingCatalog} from '../server/fabrything.mjs';
 import {normalizeProduct} from '../server/catalog.mjs';
@@ -14,6 +14,11 @@ const topic={key:'compatibility',title:'Choosing compatible Bluetooth headphones
 const plan={automation:{trustedHosts:['example.com'],topics:[topic]}};
 const product={external_id:'real-store-id',title:'Bluetooth Headphones',available:true,url:'https://www.fabrything.com/product/headphones',image_url:'https://www.fabrything.com/image.webp',attributes:{specifications:{Connector:'Bluetooth',Price:'forbidden'}}};
 const readSource=async s=>({...s,paragraphs:Array.from({length:5},(_,i)=>'Bluetooth headphones compatibility depends on the supported audio profiles and both devices. Check the manufacturer documentation before choosing an accessory. Features are not supported on every device. This is source paragraph '+i+'.')});
+
+test('the global publishing stop also blocks website delivery before database or network access',async()=>{
+ const prior=process.env.PLATFORM_PUBLISHING_ENABLED;process.env.PLATFORM_PUBLISHING_ENABLED='false';
+ try{await assert.rejects(publishWebsiteArticle({}),/Live publishing is disabled/);}finally{if(prior===undefined)delete process.env.PLATFORM_PUBLISHING_ENABLED;else process.env.PLATFORM_PUBLISHING_ENABLED=prior;}
+});
 
 test('automatic website destinations require an actual journal configuration, not Facebook verification',()=>{
  const page={destination_type:'website',kind:'blog',website_publishing:true,website_id:'site',creative_policy:{journal:{enabled:true}}};

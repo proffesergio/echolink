@@ -6,12 +6,14 @@ import {reservePublication} from './quotas.mjs';
 import {deliveryState} from './publication-state.mjs';
 import {publishJournal} from './journal.mjs';
 import {websiteConfigurationProblem} from '../shared/destinations.mjs';
+import {env} from './env.mjs';
 
 export function websitePublicationFailure(error,{submitted=false,confirmed=false}={}){
  const unknown=confirmed||submitted&&!error.definiteRejection;
  return {unknown,message:confirmed?'The website saved the article; public or local confirmation needs reconciliation. Do not republish.':unknown?'Website delivery needs reconciliation after an interrupted response. Do not republish.':error.status?error.message:'Website publication failed before submission.'};
 }
 export async function publishWebsiteArticle(task,{updateTask,publish=publishJournal}={}){
+ if(!env().publishing)throw new AppError(409,'Live publishing is disabled in this environment.');
  const w=task.workspace_id;
  const state=await transaction(w,async db=>{
   await workspaceLock(db,w);
