@@ -428,7 +428,7 @@ export async function runOne({publishOnly=false,excludePublish=false,taskId=null
  }
  return true;
 }
-export async function recoverExpiredTasks(){return transaction(null,async client=>{
+export async function recoverExpiredTasks({transact=transaction}={}){return transact(null,async client=>{
  const stale=(await client.query("SELECT * FROM creator.tasks WHERE status='running' AND lease_until<now() FOR UPDATE")).rows;
  // Text preparation is resumable and has no external publication side effect.
  // Preserve its post/checkpoints; delivery jobs still require reconciliation.
@@ -438,7 +438,7 @@ export async function recoverExpiredTasks(){return transaction(null,async client
  for(const task of stale.filter(t=>t.kind==='notify_approval'))await client.query("UPDATE creator.approval_notifications SET status='unknown',last_error='Worker interrupted during notification; check destination' WHERE workspace_id=$1 AND id=$2 AND status='sending'",[task.workspace_id,task.input.notificationId]);
  for(const task of stale.filter(t=>t.kind==='post_link_comment')){await client.query("UPDATE creator.link_comments SET status='unknown',last_error='Worker interrupted during comment submission; check Facebook' WHERE workspace_id=$1 AND id=$2 AND status='publishing'",[task.workspace_id,task.input.commentId]);}
  for(const task of stale.filter(t=>t.kind==='manual_handoff'))await client.query("UPDATE creator.tasks SET status='queued',phase='Resuming profile handoff',started_at=NULL,lease_until=NULL WHERE id=$1",[task.id]);
- for(const task of stale.filter(t=>!['manual_handoff','publish_instagram','generate','write_article'].includes(t.kind))){await client.query("UPDATE creator.tasks SET status='unknown',phase='Worker interrupted; review before retry',finished_at=now() WHERE id=$1",[task.id]);if(task.kind==='publish'){await client.query("UPDATE creator.posts SET status='unknown',last_error='Worker interrupted; reconcile Facebook and website before retrying.' WHERE workspace_id=$1 AND id=$2 AND status='publishing'",[task.workspace_id,task.post_id]);await client.query("UPDATE creator.publish_attempts SET outcome='unknown' WHERE workspace_id=$1 AND task_id=$2 AND outcome='started'",[task.workspace_id,task.id]);await client.query("UPDATE creator.usage_reservations SET status='unknown' WHERE workspace_id=$1 AND post_id=$2 AND status='reserved'",[task.workspace_id,task.post_id]);}}
+ for(const task of stale.filter(t=>!['manual_handoff','publish_instagram','generate','write_article','research_journal'].includes(t.kind))){await client.query("UPDATE creator.tasks SET status='unknown',phase='Worker interrupted; review before retry',finished_at=now() WHERE id=$1",[task.id]);if(task.kind==='publish'){await client.query("UPDATE creator.posts SET status='unknown',last_error='Worker interrupted; reconcile Facebook and website before retrying.' WHERE workspace_id=$1 AND id=$2 AND status='publishing'",[task.workspace_id,task.post_id]);await client.query("UPDATE creator.publish_attempts SET outcome='unknown' WHERE workspace_id=$1 AND task_id=$2 AND outcome='started'",[task.workspace_id,task.id]);await client.query("UPDATE creator.usage_reservations SET status='unknown' WHERE workspace_id=$1 AND post_id=$2 AND status='reserved'",[task.workspace_id,task.post_id]);}}
  return stale.length;
 },{owner:true});}
 export async function continuePipeline(task,result,{transact=transaction,queue=enqueue,capacity=requireGenerationCapacity,notify=queueApprovalNotification,publication=queuePublication}={}){

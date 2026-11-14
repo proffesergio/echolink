@@ -8,6 +8,7 @@ import {readFabrythingCatalog} from '../server/fabrything.mjs';
 import {normalizeProduct} from '../server/catalog.mjs';
 import {readFile,readdir} from 'node:fs/promises';
 import {queuePublication} from '../server/planner.mjs';
+import {recoverExpiredTasks} from '../server/jobs.mjs';
 
 const source={title:'Audio compatibility documentation',url:'https://www.example.com/audio'};
 const topic={key:'compatibility',title:'Choosing compatible Bluetooth headphones',keyword:'Bluetooth headphones compatibility',problem:'Check compatibility before ordering',intent:'buying_guide',sources:[source,{...source,url:'https://www.example.com/manual'}]};
@@ -86,5 +87,9 @@ test('website-only scheduling uses real bridge readiness and preserves unknown r
   const uncertain=(await db.query('SELECT * FROM creator.posts WHERE id=$1',[post.id])).rows[0];
   await assert.rejects(queuePublication(db,w,null,page,uncertain,{autoPick:true}),/Restore or reconcile/);
   assert.equal((await db.query('SELECT status FROM creator.usage_reservations WHERE post_id=$1',[post.id])).rows[0].status,'unknown');
+  const research=(await db.query("INSERT INTO creator.tasks(workspace_id,page_id,kind,status,lease_until,result) VALUES($1,$2,'research_journal','running',now()-interval '1 minute',$3) RETURNING id",[w,page.id,JSON.stringify({postId:post.id})])).rows[0];
+  await recoverExpiredTasks({transact:async(_w,fn)=>fn(db)});
+  const resumed=(await db.query('SELECT status,result FROM creator.tasks WHERE id=$1',[research.id])).rows[0];
+  assert.equal(resumed.status,'queued');assert.equal(resumed.result.postId,post.id);
  }finally{await db.close();}
 });
