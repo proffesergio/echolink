@@ -36,7 +36,7 @@ EchoLink supports source-grounded Bengali news articles and social captions, wit
 
 Commerce workflows turn catalogue products into branded content and keep a durable publishing history as the active catalogue advances. Captions omit product prices and direct customers to the website for the updated price. Brand-led artwork supports coordinated background variations, headline treatments, pointer accents and licensed custom fonts.
 
-For connected stores, focused journal guides bring together reader problems, product comparisons, useful accessories and attributable sources. Structured product cards, clear affiliate disclosures and responsive article layouts support a consistent reading and shopping experience. Journal publishing is opt-in and depends on the configured website and editorial workflow.
+For connected stores, focused journal guides bring together reader problems, product comparisons, useful accessories and attributable sources. Structured product cards, clear affiliate disclosures and responsive article layouts support a consistent reading and shopping experience. Website-only profiles can research, write, review and schedule guides through a signed publishing connection, with saved drafts and delivery receipts. Journal publishing is opt-in and depends on the configured website and editorial workflow.
 
 Facebook and Instagram delivery depend on the connected account, permissions and supported content type. Personal-profile workflows use a manual sharing handoff. Editorial checks support a team's judgment; they do not independently verify every fact or guarantee a platform's monetization eligibility.
 

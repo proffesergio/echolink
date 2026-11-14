@@ -435,5 +435,30 @@
       "lastError": null,
       "synthetic": false
     }
+  },
+  "fabrythingBlog": {
+    "status": "live",
+    "profileName": "Fabrything Blog",
+    "destination": "https://www.fabrything.com/blog",
+    "sourceRelease": "ca3a607",
+    "storeRelease": "8d0625b",
+    "migration": 22,
+    "language": "English",
+    "dailyCap": 2,
+    "gapMinutes": 720,
+    "timezone": "America/New_York",
+    "signedBridgeVerified": true,
+    "metaRequired": false,
+    "firstPublication": "first structured-output issue corrected; real preparation retry in progress, not confirmed published",
+    "existingProfilesUnchanged": true
+  },
+  "nobleSeekCleanup": {
+    "at": "2026-11-14",
+    "archived": 494,
+    "remainingAttention": 7,
+    "humanSafetyReview": 3,
+    "confirmedWebsiteSummaryReview": 4,
+    "hardDeleted": 0,
+    "sourceHistoryRetained": true
   }
 }

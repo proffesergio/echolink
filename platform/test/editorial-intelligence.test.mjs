@@ -8,6 +8,12 @@ import {clusterStories,shortlistStories,parseRankedChoice,rankStories,researchSt
 import {analyzeReferences} from '../server/reference-analysis.mjs';
 import {generateFactualCaption,captionLanguageWarnings} from '../server/caption-generation.mjs';
 import {validate} from '../server/validation.mjs';
+test('product identifiers are not estimated quantities and a denied guarantee is not an endorsement',()=>{
+ const facts={text:'HE05X headphones. Battery life is about 5 hours.'};
+ assert.deepEqual(editorialWarnings('HE05X compatibility is not guaranteed.',facts),[]);
+ assert(editorialWarnings('Battery life is 5 hours.',facts).some(w=>w.startsWith('Source qualification')));
+ assert(editorialWarnings('HE05X offers guaranteed compatibility.',facts).some(w=>w.startsWith('Urgency')));
+});
 test('audience copy removes Bengali/English delivery instructions without touching real news facts',()=>{
  const text='ঢাকায় নতুন প্রকল্পের কাজ শুরু হয়েছে।\n৫ মিনিট পর ওয়েবসাইটে লিঙ্কসহ প্রথম কমেন্ট অটোমেটিক হবে।\nবিস্তারিত প্রথম কমেন্টে 👇';
  const clean=cleanPublicCopy(text);assert.equal(clean.caption,'ঢাকায় নতুন প্রকল্পের কাজ শুরু হয়েছে।\n\nবিস্তারিত প্রথম কমেন্টে 👇');assert.equal(clean.removed.length,1);

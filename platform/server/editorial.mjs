@@ -14,8 +14,11 @@ export function editorialWarnings(caption,facts,niche=''){
  if(extra.length)warnings.push('Check numbers absent from the supplied facts: '+extra.join(', '));
  const approximate=/(?:প্রায়|প্রায়|আনুমানিক|approximately|roughly|about)\s+([^।.!?"\n]{1,45})/giu;
  const qualifiedNumbers=[...source.matchAll(approximate)].flatMap(m=>sourceNumbers(m[1]));
- if(qualifiedNumbers.some(n=>sourceNumbers(output).includes(n))&&!/(?:প্রায়|প্রায়|আনুমানিক|approximately|roughly|about)/iu.test(output))warnings.push('Source qualification: preserve approximately/about when repeating an estimated quantity.');
- if(/limited time|hurry|selling fast|best.?seller|guaranteed|free shipping|সীমিত সময়|স্টক শেষ|স্টক সীমিত|নিশ্চয়তা/i.test(output)&&!/limited time|hurry|selling fast|best.?seller|guaranteed|free shipping|সীমিত সময়|স্টক শেষ|স্টক সীমিত|নিশ্চয়তা/i.test(source))warnings.push('Urgency, popularity or guarantees need source support.');
+ // Alphanumeric product identifiers are not repeated estimated quantities.
+ const quantities=output.replace(/\b[A-Za-z][A-Za-z0-9-]*\d[A-Za-z0-9-]*\b/g,'');
+ if(qualifiedNumbers.some(n=>sourceNumbers(quantities).includes(n))&&!/(?:প্রায়|প্রায়|আনুমানিক|approximately|roughly|about)/iu.test(output))warnings.push('Source qualification: preserve approximately/about when repeating an estimated quantity.');
+ const assertions=output.replace(/\b(?:not|never)\s+guaranteed\b|\bcannot\s+be\s+guaranteed\b/gi,'');
+ if(/limited time|hurry|selling fast|best.?seller|guaranteed|free shipping|সীমিত সময়|স্টক শেষ|স্টক সীমিত|নিশ্চয়তা/i.test(assertions)&&!/limited time|hurry|selling fast|best.?seller|guaranteed|free shipping|সীমিত সময়|স্টক শেষ|স্টক সীমিত|নিশ্চয়তা/i.test(source))warnings.push('Urgency, popularity or guarantees need source support.');
  if(/#(?:mens|womens|kids|children)/i.test(output)&&!/(men|women|kids|children|পুরুষ|মহিলা|শিশু)/i.test(source+' '+niche))warnings.push('Audience or gender hashtags were inferred; review their relevance.');
  if(/https?:\/\//i.test(output))warnings.push('An external URL was generated; automatic link sharing is disabled.');
  const sourceYears=new Set(source.match(/\b(?:19|20)\d{2}\b/g)||[]);if(sourceYears.size>1&&/elected|election|নির্বাচিত|নির্বাচন/i.test(output)&&[...sourceYears].some(y=>!output.includes(y)))warnings.push('The source mentions several years. Check that historical election results are not described as current.');

@@ -2,11 +2,17 @@
 
 Read this page first; `PROJECT_MEMORY.json` maps files and relationships.
 
-## Fabrything Blog — November14 (activation in progress)
+## Fabrything Blog — November14 (live)
 
 - Owner authorized a separate website-only Fabrything Blog profile, automatic English writing/review/scheduling/publication and production CI/CD. Scope, source pool, model routing, delivery protections and verification: `docs/FABRYTHING_BLOG_ACTIVATION.md`.
-- Verified supplied Fabrything database URL; migrations already applied. Fresh backups completed for both databases. SQL022 is now applied only to the active `echolink_live` primary. New profile/rule are disabled pending checked worker and signed production bridge health; five real topic levels are configured, no test articles seeded.
+- Verified supplied Fabrything database URL; migrations already applied. Fresh backups completed for both databases. SQL022 is now applied only to the active `echolink_live` primary. The new profile/rule were enabled after both checked deployments and signed production bridge health succeeded. Five real topic levels are configured; no synthetic articles were seeded.
 - Securely added four dedicated production blog bridge settings, preserving existing database/storage/app settings. Meta is unnecessary for website-only publishing. Separate image/WhatsApp worker remains pending its own credentials.
+- EchoLink source144c3bb/6251afb: GitHub test/deploy and native Vercel SUCCESS. Fabrything8d0625b: frontend and backend native Vercel SUCCESS. Graceful worker activation completed, queued work retained; public dashboard reports journalBridgeVersion2 and all seven operations services are healthy. The first real preparation exposed unconstrained writer structure; ca3a607 adds schema-constrained output, meaningful stage labels and source-bound checkpoints so a review retry does not regenerate the article. Eleven focused checks pass (one optional database skip). The real brief exposed unsupported product-compatibility conclusions and remains held. A bounded factual correction/review pass and precise quantity/negation checks pass282 portable tests; no first publication has been confirmed.
+
+## NobleSeek backlog cleanup — November14
+
+- Owner requested removal of incomplete unpublished items unless awaiting admin approval. Backed up candidate records privately, then archived494 records, retaining source hashes/history. Seven attention items remain: three safety reviews requiring a human and four confirmed website articles whose Facebook summaries need correction. Published307 at audit, one scheduled delivery and active work were preserved. No post was republished or hard-deleted.
+- Live indexing recheck: apex308 to www; www homepage200, canonical www, index/follow; robots/sitemap200 and899 canonical www sitemap URLs. The supplied Search Console report covers only the redirecting apex, whose exclusion is expected. Do not claim43 URLs became indexed or that Google recrawled them.
 
 ## Live activation — November14
 
