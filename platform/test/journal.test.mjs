@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
-import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle,journalProductScopeWarnings} from '../server/journal.mjs';
+import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle,journalProductScopeWarnings,journalText} from '../server/journal.mjs';
 const w='11111111-1111-4111-8111-111111111111',p='22222222-2222-4222-8222-222222222222',postId='33333333-3333-4333-8333-333333333333';
 const fixture=()=>({version:'fabrything-journal-v1',sourceKey:[w,p,postId].join(':'),workspaceId:w,pageId:p,title:'Choose a compatible accessory',slug:'compatible-accessory',excerpt:'Check the manual before ordering.',seoTitle:'Accessory compatibility',seoDescription:'How to check a connector.',keyword:'compatible connector',problem:'Avoid an incompatible connector',audience:'Shoppers',intent:'buying_guide',clusterSlug:'accessories',tags:['accessories'],sources:[{title:'Manual',url:'https://example.com/manual'}],products:[],blocks:[{type:'heading',text:'Check the manual'},{type:'paragraph',text:'Read the supplied connector documentation before choosing an accessory.'},{type:'image',alt:'Connector dimensions in the manual',width:1200,height:675}],editorial:{reviewed:true},publish:true});
 const secret='test-only-'.repeat(5),connection={config:{url:'https://www.fabrything.com'},secret:{apiKey:secret}},site={url:'https://www.fabrything.com'};
@@ -11,6 +11,11 @@ test('general technology documentation cannot validate catalog-model compatibili
  assert(journalProductScopeWarnings('Lenovo does not support this feature.',products,source).length);
  assert.deepEqual(journalProductScopeWarnings('Check manufacturer compatibility documentation before buying.',products,source),[]);
  assert.deepEqual(journalProductScopeWarnings('The HE05X is documented here.',products,'Official HE05X documentation.'),[]);
+});
+test('a model-approved payload still cannot submit unsupported catalog compatibility prose',async()=>{
+ const payload=fixture();payload.products=[{id:'real-example',title:'Lenovo HE05X Bluetooth Neckband',platform:'fabrything',url:'https://example.com/product',sourceUrl:'https://example.com/product',imageAlt:'Catalog example',specs:{}}];payload.blocks.push({type:'paragraph',text:'The HE05X uses Classic Audio and cannot support LE Audio.'});
+ const prepared=post(payload);prepared.body='General LE Audio documentation describes requirements for supported devices.';prepared.seo.article.text=journalText(payload.blocks);prepared.seo.journal.sourceHash=journalSourceHash(prepared);
+ let requests=0;await assert.rejects(publishJournal(connection,site,prepared,{send:async()=>{requests++;}}),/model-specific source documentation/);assert.equal(requests,0);
 });
 function post(payload=fixture()){return {id:postId,workspace_id:w,page_id:p,title:payload.title,seo:{article:{text:'Check the manual\n\nRead the supplied connector documentation before choosing an accessory.'},journal:{payload,reviewedHash:journalHash(payload),sourceHash:journalSourceHash({})}}};}
 
