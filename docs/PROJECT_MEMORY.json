@@ -407,7 +407,7 @@
   "workflowContinuity": {
     "date": "2026-11-14",
     "handoff": "docs/WORKFLOW_CONTINUITY_2026-11-14.md",
-    "status": "Live migrations and graceful worker activation complete; observing normal scheduling",
+    "status": "Live activation verified through real Fabrything automatic scheduling",
     "observedMigrations": 21,
     "requiredMigrations": 21,
     "verification": "272 portable +24 disposable SQL checks +63 root; isolated build; scoped tab browser QA1440/390; no external writes or inference",
@@ -420,6 +420,15 @@
     "memoryFallback": "Gemma cold-load admission exceeded current free RAM. Enabled existing local automatic fallback to installed echotent:qwen3-4b; primary/task routing, emergency guard and single-inference lane preserved.13 resource tests pass.",
     "database": "Local PostgreSQL18 port55432 databaseecholink_live; echolink_local is a separate prepared database",
     "storeWorker": "Owner will add original database/R2 and Meta settings to sibling fabrythingweb/.env.local; credentials not yet available.",
-    "remaining": "Three Fabrything preparations queued; Gemma/Qwen memory admission still defers when free RAM is insufficient. Noble Seek successor hit its bounded writing time budget; next real source continues automatically. No target-throughput claim."
+    "remaining": "Additional preparation can defer when free RAM falls below admission estimates. Daily throughput is not guaranteed. Store image/WhatsApp worker awaits original private service settings.",
+    "liveScheduling": {
+      "verifiedAt": "2026-11-14T06:25:06Z",
+      "page": "Fabrything",
+      "status": "scheduled",
+      "scheduledFor": "2026-11-14T06:36:00Z",
+      "editorialWarnings": 0,
+      "lastError": null,
+      "synthetic": false
+    }
   }
 }
