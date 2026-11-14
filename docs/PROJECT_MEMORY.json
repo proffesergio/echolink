@@ -413,6 +413,9 @@
     "verification": "272 portable +24 disposable SQL checks +63 root; isolated build; scoped tab browser QA1440/390; no external writes or inference",
     "restartAuthorized": false,
     "liveConfigChanged": false,
-    "personalProfile": "Review required; routine disabled; routed text available; no image-generation connection; manual sharing"
+    "personalProfile": "Review required; routine disabled; routed text available; no image-generation connection; manual sharing",
+    "sourceCommit": "1e3e343",
+    "ci": "Actions43561162279 test/deploy SUCCESS; native Vercel8HjJCFiGKBQYyDAHTAWeXMq33N1s SUCCESS; dashboard200",
+    "activation": "Restart exception requested and pending; no migrations/config changes or live restart performed"
   }
 }

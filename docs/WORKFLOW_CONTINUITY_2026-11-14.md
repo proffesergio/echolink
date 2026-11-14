@@ -27,6 +27,8 @@ Designed studio typography/image composition works without an image-provider tok
 
 ## Activation awaiting the owner's restart exception
 
+Implementation source1e3e343 is pushed to main. GitHub Actions43561162279 completed successfully, including test and deploy; native Vercel deployment8HjJCFiGKBQYyDAHTAWeXMq33N1s also succeeded. The live dashboard returns200 with entry`index-Cf3rlN1y.js`. The existing persistent worker still returns the old health payload without lifecycle/continuity markers. The owner has been asked for the specific graceful activation exception; no answer is inferred from elapsed time. Later documentation-only commits do not activate that worker.
+
 No live server, daemon, database, inference host, bridge or worker was stopped or restarted. No production EchoLink migration or Page/rule configuration change has been applied. The user previously prohibited live interruptions, so source/CI delivery alone cannot complete runtime activation.
 
 The concrete proposed activation is migrations017–021 followed by the existing graceful drain/restart of the EchoLink worker/bridge supervisor. Active work must finish; uncertain receipts remain held; PostgreSQL and Ollama stay running. Apply only Fabrything's requested planning changes: preserve target50, buffer24h and minimum gap20m; use spread scheduling across the day, disable its overnight-only generation preference, and prepare small batches of three. Preserve all custom prompts/languages/connections and held content. Noble Seek keeps its24-hour live-news mode and24-hour source-age allowance. The personal routine remains paused with manual approval until deliberately enabled.
