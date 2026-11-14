@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
-import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle,journalProductScopeWarnings,journalText} from '../server/journal.mjs';
+import {journalSchema,journalHash,journalSourceHash,journalSignature,publishJournal,generateJournalArticle,journalProductScopeWarnings,journalProseWarnings,journalText} from '../server/journal.mjs';
 const w='11111111-1111-4111-8111-111111111111',p='22222222-2222-4222-8222-222222222222',postId='33333333-3333-4333-8333-333333333333';
 const fixture=()=>({version:'fabrything-journal-v1',sourceKey:[w,p,postId].join(':'),workspaceId:w,pageId:p,title:'Choose a compatible accessory',slug:'compatible-accessory',excerpt:'Check the manual before ordering.',seoTitle:'Accessory compatibility',seoDescription:'How to check a connector.',keyword:'compatible connector',problem:'Avoid an incompatible connector',audience:'Shoppers',intent:'buying_guide',clusterSlug:'accessories',tags:['accessories'],sources:[{title:'Manual',url:'https://example.com/manual'}],products:[],blocks:[{type:'heading',text:'Check the manual'},{type:'paragraph',text:'Read the supplied connector documentation before choosing an accessory.'},{type:'image',alt:'Connector dimensions in the manual',width:1200,height:675}],editorial:{reviewed:true},publish:true});
 const secret='test-only-'.repeat(5),connection={config:{url:'https://www.fabrything.com'},secret:{apiKey:secret}},site={url:'https://www.fabrything.com'};
@@ -11,6 +11,13 @@ test('general technology documentation cannot validate catalog-model compatibili
  assert(journalProductScopeWarnings('Lenovo does not support this feature.',products,source).length);
  assert.deepEqual(journalProductScopeWarnings('Check manufacturer compatibility documentation before buying.',products,source),[]);
  assert.deepEqual(journalProductScopeWarnings('The HE05X is documented here.',products,'Official HE05X documentation.'),[]);
+});
+test('truncated sentences and serialized response fragments cannot pass reviewed delivery',async()=>{
+ assert(journalProseWarnings([{type:'paragraph',text:'This sentence ends part-way through the'}]).length);
+ assert(journalProseWarnings([{type:'paragraph',text:'A source claim.”} , { Next claim.'}]).length);
+ assert.deepEqual(journalProseWarnings([{type:'heading',text:'Check support'},{type:'paragraph',text:'Support may depend on drivers.'},{type:'verdict',text:'Check the manufacturer’s documentation.'}]),[]);
+ const payload=fixture();payload.blocks[1].text='This generated paragraph was cut mid-sentence';const prepared=post(payload);prepared.seo.article.text=journalText(payload.blocks);
+ let requests=0;await assert.rejects(publishJournal(connection,site,prepared,{send:async()=>{requests++;}}),/complete sentence/);assert.equal(requests,0);
 });
 test('a model-approved payload still cannot submit unsupported catalog compatibility prose',async()=>{
  const payload=fixture();payload.products=[{id:'real-example',title:'Lenovo HE05X Bluetooth Neckband',platform:'fabrything',url:'https://example.com/product',sourceUrl:'https://example.com/product',imageAlt:'Catalog example',specs:{}}];payload.blocks.push({type:'paragraph',text:'The HE05X uses Classic Audio and cannot support LE Audio.'});
@@ -29,6 +36,9 @@ test('structured writing checkpoints survive a review interruption without anoth
  assert(checkpoint);assert(phases.some(p=>p.includes('reviewing')));
  const calls=[];const result=await generateJournalArticle({page,post:prepared,connection:{config:{}},secret:{}},{savedDraft:checkpoint,complete:async(_c,_s,_prompt,o)=>{calls.push(o.purpose);return JSON.stringify({supported:true,contextComplete:true,issues:[]});}});
  assert.deepEqual(calls,['journal_review']);assert(result.journal?.reviewedHash);assert(result.journal.payload.blocks.some(b=>b.type==='image'&&b.src));
+ const shaped={excerpt:draft.excerpt,lead:'Read the documentation before deciding whether a replacement accessory addresses the problem.',sections:[{heading:'**Check compatibility**',paragraph:draft.blocks[1].text},{heading:'Make a supported choice',paragraph:draft.blocks[3].text}],verdict:'Confirm the documented requirements before buying.'};
+ const structured=await generateJournalArticle({page,post:prepared,connection:{config:{}},secret:{}},{complete:async(_c,_s,_prompt,o)=>JSON.stringify(o.purpose==='journal_article'?shaped:{supported:true,contextComplete:true,issues:[]})});
+ assert(structured.journal?.reviewedHash);assert.equal(structured.journal.payload.blocks.filter(b=>b.type==='heading').length,2);assert.equal(structured.journal.payload.blocks.find(b=>b.type==='heading').text,'Check compatibility');
  const correctionCalls=[];let reviews=0;const corrected=await generateJournalArticle({page,post:prepared,connection:{config:{}},secret:{}},{savedDraft:checkpoint,complete:async(_c,_s,_prompt,o)=>{correctionCalls.push(o.purpose);return JSON.stringify(o.purpose==='journal_article'?draft:++reviews===1?{supported:false,contextComplete:true,issues:['A product claim needs correction']}:{supported:true,contextComplete:true,issues:[]});}});
  assert.deepEqual(correctionCalls,['journal_review','journal_article','journal_review']);assert(corrected.journal?.reviewedHash);
  const heldCalls=[];const held=await generateJournalArticle({page,post:prepared,connection:{config:{}},secret:{}},{savedDraft:checkpoint,complete:async(_c,_s,_prompt,o)=>{heldCalls.push(o.purpose);return JSON.stringify(o.purpose==='journal_article'?draft:{supported:false,contextComplete:false,issues:['Unresolved source limitation']});}});assert.equal(held.hold,true);assert.equal(heldCalls.filter(p=>p==='journal_article').length,1);
